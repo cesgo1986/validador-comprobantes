@@ -145,15 +145,7 @@ def extract_field_value(campo) -> str | None:
 
 
 def clean_clave_rastreo(clave: str) -> str:
-    """
-    Limpia la clave de rastreo:
-    - Elimina espacios
-    - Elimina caracteres no alfanuméricos al final (ej: 'I', 'l', 'O')
-    - Corrige confusiones comunes de OCR: I→1, l→1, O→0
-    """
-    clave = clave.strip()
-    # Corregir OCR al final: I o l sueltos al final → 1, O → 0
-    clave = re.sub(r'[Il]
+    return clave.strip()
 
 
 @app.post("/analizar")
