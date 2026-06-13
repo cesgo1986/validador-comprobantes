@@ -75,15 +75,27 @@ def build_system_prompt(fecha_hoy: str, fecha_legible: str, banco_hint: str, cla
         "- NO confirmes que una transferencia ocurrio realmente.\n"
         "- NO afirmes que el dinero fue recibido.\n"
         "- Evalua unicamente la evidencia presente en el comprobante.\n"
-        "- Los numeros ocultos con asteriscos (****1234) son NORMALES en Mexico.\n"
-        "- El diseno visual NO es evidencia suficiente para identificar un banco.\n"
-        "- Identifica bancos UNICAMENTE por texto visible, nunca por colores o tipografia.\n"
-        "- Si un dato no puede determinarse con seguridad, devuelve null.\n"
-        "- La leyenda 'Datos no verificados por esta institucion' es NORMAL y estandar en transferencias SPEI. NO la marques como riesgo.\n"
-        "- El concepto de pago puede ser cualquier texto libre (tacos, renta, pago, etc.) o estar ausente. NO lo uses como indicador de riesgo.\n"
-        "- NO inferas inconsistencia entre el tipo de cuenta origen y el concepto del pago. Una cuenta de nomina puede pagar cualquier concepto.\n"
-        "- Comprobantes con fechas pasadas son NORMALES. Solo marca como sospechoso si la fecha es futura.\n"
-        "- La clave de rastreo SPEI puede terminar en letra (ej: ...262I). Esto es VALIDO y estandar.\n\n"
+        "- Si un dato no puede determinarse con seguridad, devuelve null.\n\n"
+        "REGLAS SOBRE FORMATOS VALIDOS EN MEXICO:\n"
+        "- Numeros de cuenta ocultos con asteriscos (****1234), puntos (•4023) o cualquier mascara son NORMALES. NO los marques como error.\n"
+        "- El diseno visual NO identifica un banco. Usa SOLO el texto visible.\n"
+        "- La clave de rastreo SPEI puede ser alfanumerica y terminar en letra (ej: 260608077756961262I, MBAN010026061500901361189). Longitudes entre 16 y 25 caracteres son VALIDAS. NO marques esto como error.\n"
+        "- Claves de rastreo solo numericas (ej: 08590066034031646) tambien son VALIDAS.\n"
+        "- La diferencia de segundos entre fecha de aceptacion y fecha de liquidacion es NORMAL en SPEI. NO la marques como sospechosa.\n"
+        "- Comprobantes con fechas pasadas son NORMALES. El usuario puede estar verificando una transferencia anterior. Solo marca como sospechoso si la fecha es FUTURA.\n"
+        "- La leyenda 'Datos no verificados por esta institucion' es ESTANDAR en transferencias SPEI. Significa que el banco receptor aun no confirma, NO es senal de fraude.\n"
+        "- El concepto de pago puede ser CUALQUIER texto libre (tacos, renta, gasolina, etc.) o estar ausente. Es opcional en SPEI. NO lo uses como indicador de riesgo.\n"
+        "- NO inferas inconsistencia entre el tipo de cuenta origen y el concepto del pago. Una cuenta de nomina puede pagar tacos, renta o cualquier concepto.\n"
+        "- El campo 'cuenta origen' o 'realizado con' muestra la cuenta DEL EMISOR, no del receptor. No confundas ambos campos.\n"
+        "- Capturas de pantalla recortadas son NORMALES. El usuario puede haber cortado el encabezado o pie de pagina. No lo marques como señal de fraude.\n"
+        "- Nombres de cuenta como 'Switch Banamex', 'Nomina', 'Debito' seguidos de digitos parciales son FORMATOS VALIDOS de los bancos mexicanos.\n"
+        "- Un asterisco al final de un nombre (ej: 'Cesar Gomez Montañez *') es formato valido de algunas apps bancarias.\n\n"
+        "REGLAS SOBRE LO QUE SI DEBES MARCAR COMO RIESGO:\n"
+        "- Fecha futura (posterior a hoy).\n"
+        "- Monto en cero o negativo.\n"
+        "- Campos criticos completamente ausentes (monto, fecha, banco).\n"
+        "- Evidencia visual clara de edicion: pixelacion localizada en monto o fecha, fuentes mixtas en el mismo campo, elementos pegados.\n"
+        "- Referencias o folios con valores genericos (000000, 123456, 111111).\n\n"
         "CRITERIOS DE ANALISIS:\n"
         "1. ESTRUCTURAL: Consistencia de folios, referencias, montos, fechas, horas, campos obligatorios.\n"
         "2. SEMANTICO: Coherencia entre texto y operacion, banco y terminologia, conceptos y formato.\n"
@@ -185,7 +197,8 @@ async def verify_cep(clave_rastreo: str, referencia: str, fecha: str, monto: flo
         if monto_match_re and monto > 0:
             monto_cep = round(float(monto_match_re.group(1).replace(",", "")), 2)
             monto_comp = round(monto, 2)
-            match_monto = abs(monto_cep - monto_comp) < 0.05
+            # Tolerancia de 1 peso para cubrir diferencias de redondeo y formato
+            match_monto = abs(monto_cep - monto_comp) < 1.0
 
         confidence = 1.0 if match_monto else 0.7
         monto_txt = "Monto coincide" if match_monto else "Monto no coincide con el comprobante"
