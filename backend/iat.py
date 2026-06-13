@@ -1,86 +1,85 @@
 """
-IAT — Índice de Autenticidad Transaccional
-Motor matemático independiente de Claude.
-Calcula score de autenticidad basado en:
-  - Entropía de clave de rastreo
-  - Z-score de longitud de campos
-  - Rareza estadística por banco
-  - Coherencia temporal
-  - Patrones combinados
+IAT — Indice de Autenticidad Transaccional v2
+Motor matematico independiente de Claude.
 """
 
 import math
 import re
-from datetime import datetime, time
+from datetime import datetime
 from typing import Optional
 
 
 # ─────────────────────────────────────────────
-# ESTADÍSTICAS BASE POR BANCO
-# Longitudes esperadas de campos SPEI reales
-# (media y desviación estándar)
+# ESTADISTICAS BASE POR BANCO
 # ─────────────────────────────────────────────
 BANK_STATS = {
     "BBVA": {
         "referencia": {"mean": 7.0, "std": 1.5},
-        "clave_rastreo": {"mean": 18.0, "std": 2.0},
+        "clave_rastreo": {"mean": 19.0, "std": 3.0},
         "folio": {"mean": 8.0, "std": 2.0},
         "entropia_min": 2.5,
     },
     "SANTANDER": {
         "referencia": {"mean": 7.0, "std": 1.5},
-        "clave_rastreo": {"mean": 18.0, "std": 2.0},
+        "clave_rastreo": {"mean": 19.0, "std": 3.0},
         "folio": {"mean": 7.0, "std": 1.5},
         "entropia_min": 2.5,
     },
     "BANORTE": {
         "referencia": {"mean": 6.0, "std": 1.5},
-        "clave_rastreo": {"mean": 18.0, "std": 2.0},
+        "clave_rastreo": {"mean": 19.0, "std": 3.0},
         "folio": {"mean": 8.0, "std": 2.0},
         "entropia_min": 2.5,
     },
     "HSBC": {
         "referencia": {"mean": 7.0, "std": 1.5},
-        "clave_rastreo": {"mean": 18.0, "std": 2.0},
+        "clave_rastreo": {"mean": 19.0, "std": 3.0},
         "folio": {"mean": 7.0, "std": 1.5},
         "entropia_min": 2.5,
     },
     "AZTECA": {
-        "referencia": {"mean": 6.0, "std": 1.5},
-        "clave_rastreo": {"mean": 18.0, "std": 2.0},
+        "referencia": {"mean": 6.0, "std": 2.0},
+        "clave_rastreo": {"mean": 19.0, "std": 3.0},
         "folio": {"mean": 7.0, "std": 2.0},
         "entropia_min": 2.0,
     },
     "MERCADO PAGO": {
         "referencia": {"mean": 8.0, "std": 2.0},
-        "clave_rastreo": {"mean": 18.0, "std": 2.0},
+        "clave_rastreo": {"mean": 19.0, "std": 3.0},
         "folio": {"mean": 8.0, "std": 2.0},
         "entropia_min": 2.5,
     },
     "DEFAULT": {
         "referencia": {"mean": 7.0, "std": 2.0},
-        "clave_rastreo": {"mean": 18.0, "std": 2.5},
+        "clave_rastreo": {"mean": 19.0, "std": 3.0},
         "folio": {"mean": 7.0, "std": 2.0},
         "entropia_min": 2.0,
     },
 }
 
-# Horarios SPEI en México (hora local CST/CDT)
-SPEI_START = time(0, 0)   # 00:00
-SPEI_END   = time(23, 59) # 23:59
-SPEI_MAINTENANCE_START = time(22, 0)  # mantenimiento domingos
-SPEI_MAINTENANCE_END   = time(23, 59)
+# Leyendas estandar bancarias — NO son señal de fraude
+LEYENDAS_NORMALES = [
+    "datos no verificados por esta institucion",
+    "datos no verificados",
+    "no verificado por",
+    "informacion no verificada",
+    "pendiente de verificacion",
+    "este vinculo se activara",
+    "consulta el estatus en",
+    "transferencia liquidada",
+    "operacion liquidada",
+]
 
-# Días de semana (0=lunes, 6=domingo)
-WEEKEND_DAYS = {5, 6}  # sábado y domingo
+# Formato valido de clave de rastreo SPEI
+# Puede terminar en letra (ej: ...262I) — es valido
+CLAVE_RASTREO_PATTERN = re.compile(r'^[A-Z]{3,4}\d{6,}[A-Z0-9]*$', re.IGNORECASE)
 
 
 # ─────────────────────────────────────────────
-# FUNCIONES MATEMÁTICAS CORE
+# FUNCIONES MATEMATICAS CORE
 # ─────────────────────────────────────────────
 
 def entropy(s: str) -> float:
-    """Calcula la entropía de Shannon de un string."""
     if not s:
         return 0.0
     freq: dict = {}
@@ -93,14 +92,12 @@ def entropy(s: str) -> float:
 
 
 def z_score(x: float, mean: float, std: float) -> float:
-    """Calcula el Z-score normalizado."""
     if std == 0:
         return 0.0
     return (x - mean) / std
 
 
 def normalize_bank_name(banco: Optional[str]) -> str:
-    """Normaliza el nombre del banco para buscar en BANK_STATS."""
     if not banco:
         return "DEFAULT"
     banco_upper = banco.upper()
@@ -111,14 +108,12 @@ def normalize_bank_name(banco: Optional[str]) -> str:
 
 
 def clean_field(value: Optional[str]) -> str:
-    """Limpia un campo extraído."""
     if not value:
         return ""
     return re.sub(r"\s+", "", str(value)).strip()
 
 
 def parse_hour(hora: Optional[str]) -> Optional[int]:
-    """Extrae la hora de un string de tiempo."""
     if not hora:
         return None
     match = re.search(r"(\d{1,2}):", hora)
@@ -128,13 +123,13 @@ def parse_hour(hora: Optional[str]) -> Optional[int]:
 
 
 def parse_date(fecha: Optional[str]) -> Optional[datetime]:
-    """Intenta parsear una fecha en varios formatos."""
     if not fecha:
         return None
     formats = [
         "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y",
         "%d/%b/%Y", "%d de %B de %Y",
         "%d/%m/%y", "%Y/%m/%d",
+        "%d/%b/%y",
     ]
     meses = {
         "enero": "January", "febrero": "February", "marzo": "March",
@@ -156,22 +151,33 @@ def parse_date(fecha: Optional[str]) -> Optional[datetime]:
     return None
 
 
+def normalize_monto(monto_str: str) -> float:
+    """Normaliza un monto a float. 180 == 180.00"""
+    if not monto_str:
+        return 0.0
+    clean = re.sub(r"[^\d.]", "", str(monto_str).replace(",", ""))
+    try:
+        return round(float(clean), 2)
+    except ValueError:
+        return 0.0
+
+
 # ─────────────────────────────────────────────
-# MÓDULOS DE ANÁLISIS
+# MODULOS DE ANALISIS
 # ─────────────────────────────────────────────
 
 def analyze_entropy(clave_rastreo: str, bank_stats: dict) -> dict:
-    """Analiza la entropía de la clave de rastreo."""
+    """Analiza la entropia de la clave de rastreo."""
     e = entropy(clave_rastreo)
     min_entropy = bank_stats.get("entropia_min", 2.0)
     penalty = 0.0
     anomalia = None
 
     if e < min_entropy and clave_rastreo:
-        penalty = (min_entropy - e) * 10
+        penalty = (min_entropy - e) * 8
         anomalia = {
             "tipo": "entropia_baja",
-            "descripcion": f"Clave de rastreo con baja entropía ({e:.2f} bits). Patrón repetitivo o generado artificialmente.",
+            "descripcion": "Clave de rastreo con baja entropia (" + str(round(e, 2)) + " bits). Patron repetitivo o generado artificialmente.",
             "severidad": "alta" if e < 1.5 else "media"
         }
 
@@ -185,7 +191,7 @@ def analyze_entropy(clave_rastreo: str, bank_stats: dict) -> dict:
 def analyze_field_lengths(campos: dict, bank_stats: dict) -> dict:
     """Calcula Z-scores de longitud de campos clave."""
     fields = ["referencia", "clave_rastreo", "folio"]
-    z_scores = {}
+    z_scores_result = {}
     penalties = {}
     anomalias = []
 
@@ -193,28 +199,74 @@ def analyze_field_lengths(campos: dict, bank_stats: dict) -> dict:
         valor = clean_field(campos.get(field))
         if not valor:
             continue
+
         stats = bank_stats.get(field, {"mean": 7.0, "std": 2.0})
         z = z_score(len(valor), stats["mean"], stats["std"])
-        z_scores[field] = round(z, 4)
-        penalty = max(0, abs(z) - 1.5) * 8
+        z_scores_result[field] = round(z, 4)
+
+        # Umbral mas permisivo para clave_rastreo (formato alfanumerico variable)
+        threshold = 3.5 if field == "clave_rastreo" else 2.5
+        penalty = max(0, abs(z) - threshold) * 6
         penalties[field] = round(penalty, 2)
 
-        if abs(z) > 2.5:
+        if abs(z) > threshold + 1:
             anomalias.append({
-                "tipo": f"longitud_anomala_{field}",
-                "descripcion": f"Campo '{field}' con longitud inusual (z={z:.2f}). Valor: '{valor}' ({len(valor)} caracteres).",
-                "severidad": "alta" if abs(z) > 3.5 else "media"
+                "tipo": "longitud_anomala_" + field,
+                "descripcion": "Campo '" + field + "' con longitud inusual (z=" + str(round(z, 2)) + "). Valor: '" + valor + "' (" + str(len(valor)) + " caracteres).",
+                "severidad": "media"
             })
 
     return {
-        "z_scores": z_scores,
+        "z_scores": z_scores_result,
         "penalties": penalties,
         "anomalias": anomalias
     }
 
 
+def validate_clave_rastreo_format(clave: str) -> dict:
+    """
+    Valida el formato de la clave de rastreo SPEI.
+    Formato valido: BANKYYYYMMDD + digitos + letra opcional al final (ej: ...262I)
+    """
+    if not clave:
+        return {"valid": True, "penalty": 0, "anomalia": None}
+
+    # Formato SPEI real: prefijo banco (3-4 letras) + fecha (6-8 digitos) + secuencia + letra opcional
+    # Ejemplos validos: MBAN20260608123456789, BBVA20260608123456I
+    spei_ok = bool(re.match(r'^[A-Za-z]{3,4}\d{8,}[A-Za-z0-9]*$', clave))
+
+    if spei_ok:
+        return {"valid": True, "penalty": 0, "anomalia": None}
+
+    # Si no cumple el patron pero tiene longitud razonable, solo info
+    if 10 <= len(clave) <= 25:
+        return {
+            "valid": True,
+            "penalty": 3,
+            "anomalia": {
+                "tipo": "formato_clave_atipico",
+                "descripcion": "La clave de rastreo '" + clave + "' tiene un formato no estandar, pero la longitud es aceptable.",
+                "severidad": "info"
+            }
+        }
+
+    return {
+        "valid": False,
+        "penalty": 10,
+        "anomalia": {
+            "tipo": "formato_clave_invalido",
+            "descripcion": "La clave de rastreo '" + clave + "' tiene longitud o formato muy inusual.",
+            "severidad": "media"
+        }
+    }
+
+
 def analyze_temporal(fecha: Optional[str], hora: Optional[str]) -> dict:
-    """Analiza coherencia temporal de la operación."""
+    """
+    Analiza coherencia temporal.
+    Comprobantes pasados son NORMALES — solo penalizar si son muy antiguos (>180 dias)
+    o si la fecha es futura.
+    """
     penalty = 0.0
     anomalias = []
     hoy = datetime.now()
@@ -222,24 +274,34 @@ def analyze_temporal(fecha: Optional[str], hora: Optional[str]) -> dict:
     fecha_parsed = parse_date(fecha)
     hora_int = parse_hour(hora)
 
-    # Validar fecha
     if fecha_parsed:
         diff_dias = (hoy - fecha_parsed).days
-        if fecha_parsed > hoy:
+
+        if fecha_parsed.date() > hoy.date():
             penalty += 30
             anomalias.append({
                 "tipo": "fecha_futura",
-                "descripcion": f"La fecha del comprobante ({fecha}) es posterior a hoy. Altamente sospechoso.",
+                "descripcion": "La fecha del comprobante (" + str(fecha) + ") es posterior a hoy. Altamente sospechoso.",
                 "severidad": "alta"
             })
-        elif diff_dias > 90:
-            penalty += 15
+        elif diff_dias > 180:
+            # Solo informativo para comprobantes muy antiguos, no critico
+            penalty += 8
             anomalias.append({
                 "tipo": "fecha_antigua",
-                "descripcion": f"El comprobante tiene {diff_dias} días de antigüedad. Inusual para uso comercial.",
-                "severidad": "media"
+                "descripcion": "El comprobante tiene " + str(diff_dias) + " dias de antiguedad. Inusual para uso comercial inmediato.",
+                "severidad": "info"
             })
-        # Verificar fin de semana
+        elif diff_dias > 90:
+            # Advertencia leve para comprobantes de 90-180 dias
+            penalty += 3
+            anomalias.append({
+                "tipo": "fecha_reciente_pero_pasada",
+                "descripcion": "El comprobante tiene " + str(diff_dias) + " dias. Verifica que corresponda a la operacion actual.",
+                "severidad": "info"
+            })
+
+        # Horario de mantenimiento SPEI: domingos despues de las 22:00
         if fecha_parsed.weekday() == 6 and hora_int is not None and hora_int >= 22:
             penalty += 20
             anomalias.append({
@@ -248,15 +310,13 @@ def analyze_temporal(fecha: Optional[str], hora: Optional[str]) -> dict:
                 "severidad": "alta"
             })
 
-    # Validar hora
-    if hora_int is not None:
-        if hora_int < 0 or hora_int > 23:
-            penalty += 20
-            anomalias.append({
-                "tipo": "hora_invalida",
-                "descripcion": f"Hora inválida detectada: {hora}.",
-                "severidad": "alta"
-            })
+    if hora_int is not None and (hora_int < 0 or hora_int > 23):
+        penalty += 20
+        anomalias.append({
+            "tipo": "hora_invalida",
+            "descripcion": "Hora invalida detectada: " + str(hora),
+            "severidad": "alta"
+        })
 
     return {
         "penalty": round(penalty, 2),
@@ -273,14 +333,8 @@ def analyze_monto(monto: Optional[str]) -> dict:
     if not monto:
         return {"penalty": 0.0, "anomalias": [], "monto_numerico": None}
 
-    # Limpiar y extraer valor numérico
-    monto_clean = re.sub(r"[^\d.]", "", str(monto).replace(",", ""))
-    try:
-        valor = float(monto_clean)
-    except ValueError:
-        return {"penalty": 0.0, "anomalias": [], "monto_numerico": None}
+    valor = normalize_monto(str(monto))
 
-    # Monto cero
     if valor == 0:
         penalty += 40
         anomalias.append({
@@ -289,12 +343,11 @@ def analyze_monto(monto: Optional[str]) -> dict:
             "severidad": "alta"
         })
 
-    # Monto redondo sospechoso (múltiplo exacto de 1000 mayor a 5000)
+    # Monto redondo: solo informativo, no penalizar
     if valor > 5000 and valor % 1000 == 0:
-        penalty += 5
         anomalias.append({
             "tipo": "monto_redondo",
-            "descripcion": f"Monto redondo exacto (${valor:,.0f}). Más frecuente en fraudes que en transacciones naturales.",
+            "descripcion": "Monto redondo exacto ($" + str(int(valor)) + "). Es mas frecuente en fraudes, pero tambien en pagos normales.",
             "severidad": "info"
         })
 
@@ -307,8 +360,8 @@ def analyze_monto(monto: Optional[str]) -> dict:
 
 def analyze_combined_patterns(campos: dict, banco: str) -> dict:
     """
-    Analiza combinaciones de variables para detectar patrones
-    que individualmente parecen normales pero juntos son sospechosos.
+    Analiza combinaciones de variables para detectar patrones sospechosos.
+    NO penaliza por concepto libre, tipo de cuenta vs concepto, ni leyendas bancarias estandar.
     """
     penalty = 0.0
     anomalias = []
@@ -316,45 +369,47 @@ def analyze_combined_patterns(campos: dict, banco: str) -> dict:
     ref = clean_field(campos.get("referencia"))
     clave = clean_field(campos.get("clave_rastreo"))
     folio = clean_field(campos.get("folio"))
+    concepto = (campos.get("concepto") or "").lower().strip()
 
-    # Patrón: referencia == folio (copia exacta)
+    # Patron: referencia == folio (copia exacta)
     if ref and folio and ref == folio:
         penalty += 15
         anomalias.append({
             "tipo": "referencia_igual_folio",
-            "descripcion": "La referencia y el folio son idénticos. Patrón inusual en comprobantes reales.",
+            "descripcion": "La referencia y el folio son identicos. Patron inusual en comprobantes reales.",
             "severidad": "media"
         })
 
-    # Patrón: campos completamente numéricos simples (111111, 123456)
+    # Patron: campos con muy poca variacion (111111, 000000)
     for field_name, field_val in [("referencia", ref), ("folio", folio)]:
         if field_val and len(field_val) >= 4:
             if len(set(field_val)) <= 2:
                 penalty += 12
                 anomalias.append({
-                    "tipo": f"campo_repetitivo_{field_name}",
-                    "descripcion": f"El campo '{field_name}' tiene muy poca variación de caracteres: '{field_val}'.",
+                    "tipo": "campo_repetitivo_" + field_name,
+                    "descripcion": "El campo '" + field_name + "' tiene muy poca variacion de caracteres: '" + field_val + "'.",
                     "severidad": "media"
                 })
             if field_val in ["123456", "000000", "111111", "999999", "123123"]:
                 penalty += 20
                 anomalias.append({
-                    "tipo": f"campo_generico_{field_name}",
-                    "descripcion": f"El campo '{field_name}' tiene un valor genérico o de prueba: '{field_val}'.",
+                    "tipo": "campo_generico_" + field_name,
+                    "descripcion": "El campo '" + field_name + "' tiene un valor generico o de prueba: '" + field_val + "'.",
                     "severidad": "alta"
                 })
 
-    # Patrón: clave de rastreo con formato SPEI válido
-    # Formato real: MBAN + fecha8 + 10dígitos = 22 chars aprox
+    # Validar formato de clave de rastreo
     if clave:
-        spei_pattern = re.match(r"^[A-Z]{4}\d{8}\d+$", clave)
-        if not spei_pattern and len(clave) > 5:
-            penalty += 8
-            anomalias.append({
-                "tipo": "formato_clave_atipico",
-                "descripcion": f"La clave de rastreo '{clave}' no sigue el patrón SPEI estándar (BANKYYYYMMDDNNNN).",
-                "severidad": "media"
-            })
+        clave_result = validate_clave_rastreo_format(clave)
+        if clave_result["anomalia"]:
+            penalty += clave_result["penalty"]
+            anomalias.append(clave_result["anomalia"])
+
+    # NOTA: No penalizamos por:
+    # - Concepto libre o inusual (tacos, renta, etc.) — es normal
+    # - Ausencia de concepto — es opcional en SPEI
+    # - Tipo de cuenta origen vs concepto — no hay relacion obligatoria
+    # - Leyendas como "datos no verificados por esta institucion" — son estandar bancario
 
     return {
         "penalty": round(penalty, 2),
@@ -363,33 +418,48 @@ def analyze_combined_patterns(campos: dict, banco: str) -> dict:
 
 
 # ─────────────────────────────────────────────
-# FUNCIÓN PRINCIPAL DEL MOTOR IAT
+# CAPA DE APRENDIZAJE — Fingerprint de comprobante
+# ─────────────────────────────────────────────
+
+def generate_fingerprint(campos: dict, banco: str, score: float) -> dict:
+    """
+    Genera un fingerprint del comprobante para la base de aprendizaje.
+    Se guarda en Supabase para mejorar el analisis con el tiempo.
+    """
+    clave = clean_field(campos.get("clave_rastreo") or "")
+    ref = clean_field(campos.get("referencia") or "")
+    folio = clean_field(campos.get("folio") or "")
+
+    return {
+        "banco": normalize_bank_name(banco),
+        "longitud_clave": len(clave),
+        "longitud_referencia": len(ref),
+        "longitud_folio": len(folio),
+        "entropia_clave": round(entropy(clave), 4),
+        "tiene_concepto": bool(campos.get("concepto")),
+        "tiene_folio": bool(folio),
+        "tiene_clave_rastreo": bool(clave),
+        "score_iat": round(score, 2),
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+# ─────────────────────────────────────────────
+# FUNCION PRINCIPAL DEL MOTOR IAT
 # ─────────────────────────────────────────────
 
 def calculate_iat(campos: dict, banco_origen: Optional[str] = None) -> dict:
-    """
-    Calcula el IAT Score a partir de los campos extraídos.
-    
-    Args:
-        campos: dict con campos extraídos por Claude
-        banco_origen: nombre del banco emisor
-    
-    Returns:
-        dict con iat_score, anomalias y métricas detalladas
-    """
     banco_norm = normalize_bank_name(banco_origen)
     bank_stats = BANK_STATS.get(banco_norm, BANK_STATS["DEFAULT"])
 
     clave_rastreo = clean_field(campos.get("clave_rastreo"))
 
-    # Ejecutar análisis por módulo
-    entropy_result   = analyze_entropy(clave_rastreo, bank_stats)
-    lengths_result   = analyze_field_lengths(campos, bank_stats)
-    temporal_result  = analyze_temporal(campos.get("fecha"), campos.get("hora"))
-    monto_result     = analyze_monto(campos.get("monto"))
-    patterns_result  = analyze_combined_patterns(campos, banco_norm)
+    entropy_result  = analyze_entropy(clave_rastreo, bank_stats)
+    lengths_result  = analyze_field_lengths(campos, bank_stats)
+    temporal_result = analyze_temporal(campos.get("fecha"), campos.get("hora"))
+    monto_result    = analyze_monto(campos.get("monto"))
+    patterns_result = analyze_combined_patterns(campos, banco_norm)
 
-    # Calcular penalización total
     total_penalty = (
         entropy_result["penalty"] +
         sum(lengths_result["penalties"].values()) +
@@ -398,10 +468,8 @@ def calculate_iat(campos: dict, banco_origen: Optional[str] = None) -> dict:
         patterns_result["penalty"]
     )
 
-    # IAT Score base: 100 - penalizaciones
     iat_score = max(0.0, min(100.0, 100.0 - total_penalty))
 
-    # Recopilar todas las anomalías
     anomalias = []
     if entropy_result["anomalia"]:
         anomalias.append(entropy_result["anomalia"])
@@ -410,10 +478,13 @@ def calculate_iat(campos: dict, banco_origen: Optional[str] = None) -> dict:
     anomalias.extend(monto_result["anomalias"])
     anomalias.extend(patterns_result["anomalias"])
 
+    fingerprint = generate_fingerprint(campos, banco_origen or "", iat_score)
+
     return {
         "iat_score": round(iat_score, 2),
         "banco_analizado": banco_norm,
         "anomalias": anomalias,
+        "fingerprint": fingerprint,
         "metricas": {
             "entropia_clave": entropy_result["entropia"],
             "z_scores": lengths_result["z_scores"],
@@ -430,15 +501,10 @@ def calculate_iat(campos: dict, banco_origen: Optional[str] = None) -> dict:
 
 
 def fuse_scores(claude_score: float, iat_score: float) -> float:
-    """
-    Fusiona el score de Claude con el IAT Score.
-    FINAL = 0.7 * CLAUDE + 0.3 * IAT
-    """
     return round(0.7 * claude_score + 0.3 * iat_score, 2)
 
 
 def iat_anomalias_to_validaciones(anomalias: list) -> list:
-    """Convierte anomalías IAT al formato de validaciones del frontend."""
     severidad_to_status = {
         "alta": "fail",
         "media": "warn",
@@ -448,8 +514,13 @@ def iat_anomalias_to_validaciones(anomalias: list) -> list:
     for a in anomalias:
         result.append({
             "categoria": "reputacion",
-            "nombre": f"IAT: {a.get('tipo', 'anomalia').replace('_', ' ').title()}",
+            "nombre": "IAT: " + a.get("tipo", "anomalia").replace("_", " ").title(),
             "status": severidad_to_status.get(a.get("severidad", "media"), "warn"),
             "detalle": a.get("descripcion", "")
         })
     return result
+
+
+def normalize_monto_compare(monto1: str, monto2: str) -> bool:
+    """Compara dos montos normalizados. 180 == 180.00"""
+    return normalize_monto(monto1) == normalize_monto(monto2)
