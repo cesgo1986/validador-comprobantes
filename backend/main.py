@@ -78,7 +78,12 @@ def build_system_prompt(fecha_hoy: str, fecha_legible: str, banco_hint: str, cla
         "- Los numeros ocultos con asteriscos (****1234) son NORMALES en Mexico.\n"
         "- El diseno visual NO es evidencia suficiente para identificar un banco.\n"
         "- Identifica bancos UNICAMENTE por texto visible, nunca por colores o tipografia.\n"
-        "- Si un dato no puede determinarse con seguridad, devuelve null.\n\n"
+        "- Si un dato no puede determinarse con seguridad, devuelve null.\n"
+        "- La leyenda 'Datos no verificados por esta institucion' es NORMAL y estandar en transferencias SPEI. NO la marques como riesgo.\n"
+        "- El concepto de pago puede ser cualquier texto libre (tacos, renta, pago, etc.) o estar ausente. NO lo uses como indicador de riesgo.\n"
+        "- NO inferas inconsistencia entre el tipo de cuenta origen y el concepto del pago. Una cuenta de nomina puede pagar cualquier concepto.\n"
+        "- Comprobantes con fechas pasadas son NORMALES. Solo marca como sospechoso si la fecha es futura.\n"
+        "- La clave de rastreo SPEI puede terminar en letra (ej: ...262I). Esto es VALIDO y estandar.\n\n"
         "CRITERIOS DE ANALISIS:\n"
         "1. ESTRUCTURAL: Consistencia de folios, referencias, montos, fechas, horas, campos obligatorios.\n"
         "2. SEMANTICO: Coherencia entre texto y operacion, banco y terminologia, conceptos y formato.\n"
@@ -178,8 +183,9 @@ async def verify_cep(clave_rastreo: str, referencia: str, fecha: str, monto: flo
         monto_match_re = re.search(r"\$\s*([\d,]+\.?\d*)", found_html)
         match_monto = False
         if monto_match_re and monto > 0:
-            monto_cep = float(monto_match_re.group(1).replace(",", ""))
-            match_monto = abs(monto_cep - monto) < 0.01
+            monto_cep = round(float(monto_match_re.group(1).replace(",", "")), 2)
+            monto_comp = round(monto, 2)
+            match_monto = abs(monto_cep - monto_comp) < 0.05
 
         confidence = 1.0 if match_monto else 0.7
         monto_txt = "Monto coincide" if match_monto else "Monto no coincide con el comprobante"
