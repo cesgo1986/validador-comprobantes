@@ -94,40 +94,79 @@ def normalize_monto_float(monto_str: str) -> float:
 
 def extract_montos_from_html(html: str) -> list[float]:
     """
-    Extrae TODOS los montos posibles que aparecen en el HTML del CEP de Banxico.
-    Considera todos los formatos que usan los bancos mexicanos.
-    Retorna una lista de floats unicos ordenados.
+    Extrae TODOS los montos posibles del HTML del CEP de Banxico.
+    El CEP puede renderizar el monto en texto plano, inputs, atributos o JS.
+    Aplica patrones en orden de especificidad para cubrir todos los formatos.
     """
     montos = set()
 
-    # Patrones en orden de especificidad (de mas especifico a mas general)
-    patrones = [
-        # $1,234.56 o $1234.56
-        r'\$\s*([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
-        # MXN 1,234.56
-        r'(?i)mxn\s*([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
-        # Importe: 1,234.56
-        r'(?i)importe[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
-        # Monto: 1,234.56
-        r'(?i)monto[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
-        # Cantidad: 1,234.56
-        r'(?i)cantidad[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
-        # amount: 1234.56 (para respuestas en ingles)
-        r'(?i)amount[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
-        # Valor: 1,234.56
-        r'(?i)valor[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
-        # Numero con punto decimal dentro de HTML: >1,234.56<
-        r'>[\s]*([\d]{1,3}(?:,\d{3})+\.\d{2})[\s]*<',
-        # Numero plano con decimales >= 3 digitos: 1234.56
-        r'(?<!\d)([\d]{2,10}\.\d{2})(?!\d)',
-    ]
+    # 1. Inputs con name/id que contenga monto/importe (formularios del CEP)
+    for m in re.finditer(
+        r'(?i)<input[^>]*name=["\'][^"\']*(?:monto|importe|amount|valor|total)[^"\']*["\'][^>]*value=["\']([^"\']+)["\']',
+        html
+    ):
+        v = normalize_monto_float(m.group(1))
+        if 0 < v < 1_000_000: montos.add(v)
+    # Orden inverso (value antes de name)
+    for m in re.finditer(
+        r'(?i)<input[^>]*value=["\']([^"\']+)["\'][^>]*name=["\'][^"\']*(?:monto|importe|amount|valor|total)[^"\']*["\']',
+        html
+    ):
+        v = normalize_monto_float(m.group(1))
+        if 0 < v < 1_000_000: montos.add(v)
 
-    for patron in patrones:
-        for match in re.finditer(patron, html):
-            raw = match.group(1)
-            val = normalize_monto_float(raw)
-            if val > 0:
-                montos.add(val)
+    # 2. Etiqueta de monto seguida de <td> con el valor (tabla HTML del CEP)
+    for m in re.finditer(
+        r'(?i)(?:monto|importe|cantidad|amount|total|valor)[^<]{0,30}</td>\s*<td[^>]*>\s*\$?\s*([\d\s,\.]+)',
+        html
+    ):
+        v = normalize_monto_float(m.group(1))
+        if 0 < v < 1_000_000: montos.add(v)
+
+    # 3. $1,234.56 o $45.01
+    for m in re.finditer(r'\$\s*([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)', html):
+        v = normalize_monto_float(m.group(1))
+        if 0 < v < 1_000_000: montos.add(v)
+
+    # 4. MXN prefijo o sufijo
+    for m in re.finditer(r'(?i)mxn\s*([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)', html):
+        v = normalize_monto_float(m.group(1))
+        if 0 < v < 1_000_000: montos.add(v)
+    for m in re.finditer(r'(?i)([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)\s*mxn', html):
+        v = normalize_monto_float(m.group(1))
+        if 0 < v < 1_000_000: montos.add(v)
+
+    # 5. Palabras clave seguidas de : o espacio
+    for patron in [
+        r'(?i)importe[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+        r'(?i)\bmonto[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+        r'(?i)cantidad[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+        r'(?i)\btotal[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+        r'(?i)amount[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+        r'(?i)\bvalor[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+    ]:
+        for m in re.finditer(patron, html):
+            v = normalize_monto_float(m.group(1))
+            if 0 < v < 1_000_000: montos.add(v)
+
+    # 6. <td> con numero solo (excluir IDs y claves largas > 9 dígitos)
+    for m in re.finditer(r'<td[^>]*>\s*([\d]{1,7}(?:\.\d{1,2})?)\s*</td>', html):
+        raw = m.group(1)
+        if len(re.sub(r'[^\d]', '', raw)) <= 9:
+            v = normalize_monto_float(raw)
+            if 0 < v < 1_000_000: montos.add(v)
+
+    # 7. Formato europeo en TD: 45,01 o 1.234,56
+    for m in re.finditer(r'<td[^>]*>\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*</td>', html):
+        v = normalize_monto_float(m.group(1))
+        if 0 < v < 1_000_000: montos.add(v)
+
+    # 8. Cualquier numero con exactamente 2 decimales fuera de URLs/IDs
+    for m in re.finditer(r'(?<![/\d\-])([\d]{1,7}\.\d{2})(?!\d)', html):
+        raw = m.group(1)
+        if len(raw.replace('.', '')) <= 9:
+            v = normalize_monto_float(raw)
+            if 0 < v < 1_000_000: montos.add(v)
 
     return sorted(montos)
 
@@ -311,15 +350,26 @@ async def verify_cep(
         monto_comprobante = normalize_monto_float(str(monto)) if monto > 0 else 0.0
         match_monto = montos_coinciden(monto_comprobante, montos_cep)
 
-        # Construir detalle del resultado
+        # Si el HTML no tiene monto (CEP usa JS dinámico), marcar como no verificable
+        cep_es_dinamico = len(montos_cep) == 0
+
         montos_str = ", ".join(
             "$" + "{:,.2f}".format(m) for m in montos_cep
-        ) if montos_cep else "no detectado"
+        ) if montos_cep else "no visible en HTML (el CEP de Banxico requiere navegador para mostrar el monto)"
 
         if monto_comprobante <= 0:
-            # Sin monto en el comprobante: solo confirmamos existencia
             confidence = 0.8
             monto_txt = "Monto del comprobante no disponible para comparar. Montos en CEP: " + montos_str
+        elif cep_es_dinamico:
+            # Transferencia existe en Banxico pero el monto requiere JS para renderizarse
+            confidence = 0.85
+            match_monto = None  # indeterminado, no es fallo
+            monto_txt = (
+                "Transferencia confirmada en Banxico. El monto del comprobante es $"
+                + "{:,.2f}".format(monto_comprobante)
+                + ". El monto en CEP no pudo extraerse automaticamente (requiere navegador). "
+                "Verifica manualmente en banxico.org.mx/cep"
+            )
         elif match_monto:
             confidence = 1.0
             monto_txt = "Monto coincide ($" + "{:,.2f}".format(monto_comprobante) + "). Montos en CEP: " + montos_str
@@ -327,8 +377,8 @@ async def verify_cep(
             confidence = 0.6
             monto_txt = (
                 "Monto del comprobante ($" + "{:,.2f}".format(monto_comprobante) + ") "
-                "no coincide exactamente con los montos encontrados en CEP: " + montos_str + ". "
-                "Esto puede deberse a diferencias de formato entre bancos. Verifica manualmente."
+                "difiere de los montos en CEP: " + montos_str + ". "
+                "Verifica manualmente en banxico.org.mx/cep"
             )
 
         detalle = (
@@ -341,7 +391,8 @@ async def verify_cep(
             "found": True,
             "status": "EXISTE",
             "confidence": confidence,
-            "match_monto": match_monto,
+            "match_monto": match_monto,   # True, False, o None (indeterminado)
+            "cep_dinamico": cep_es_dinamico,
             "monto_comprobante": monto_comprobante,
             "montos_cep": montos_cep,
             "clave_usada": clave_usada,
@@ -479,10 +530,14 @@ async def analizar(
     clave_rastreo = campos_planos.get("clave_rastreo") or ""
     referencia = campos_planos.get("referencia") or ""
     monto_str = campos_planos.get("monto") or ""
+    monto_texto_str = campos_planos.get("monto_texto") or ""
     fecha_str = campos_planos.get("fecha") or ""
 
     if (clave_rastreo or referencia) and fecha_str:
+        # Usar monto numérico; si falla, extraer de monto_texto (ej: "$45.01 MXN")
         monto_num = normalize_monto_float(str(monto_str)) if monto_str else 0.0
+        if monto_num <= 0 and monto_texto_str:
+            monto_num = normalize_monto_float(str(monto_texto_str))
 
         cep = await verify_cep(
             clave_rastreo=str(clave_rastreo),
@@ -493,12 +548,14 @@ async def analizar(
             banco_destino=str(campos_planos.get("banco_destino") or "")
         )
 
-        # Status CEP: ok solo si se encontro Y el monto coincide
+        # Status: ok=coincide, warn=encontrado sin monto o CEP dinámico, info=no encontrado
         if cep.get("found"):
             if cep.get("confidence", 0) >= 1.0:
                 cep_status = "ok"
+            elif cep.get("cep_dinamico") or cep.get("match_monto") is None:
+                cep_status = "warn"   # encontrado, monto no verificable automáticamente
             elif cep.get("confidence", 0) >= 0.8:
-                cep_status = "warn"   # encontrado pero monto no disponible
+                cep_status = "warn"   # encontrado, monto no disponible
             else:
                 cep_status = "warn"   # encontrado pero monto no coincide
         else:
@@ -512,8 +569,8 @@ async def analizar(
         })
         result["cep_resultado"] = cep
 
-        # Solo subir score si fue encontrado y monto NO coincide
-        if cep.get("found") and not cep.get("match_monto") and monto_num > 0:
+        # Solo subir score si fue encontrado y el monto DEFINITIVAMENTE no coincide
+        if cep.get("found") and cep.get("match_monto") is False and monto_num > 0:
             final_score = max(final_score, 50)
 
     result["score"] = round(final_score, 2)
