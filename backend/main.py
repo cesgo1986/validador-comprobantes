@@ -55,6 +55,96 @@ def clean_clave_rastreo(clave: str) -> str:
     return clave.strip()
 
 
+def normalize_monto_float(monto_str: str) -> float:
+    """
+    Convierte cualquier representacion de monto a float.
+    Soporta:
+      - $1,234.56  /  $1.234,56  /  1234.56  /  1,234  /  MXN 1234.56
+      - 1 234.56 (espacio como separador de miles)
+      - Montos sin decimales: 180 -> 180.00
+      - Prefijos: $, MXN, USD, pesos, mx
+    """
+    if not monto_str:
+        return 0.0
+    # Quitar simbolos de moneda y espacios
+    s = str(monto_str)
+    s = re.sub(r'(?i)(mxn|usd|pesos?|mx|\$)', '', s)
+    s = s.strip()
+
+    # Detectar formato europeo: 1.234,56 (punto miles, coma decimal)
+    if re.search(r'\d\.\d{3},\d{1,2}$', s):
+        s = s.replace('.', '').replace(',', '.')
+    # Formato con coma de miles y punto decimal: 1,234.56
+    elif re.search(r'\d,\d{3}\.', s) or re.search(r'\d,\d{3}$', s):
+        s = s.replace(',', '')
+    # Solo coma como decimal: 1234,56
+    elif re.search(r'\d,\d{1,2}$', s):
+        s = s.replace(',', '.')
+    # Quitar comas y espacios restantes
+    s = re.sub(r'[,\s]', '', s)
+    # Extraer primer numero flotante valido
+    match = re.search(r'\d+\.?\d*', s)
+    if not match:
+        return 0.0
+    try:
+        return round(float(match.group()), 2)
+    except ValueError:
+        return 0.0
+
+
+def extract_montos_from_html(html: str) -> list[float]:
+    """
+    Extrae TODOS los montos posibles que aparecen en el HTML del CEP de Banxico.
+    Considera todos los formatos que usan los bancos mexicanos.
+    Retorna una lista de floats unicos ordenados.
+    """
+    montos = set()
+
+    # Patrones en orden de especificidad (de mas especifico a mas general)
+    patrones = [
+        # $1,234.56 o $1234.56
+        r'\$\s*([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+        # MXN 1,234.56
+        r'(?i)mxn\s*([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+        # Importe: 1,234.56
+        r'(?i)importe[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+        # Monto: 1,234.56
+        r'(?i)monto[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+        # Cantidad: 1,234.56
+        r'(?i)cantidad[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+        # amount: 1234.56 (para respuestas en ingles)
+        r'(?i)amount[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+        # Valor: 1,234.56
+        r'(?i)valor[:\s]+([\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+        # Numero con punto decimal dentro de HTML: >1,234.56<
+        r'>[\s]*([\d]{1,3}(?:,\d{3})+\.\d{2})[\s]*<',
+        # Numero plano con decimales >= 3 digitos: 1234.56
+        r'(?<!\d)([\d]{2,10}\.\d{2})(?!\d)',
+    ]
+
+    for patron in patrones:
+        for match in re.finditer(patron, html):
+            raw = match.group(1)
+            val = normalize_monto_float(raw)
+            if val > 0:
+                montos.add(val)
+
+    return sorted(montos)
+
+
+def montos_coinciden(monto_comprobante: float, montos_cep: list[float], tolerancia: float = 1.0) -> bool:
+    """
+    Comprueba si el monto del comprobante coincide con alguno de los montos del CEP.
+    Tolerancia de 1 peso para cubrir diferencias de redondeo, IVA parcial, etc.
+    """
+    if monto_comprobante <= 0:
+        return False
+    for m in montos_cep:
+        if abs(m - monto_comprobante) <= tolerancia:
+            return True
+    return False
+
+
 def build_system_prompt(fecha_hoy: str, fecha_legible: str, banco_hint: str, clabe_hint: str, fecha_confirmada: bool = False) -> str:
     banco_hint_text = ""
     if banco_hint.strip():
@@ -78,7 +168,7 @@ def build_system_prompt(fecha_hoy: str, fecha_legible: str, banco_hint: str, cla
         "Determinar el nivel de riesgo de fraude de un comprobante de pago mediante analisis documental, estructural, semantico, temporal y contextual.\n\n"
         "FECHA ACTUAL DEL SISTEMA: " + fecha_legible + " (" + fecha_hoy + "). "
         "ESTA ES LA FECHA REAL Y CORRECTA. NO asumas que estamos en 2024 ni en ningun otro año. "
-        "El año actual es " + fecha_hoy[:4] + ". Usa esta fecha para todas las validaciones temporales." 
+        "El año actual es " + fecha_hoy[:4] + ". Usa esta fecha para todas las validaciones temporales."
         + banco_hint_text + clabe_hint_text + fecha_confirmada_text + "\n\n"
         "REGLAS IMPORTANTES:\n"
         "- NO confirmes que una transferencia ocurrio realmente.\n"
@@ -119,6 +209,7 @@ def build_system_prompt(fecha_hoy: str, fecha_legible: str, banco_hint: str, cla
         "EXTRACCION DE CAMPOS:\n"
         "Extrae unicamente si son visibles. Para cada campo genera valor y confianza:\n"
         "1.00 = completamente visible | 0.80 = muy probable | 0.60 = parcialmente visible | 0.40 = incierto | 0.20 = especulacion minima\n\n"
+        "IMPORTANTE para el campo 'monto': extrae el valor NUMERICO puro, sin simbolos de moneda ni comas. Ejemplo: si el comprobante dice '$1,234.56', devuelve '1234.56'.\n\n"
         "SCORING: 0-20 = riesgo bajo | 21-50 = riesgo medio | 51-80 = riesgo alto | 81-100 = riesgo critico\n\n"
         "RIESGO: Solo puede ser BAJO, MEDIO, ALTO, CRITICO o INDETERMINADO.\n\n"
         "VALIDACIONES: Genera validaciones con categoria, nombre, status (ok|warn|fail|info) y detalle.\n\n"
@@ -169,19 +260,28 @@ async def query_cep(clave: str, fecha_banxico: str):
     return not not_found, html
 
 
-async def verify_cep(clave_rastreo: str, referencia: str, fecha: str, monto: float,
-                     banco_origen: str, banco_destino: str) -> dict:
+async def verify_cep(
+    clave_rastreo: str,
+    referencia: str,
+    fecha: str,
+    monto: float,
+    banco_origen: str,
+    banco_destino: str
+) -> dict:
     try:
         fecha_clean = re.sub(r"[^\d]", "", fecha)
         if len(fecha_clean) < 8:
-            return {"found": False, "status": "FECHA_INVALIDA", "confidence": 0,
-                    "detalle": "No fue posible normalizar la fecha: " + fecha}
+            return {
+                "found": False,
+                "status": "FECHA_INVALIDA",
+                "confidence": 0,
+                "detalle": "No fue posible normalizar la fecha: " + fecha
+            }
         fecha_banxico = fecha_clean[:8]
 
         claves_a_intentar = []
         if clave_rastreo:
-            clave_limpia = clean_clave_rastreo(clave_rastreo)
-            claves_a_intentar.append(("clave_rastreo", clave_limpia))
+            claves_a_intentar.append(("clave_rastreo", clean_clave_rastreo(clave_rastreo)))
         if referencia and referencia != clave_rastreo:
             claves_a_intentar.append(("referencia", referencia.strip()))
 
@@ -206,34 +306,63 @@ async def verify_cep(clave_rastreo: str, referencia: str, fecha: str, monto: flo
                 "detalle": "No se encontro la transferencia en CEP Banxico. Claves consultadas: " + claves_intentadas
             }
 
-        monto_match_re = re.search(r"\$\s*([\d,]+\.?\d*)", found_html)
-        match_monto = False
-        if monto_match_re and monto > 0:
-            monto_cep = round(float(monto_match_re.group(1).replace(",", "")), 2)
-            monto_comp = round(monto, 2)
-            # Tolerancia de 1 peso para cubrir diferencias de redondeo y formato
-            match_monto = abs(monto_cep - monto_comp) < 1.0
+        # ── Extraccion robusta del monto ──────────────────────────────────────
+        montos_cep = extract_montos_from_html(found_html)
+        monto_comprobante = normalize_monto_float(str(monto)) if monto > 0 else 0.0
+        match_monto = montos_coinciden(monto_comprobante, montos_cep)
 
-        confidence = 1.0 if match_monto else 0.7
-        monto_txt = "Monto coincide" if match_monto else "Monto no coincide con el comprobante"
-        detalle = "Transferencia encontrada en CEP Banxico usando " + str(tipo_clave_usada) + " (" + str(clave_usada) + "). " + monto_txt
+        # Construir detalle del resultado
+        montos_str = ", ".join(
+            "$" + "{:,.2f}".format(m) for m in montos_cep
+        ) if montos_cep else "no detectado"
+
+        if monto_comprobante <= 0:
+            # Sin monto en el comprobante: solo confirmamos existencia
+            confidence = 0.8
+            monto_txt = "Monto del comprobante no disponible para comparar. Montos en CEP: " + montos_str
+        elif match_monto:
+            confidence = 1.0
+            monto_txt = "Monto coincide ($" + "{:,.2f}".format(monto_comprobante) + "). Montos en CEP: " + montos_str
+        else:
+            confidence = 0.6
+            monto_txt = (
+                "Monto del comprobante ($" + "{:,.2f}".format(monto_comprobante) + ") "
+                "no coincide exactamente con los montos encontrados en CEP: " + montos_str + ". "
+                "Esto puede deberse a diferencias de formato entre bancos. Verifica manualmente."
+            )
+
+        detalle = (
+            "Transferencia encontrada en CEP Banxico usando "
+            + str(tipo_clave_usada) + " (" + str(clave_usada) + "). "
+            + monto_txt
+        )
 
         return {
             "found": True,
             "status": "EXISTE",
             "confidence": confidence,
             "match_monto": match_monto,
+            "monto_comprobante": monto_comprobante,
+            "montos_cep": montos_cep,
             "clave_usada": clave_usada,
             "tipo_clave": tipo_clave_usada,
             "detalle": detalle
         }
 
     except httpx.TimeoutException:
-        return {"found": False, "status": "TIMEOUT", "confidence": 0,
-                "detalle": "Tiempo de espera agotado al consultar CEP de Banxico."}
+        return {
+            "found": False,
+            "status": "TIMEOUT",
+            "confidence": 0,
+            "detalle": "Tiempo de espera agotado al consultar CEP de Banxico."
+        }
     except Exception as e:
-        return {"found": False, "status": "ERROR", "confidence": 0,
-                "detalle": "Error al consultar CEP: " + str(e)}
+        return {
+            "found": False,
+            "status": "ERROR",
+            "confidence": 0,
+            "detalle": "Error al consultar CEP: " + str(e)
+        }
 
 
 @app.post("/analizar")
@@ -353,10 +482,7 @@ async def analizar(
     fecha_str = campos_planos.get("fecha") or ""
 
     if (clave_rastreo or referencia) and fecha_str:
-        try:
-            monto_num = float(re.sub(r"[^\d.]", "", str(monto_str).replace(",", ""))) if monto_str else 0.0
-        except ValueError:
-            monto_num = 0.0
+        monto_num = normalize_monto_float(str(monto_str)) if monto_str else 0.0
 
         cep = await verify_cep(
             clave_rastreo=str(clave_rastreo),
@@ -367,7 +493,17 @@ async def analizar(
             banco_destino=str(campos_planos.get("banco_destino") or "")
         )
 
-        cep_status = "ok" if cep.get("confidence", 0) >= 1.0 else "warn" if cep.get("found") else "info"
+        # Status CEP: ok solo si se encontro Y el monto coincide
+        if cep.get("found"):
+            if cep.get("confidence", 0) >= 1.0:
+                cep_status = "ok"
+            elif cep.get("confidence", 0) >= 0.8:
+                cep_status = "warn"   # encontrado pero monto no disponible
+            else:
+                cep_status = "warn"   # encontrado pero monto no coincide
+        else:
+            cep_status = "info"
+
         result["validaciones"].append({
             "categoria": "cep",
             "nombre": "CEP Banxico - Verificacion SPEI",
@@ -376,7 +512,8 @@ async def analizar(
         })
         result["cep_resultado"] = cep
 
-        if cep.get("found") and cep.get("confidence", 0) < 1.0:
+        # Solo subir score si fue encontrado y monto NO coincide
+        if cep.get("found") and not cep.get("match_monto") and monto_num > 0:
             final_score = max(final_score, 50)
 
     result["score"] = round(final_score, 2)
