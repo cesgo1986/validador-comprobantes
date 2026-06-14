@@ -181,7 +181,7 @@ export default function Home() {
   const [clabeInput, setClabeInput] = useState("");
   const [fechaPasadaConfirmada, setFechaPasadaConfirmada] = useState(false);
   const [showFechaBanner, setShowFechaBanner] = useState(false);
-  const [stage, setStage] = useState<"idle" | "loading" | "done">("idle");
+  const [stage, setStage] = useState<"idle" | "loading" | "done" | "fecha_banner">("idle");
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<Resultado | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -242,17 +242,19 @@ export default function Home() {
         if (!cv.valid) { parsed.score = Math.max(parsed.score || 0, 70); parsed.riesgo = "ALTO"; }
       }
 
-      await tick(7); 
+      await tick(7);
 
-      // Detectar si el resultado tiene alerta de fecha futura/pasada
+      // Si hay alerta de fecha y no está confirmada, mostrar banner antes del resultado
       const tieneFechaAlert = parsed.validaciones?.some((v: Validacion) =>
-        v.nombre?.toLowerCase().includes("fecha") && v.status === "fail"
+        v.nombre?.toLowerCase().includes("fecha") && (v.status === "fail" || v.status === "warn")
       );
       if (tieneFechaAlert && !fechaPasadaConfirmada) {
-        setShowFechaBanner(true);
+        setResult(parsed);
+        setStage("fecha_banner" as "idle" | "loading" | "done");
+      } else {
+        setResult(parsed);
+        setStage("done");
       }
-
-      setResult(parsed); setStage("done");
     } catch (e: unknown) {
       setError(`Error: ${e instanceof Error ? e.message : String(e)}`);
       setStage("idle");
@@ -260,6 +262,14 @@ export default function Home() {
   };
 
   const reset = () => { setFile(null); setPreview(null); setStage("idle"); setProgress(0); setResult(null); setError(null); setBankHint(""); setClabeInput(""); setFechaPasadaConfirmada(false); setShowFechaBanner(false); };
+
+  const confirmarFechaPasada = async () => {
+    setFechaPasadaConfirmada(true);
+    setShowFechaBanner(false);
+    setStage("loading");
+    setProgress(0);
+    await analyze();
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: `linear-gradient(160deg, ${DARK} 0%, #0D2137 100%)`, fontFamily: "'Inter',system-ui,sans-serif", padding: "0 0 40px" }}>
@@ -352,24 +362,24 @@ export default function Home() {
           </div>
         )}
 
-        {stage === "done" && result && showFechaBanner && !fechaPasadaConfirmada && (
-          <div style={{ background: "#FFF8E1", border: "1.5px solid #F5A623", borderRadius: 14, padding: "16px 20px", marginBottom: 16, marginTop: 8 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#854F0B", marginBottom: 6 }}>
+        {stage === "fecha_banner" && result && (
+          <div style={{ background: "#FFF8E1", border: "1.5px solid #F5A623", borderRadius: 14, padding: "20px", marginTop: 8 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#854F0B", marginBottom: 8 }}>
               📅 ¿Este comprobante es de una fecha pasada?
             </div>
-            <div style={{ fontSize: 13, color: "#5C3D0A", marginBottom: 12, lineHeight: 1.6 }}>
-              El sistema detectó una posible inconsistencia en la fecha. Si estás validando un comprobante de días o meses anteriores, confírmalo para que el análisis sea más preciso.
+            <div style={{ fontSize: 13, color: "#5C3D0A", marginBottom: 16, lineHeight: 1.6 }}>
+              El sistema detectó una posible inconsistencia en la fecha. Si estás validando un comprobante de días o meses anteriores, confírmalo para obtener un análisis más preciso.
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button
-                onClick={() => { setFechaPasadaConfirmada(true); setShowFechaBanner(false); analyze(); }}
-                style={{ flex: 1, padding: "10px", fontSize: 13, fontWeight: 700, borderRadius: 10, cursor: "pointer", background: TEAL, color: "#fff", border: "none" }}>
+                onClick={confirmarFechaPasada}
+                style={{ flex: 1, padding: "12px", fontSize: 14, fontWeight: 700, borderRadius: 10, cursor: "pointer", background: TEAL, color: "#fff", border: "none" }}>
                 ✓ Sí, es un comprobante pasado
               </button>
               <button
-                onClick={() => setShowFechaBanner(false)}
-                style={{ flex: 1, padding: "10px", fontSize: 13, fontWeight: 600, borderRadius: 10, cursor: "pointer", background: "#fff", color: "#854F0B", border: "1.5px solid #F5A623" }}>
-                ✗ No, mantener alerta
+                onClick={() => setStage("done")}
+                style={{ flex: 1, padding: "12px", fontSize: 14, fontWeight: 600, borderRadius: 10, cursor: "pointer", background: "#fff", color: "#854F0B", border: "1.5px solid #F5A623" }}>
+                ✗ No, mantener la alerta
               </button>
             </div>
           </div>
