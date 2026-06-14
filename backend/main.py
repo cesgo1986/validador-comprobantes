@@ -55,7 +55,7 @@ def clean_clave_rastreo(clave: str) -> str:
     return clave.strip()
 
 
-def build_system_prompt(fecha_hoy: str, fecha_legible: str, banco_hint: str, clabe_hint: str) -> str:
+def build_system_prompt(fecha_hoy: str, fecha_legible: str, banco_hint: str, clabe_hint: str, fecha_confirmada: bool = False) -> str:
     banco_hint_text = ""
     if banco_hint.strip():
         banco_hint_text = '\nBANCO EMISOR DECLARADO POR EL USUARIO: "' + banco_hint + '". Usalo como banco origen.'
@@ -66,11 +66,17 @@ def build_system_prompt(fecha_hoy: str, fecha_legible: str, banco_hint: str, cla
     elif len(clabe_hint) > 0:
         clabe_hint_text = "\nCUENTA PARCIAL INGRESADA: " + clabe_hint + " (" + str(len(clabe_hint)) + " digitos)."
 
+    fecha_confirmada_text = (
+        "\nIMPORTANTE: El usuario ha confirmado que este comprobante es de una fecha pasada y lo esta validando de manera retroactiva. "
+        "NO marques la fecha como sospechosa ni como futura. Analiza el resto del comprobante normalmente.\n"
+        if fecha_confirmada else ""
+    )
+
     return (
         "Eres VerificaPago AI, un analista forense especializado en comprobantes de transferencia bancaria en Mexico.\n\n"
         "OBJETIVO:\n"
         "Determinar el nivel de riesgo de fraude de un comprobante de pago mediante analisis documental, estructural, semantico, temporal y contextual.\n\n"
-        "FECHA ACTUAL: " + fecha_legible + " (" + fecha_hoy + ")." + banco_hint_text + clabe_hint_text + "\n\n"
+        "FECHA ACTUAL: " + fecha_legible + " (" + fecha_hoy + ")." + banco_hint_text + clabe_hint_text + fecha_confirmada_text + "\n\n"
         "REGLAS IMPORTANTES:\n"
         "- NO confirmes que una transferencia ocurrio realmente.\n"
         "- NO afirmes que el dinero fue recibido.\n"
@@ -231,15 +237,17 @@ async def verify_cep(clave_rastreo: str, referencia: str, fecha: str, monto: flo
 async def analizar(
     file: UploadFile = File(...),
     banco_hint: str = Form(""),
-    clabe_hint: str = Form("")
+    clabe_hint: str = Form(""),
+    fecha_pasada_confirmada: str = Form("false")
 ):
     contenido = await file.read()
     b64 = base64.b64encode(contenido).decode()
     media_type = file.content_type
     fecha_hoy = datetime.date.today().isoformat()
     fecha_legible = datetime.datetime.now().strftime("%A %d de %B de %Y")
+    fecha_confirmada = fecha_pasada_confirmada.lower() == "true"
 
-    system_prompt = build_system_prompt(fecha_hoy, fecha_legible, banco_hint, clabe_hint)
+    system_prompt = build_system_prompt(fecha_hoy, fecha_legible, banco_hint, clabe_hint, fecha_confirmada)
 
     if media_type == "application/pdf":
         user_content = [
