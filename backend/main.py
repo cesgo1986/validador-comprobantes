@@ -186,13 +186,24 @@ def montos_coinciden(monto_comprobante: float, montos_cep: list, tolerancia: flo
 def fecha_es_pasada(fecha_str: str) -> tuple:
     """
     Retorna (es_pasada: bool, dias_diferencia: int).
-    es_pasada=True si el comprobante tiene mas de 0 dias respecto a hoy.
+    es_pasada=True si el comprobante tiene MAS DE 1 dia respecto a hoy.
+    Umbral de 1 dia para evitar falsos positivos por diferencia de zona horaria.
     """
     if not fecha_str:
         return False, 0
     formatos = [
-        "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d/%m/%y",
-        "%Y/%m/%d", "%d/%b/%Y", "%d/%b/%y",
+        "%Y-%m-%d",        # 2026-06-13
+        "%d/%m/%Y",        # 13/06/2026
+        "%d-%m-%Y",        # 13-06-2026
+        "%d/%m/%y",        # 13/06/26
+        "%Y/%m/%d",        # 2026/06/13
+        "%d/%b/%Y",        # 13/Jun/2026
+        "%d/%b/%y",        # 13/Jun/26
+        "%d de %B de %Y",  # 19 de mayo de 2026
+        "%d %B %Y",        # 19 mayo 2026
+        "%d %B, %Y",       # 19 mayo, 2026
+        "%B %d, %Y",       # mayo 19, 2026
+        "%d %b %Y",        # 19 may 2026
     ]
     meses = {
         "enero": "January", "febrero": "February", "marzo": "March",
@@ -203,15 +214,16 @@ def fecha_es_pasada(fecha_str: str) -> tuple:
         "may": "May", "jun": "Jun", "jul": "Jul", "ago": "Aug",
         "sep": "Sep", "oct": "Oct", "nov": "Nov", "dic": "Dec",
     }
-    fecha_norm = fecha_str.lower()
+    fecha_norm = fecha_str.lower().strip()
     for es, en in meses.items():
         fecha_norm = fecha_norm.replace(es, en)
     for fmt in formatos:
         try:
-            dt = datetime.datetime.strptime(fecha_norm.strip(), fmt)
+            dt = datetime.datetime.strptime(fecha_norm, fmt)
             hoy = datetime.date.today()
             dias = (hoy - dt.date()).days
-            return dias > 0, dias
+            # Umbral > 1 para evitar falsos positivos por zona horaria
+            return dias > 1, dias
         except ValueError:
             continue
     return False, 0
