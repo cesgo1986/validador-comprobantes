@@ -17,10 +17,12 @@ const BANKS: Record<string, string> = {
   "722":"MERCADO PAGO","723":"CUENCA","728":"SPIN BY OXXO","741":"KLAR","748":"BINEO",
 };
 
-type RiskLevel = "BAJO" | "MEDIO" | "ALTO" | "INDETERMINADO";
+// ── FIX 1: Agregar "fecha_banner" al type de Stage ──────────────────────────
+type Stage = "idle" | "loading" | "done" | "fecha_banner";
+type RiskLevel = "BAJO" | "MEDIO" | "ALTO" | "CRITICO" | "INDETERMINADO";
 type Status = "ok" | "warn" | "fail" | "info";
 
-interface Validacion { categoria: string; nombre: string; status: Status; detalle: string; }
+interface Validacion { categoria: string; nombre: string; status: Status; detalle: string; cep_url?: string; }
 interface Resultado {
   riesgo: RiskLevel; score: number;
   campos_extraidos: Record<string, string | null>;
@@ -35,15 +37,6 @@ function validateCLABE(clabe: string) {
   const chk = (10 - (s % 10)) % 10;
   if (chk !== parseInt(c[17])) return { valid: false, reason: "Dígito verificador incorrecto" };
   return { valid: true, bank: BANKS[c.substring(0, 3)] || "Banco no reconocido", bankCode: c.substring(0, 3) };
-}
-
-function toBase64(file: File): Promise<string> {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res((r.result as string).split(",")[1]);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
 }
 
 function GaugeCircle({ score }: { score: number }) {
@@ -98,6 +91,16 @@ function ValidationRow({ v }: { v: Validacion }) {
           <div style={{ background: `${ic}10`, border: `1px solid ${ic}30`, borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#334155", lineHeight: 1.6 }}>
             💬 {v.detalle}
           </div>
+          {v.cep_url && (
+            <a
+              href={v.cep_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: "inline-block", marginTop: 8, padding: "8px 14px", fontSize: 12, fontWeight: 700, borderRadius: 8, background: TEAL, color: "#fff", textDecoration: "none" }}
+            >
+              🔗 Verificar en Banxico →
+            </a>
+          )}
         </div>
       )}
     </div>
@@ -106,13 +109,14 @@ function ValidationRow({ v }: { v: Validacion }) {
 
 function ResultScreen({ result, file, onReset }: { result: Resultado; file: File | null; onReset: () => void }) {
   const riskCfg = {
-    BAJO: { label: "BAJO", color: GREEN },
-    MEDIO: { label: "MEDIO", color: ORANGE },
-    ALTO: { label: "ALTO", color: RED },
+    BAJO:          { label: "BAJO",          color: GREEN },
+    MEDIO:         { label: "MEDIO",         color: ORANGE },
+    ALTO:          { label: "ALTO",          color: RED },
+    CRITICO:       { label: "CRÍTICO",       color: RED },
     INDETERMINADO: { label: "INDETERMINADO", color: "#9CA3AF" },
   };
   const rc = riskCfg[result.riesgo] || riskCfg.INDETERMINADO;
-  const oks = (result.validaciones || []).filter(v => v.status === "ok");
+  const oks   = (result.validaciones || []).filter(v => v.status === "ok");
   const warns = (result.validaciones || []).filter(v => v.status === "warn" || v.status === "fail");
   const infos = (result.validaciones || []).filter(v => v.status === "info");
 
@@ -134,7 +138,7 @@ function ResultScreen({ result, file, onReset }: { result: Resultado; file: File
           <p style={{ margin: 0, fontSize: 13, color: "#64748B", lineHeight: 1.6 }}>{result.resumen}</p>
         </div>
       )}
-      {oks.length > 0 && <div style={{ padding: "8px 0" }}>{oks.map((v, i) => <ValidationRow key={i} v={v} />)}</div>}
+      {oks.length   > 0 && <div style={{ padding: "8px 0" }}>{oks.map((v, i)   => <ValidationRow key={i} v={v} />)}</div>}
       {warns.length > 0 && <div style={{ padding: "8px 0" }}>{warns.map((v, i) => <ValidationRow key={i} v={v} />)}</div>}
       {infos.length > 0 && <div style={{ padding: "8px 0" }}>{infos.map((v, i) => <ValidationRow key={i} v={v} />)}</div>}
       {result.campos_extraidos && Object.values(result.campos_extraidos).some(Boolean) && (
@@ -175,17 +179,16 @@ const STAGES = [
 ];
 
 export default function Home() {
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [bankHint, setBankHint] = useState("");
-  const [clabeInput, setClabeInput] = useState("");
+  const [file, setFile]                           = useState<File | null>(null);
+  const [preview, setPreview]                     = useState<string | null>(null);
+  const [bankHint, setBankHint]                   = useState("");
+  const [clabeInput, setClabeInput]               = useState("");
   const [fechaPasadaConfirmada, setFechaPasadaConfirmada] = useState(false);
-  const [showFechaBanner, setShowFechaBanner] = useState(false);
-  const [stage, setStage] = useState<"idle" | "loading" | "done" | "fecha_banner">("idle");
-  const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<Resultado | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
+  const [stage, setStage]                         = useState<Stage>("idle");
+  const [progress, setProgress]                   = useState(0);
+  const [result, setResult]                       = useState<Resultado | null>(null);
+  const [error, setError]                         = useState<string | null>(null);
+  const [dragging, setDragging]                   = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback((f: File) => {
@@ -203,24 +206,18 @@ export default function Home() {
 
   const tick = (i: number) => new Promise<void>(r => setTimeout(() => { setProgress(i); r(); }, 600));
 
-  const analyze = async () => {
+  // ── FIX 2: analyze recibe fechaConfirmada como parámetro (evita closure stale) ──
+  const analyze = async (fechaConfirmada = false) => {
     if (!file) return;
     setStage("loading"); setProgress(0); setResult(null); setError(null);
     for (let i = 1; i <= 5; i++) await tick(i);
-    let b64: string;
-    try { b64 = await toBase64(file); } catch { setError("Error leyendo archivo."); setStage("idle"); return; }
-    const now = new Date();
-    const fechaHoy = now.toISOString().split("T")[0];
-    const fechaLeg = now.toLocaleDateString("es-MX", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-    const bHint = bankHint.trim() ? `\nBANCO EMISOR: "${bankHint.trim()}". Úsalo como banco origen.` : "";
-    const clabeHint = clabeInput.length === 18
-      ? `\nCLABE INGRESADA POR USUARIO: ${clabeInput}. Compara con la CLABE o cuenta destino visible en el comprobante.`
-      : clabeInput.length > 0 ? `\nCUENTA PARCIAL INGRESADA: ${clabeInput} (${clabeInput.length} dígitos).` : "";
 
     const fd = new FormData();
     fd.append("file", file);
     fd.append("banco_hint", bankHint);
     fd.append("clabe_hint", clabeInput);
+    // ── FIX 3: enviar fecha_pasada_confirmada al backend ─────────────────────
+    fd.append("fecha_pasada_confirmada", fechaConfirmada ? "true" : "false");
 
     try {
       const resp = await fetch(`${API_URL}/analizar`, { method: "POST", body: fd });
@@ -228,6 +225,7 @@ export default function Home() {
       if (!resp.ok) throw new Error(`Error del servidor: ${resp.status}`);
       const parsed: Resultado = await resp.json();
 
+      // Validación CLABE en frontend (complementa la del backend)
       if (clabeInput.length === 18) {
         const cv = validateCLABE(clabeInput);
         const entry: Validacion = {
@@ -244,31 +242,31 @@ export default function Home() {
 
       await tick(7);
 
-      // Si hay alerta de fecha y no está confirmada, mostrar banner antes del resultado
-      const tieneFechaAlert = parsed.validaciones?.some((v: Validacion) =>
+      // Detectar alerta de fecha (warn o fail en cualquier validación relacionada con fecha)
+      // Solo mostrar banner si el análisis NO se hizo ya con fecha confirmada
+      const tieneFechaAlert = !fechaConfirmada && parsed.validaciones?.some((v: Validacion) =>
         v.nombre?.toLowerCase().includes("fecha") && (v.status === "fail" || v.status === "warn")
       );
-      if (tieneFechaAlert && !fechaPasadaConfirmada) {
-        setResult(parsed);
-        setStage("fecha_banner" as "idle" | "loading" | "done");
-      } else {
-        setResult(parsed);
-        setStage("done");
-      }
+
+      setResult(parsed);
+      setStage(tieneFechaAlert ? "fecha_banner" : "done");
+
     } catch (e: unknown) {
       setError(`Error: ${e instanceof Error ? e.message : String(e)}`);
       setStage("idle");
     }
   };
 
-  const reset = () => { setFile(null); setPreview(null); setStage("idle"); setProgress(0); setResult(null); setError(null); setBankHint(""); setClabeInput(""); setFechaPasadaConfirmada(false); setShowFechaBanner(false); };
+  const reset = () => {
+    setFile(null); setPreview(null); setStage("idle"); setProgress(0);
+    setResult(null); setError(null); setBankHint(""); setClabeInput("");
+    setFechaPasadaConfirmada(false);
+  };
 
-  const confirmarFechaPasada = async () => {
+  // ── FIX 4: confirmarFechaPasada pasa true directamente (no depende del estado) ──
+  const confirmarFechaPasada = () => {
     setFechaPasadaConfirmada(true);
-    setShowFechaBanner(false);
-    setStage("loading");
-    setProgress(0);
-    await analyze();
+    analyze(true);   // le pasa fechaConfirmada=true sin esperar setState
   };
 
   return (
@@ -282,6 +280,8 @@ export default function Home() {
       </div>
 
       <div style={{ maxWidth: 420, margin: "0 auto", padding: "0 16px" }}>
+
+        {/* ── PANTALLA IDLE ───────────────────────────────────────────────── */}
         {stage === "idle" && (
           <>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0, marginBottom: 20, background: "rgba(255,255,255,0.05)", borderRadius: 16, padding: "14px 10px" }}>
@@ -337,7 +337,7 @@ export default function Home() {
                     )}
                   </div>
                 </div>
-                <button onClick={analyze} style={{ marginTop: 14, width: "100%", padding: 15, fontSize: 15, fontWeight: 700, borderRadius: 14, cursor: "pointer", background: TEAL, color: "#fff", border: "none" }}>
+                <button onClick={() => analyze(false)} style={{ marginTop: 14, width: "100%", padding: 15, fontSize: 15, fontWeight: 700, borderRadius: 14, cursor: "pointer", background: TEAL, color: "#fff", border: "none" }}>
                   🔍 Analizar comprobante
                 </button>
               </>
@@ -347,6 +347,7 @@ export default function Home() {
           </>
         )}
 
+        {/* ── PANTALLA LOADING ─────────────────────────────────────────────── */}
         {stage === "loading" && (
           <div style={{ background: "rgba(255,255,255,0.07)", borderRadius: 20, padding: "2rem 1.5rem", marginTop: 8, border: "1px solid rgba(255,255,255,0.1)" }}>
             <p style={{ fontWeight: 600, margin: "0 0 1rem", fontSize: 15, color: TEAL }}>{STAGES[Math.min(progress, STAGES.length - 1)]}</p>
@@ -362,28 +363,34 @@ export default function Home() {
           </div>
         )}
 
+        {/* ── BANNER FECHA PASADA ──────────────────────────────────────────── */}
         {stage === "fecha_banner" && result && (
           <div style={{ background: "#FFF8E1", border: "1.5px solid #F5A623", borderRadius: 14, padding: "20px", marginTop: 8 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#854F0B", marginBottom: 8 }}>
-              📅 ¿Este comprobante es de una fecha pasada?
+            <div style={{ fontSize: 22, textAlign: "center", marginBottom: 8 }}>📅</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#854F0B", marginBottom: 8, textAlign: "center" }}>
+              ¿Este comprobante es de una fecha pasada?
             </div>
-            <div style={{ fontSize: 13, color: "#5C3D0A", marginBottom: 16, lineHeight: 1.6 }}>
-              El sistema detectó una posible inconsistencia en la fecha. Si estás validando un comprobante de días o meses anteriores, confírmalo para obtener un análisis más preciso.
+            <div style={{ fontSize: 13, color: "#5C3D0A", marginBottom: 16, lineHeight: 1.7 }}>
+              El sistema detectó una posible inconsistencia en la fecha del comprobante.
+              Si estás validando un comprobante de días o meses anteriores, confírmalo
+              para que el análisis no penalice la fecha y sea más preciso.
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button
                 onClick={confirmarFechaPasada}
-                style={{ flex: 1, padding: "12px", fontSize: 14, fontWeight: 700, borderRadius: 10, cursor: "pointer", background: TEAL, color: "#fff", border: "none" }}>
-                ✓ Sí, es un comprobante pasado
+                style={{ width: "100%", padding: "13px", fontSize: 14, fontWeight: 700, borderRadius: 10, cursor: "pointer", background: TEAL, color: "#fff", border: "none" }}>
+                ✓ Sí, es un comprobante de fecha pasada — re-analizar
               </button>
               <button
                 onClick={() => setStage("done")}
-                style={{ flex: 1, padding: "12px", fontSize: 14, fontWeight: 600, borderRadius: 10, cursor: "pointer", background: "#fff", color: "#854F0B", border: "1.5px solid #F5A623" }}>
-                ✗ No, mantener la alerta
+                style={{ width: "100%", padding: "13px", fontSize: 14, fontWeight: 600, borderRadius: 10, cursor: "pointer", background: "#fff", color: "#854F0B", border: "1.5px solid #F5A623" }}>
+                ✗ No, mantener la alerta y ver el resultado
               </button>
             </div>
           </div>
         )}
+
+        {/* ── RESULTADO ────────────────────────────────────────────────────── */}
         {stage === "done" && result && <ResultScreen result={result} file={file} onReset={reset} />}
       </div>
     </div>
