@@ -27,6 +27,9 @@ interface Resultado {
   riesgo: RiskLevel; score: number;
   campos_extraidos: Record<string, string | null>;
   validaciones: Validacion[]; resumen: string; recomendacion: string;
+  requiere_confirmacion_fecha?: boolean;
+  mensaje_confirmacion_fecha?: string;
+  dias_diferencia?: number;
 }
 
 function validateCLABE(clabe: string) {
@@ -242,11 +245,10 @@ export default function Home() {
 
       await tick(7);
 
-      // Detectar alerta de fecha (warn o fail en cualquier validación relacionada con fecha)
-      // Solo mostrar banner si el análisis NO se hizo ya con fecha confirmada
-      const tieneFechaAlert = !fechaConfirmada && parsed.validaciones?.some((v: Validacion) =>
-        v.nombre?.toLowerCase().includes("fecha") && (v.status === "fail" || v.status === "warn")
-      );
+      // Mostrar banner si el backend detectó fecha pasada Y el usuario aún no confirmó.
+      // Usamos requiere_confirmacion_fecha (campo explícito del backend) como fuente de verdad.
+      // Esto cubre todos los casos: fecha de ayer, semana pasada, meses atrás.
+      const tieneFechaAlert = !fechaConfirmada && parsed.requiere_confirmacion_fecha === true;
 
       setResult(parsed);
       setStage(tieneFechaAlert ? "fecha_banner" : "done");
@@ -365,26 +367,31 @@ export default function Home() {
 
         {/* ── BANNER FECHA PASADA ──────────────────────────────────────────── */}
         {stage === "fecha_banner" && result && (
-          <div style={{ background: "#FFF8E1", border: "1.5px solid #F5A623", borderRadius: 14, padding: "20px", marginTop: 8 }}>
-            <div style={{ fontSize: 22, textAlign: "center", marginBottom: 8 }}>📅</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#854F0B", marginBottom: 8, textAlign: "center" }}>
-              ¿Este comprobante es de una fecha pasada?
+          <div style={{ background: "#FFF8E1", border: "1.5px solid #F5A623", borderRadius: 16, padding: "22px 20px", marginTop: 8 }}>
+            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 10 }}>📅</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#854F0B", marginBottom: 10, textAlign: "center", lineHeight: 1.4 }}>
+              Este comprobante es de una fecha pasada
             </div>
-            <div style={{ fontSize: 13, color: "#5C3D0A", marginBottom: 16, lineHeight: 1.7 }}>
-              El sistema detectó una posible inconsistencia en la fecha del comprobante.
-              Si estás validando un comprobante de días o meses anteriores, confírmalo
-              para que el análisis no penalice la fecha y sea más preciso.
+            <div style={{ fontSize: 13, color: "#5C3D0A", marginBottom: 6, lineHeight: 1.7, background: "rgba(245,166,35,0.12)", borderRadius: 8, padding: "10px 12px" }}>
+              {result.mensaje_confirmacion_fecha || (
+                "El comprobante tiene una fecha anterior a hoy. " +
+                "Si estás validando una transferencia pasada, confírmalo " +
+                "para que el sistema no penalice la fecha."
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: "#7C4A0A", marginBottom: 18, lineHeight: 1.5, paddingTop: 6 }}>
+              ⚠️ Si no confirmas, el sistema puede marcar la fecha como sospechosa y elevar el riesgo innecesariamente.
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button
                 onClick={confirmarFechaPasada}
-                style={{ width: "100%", padding: "13px", fontSize: 14, fontWeight: 700, borderRadius: 10, cursor: "pointer", background: TEAL, color: "#fff", border: "none" }}>
-                ✓ Sí, es un comprobante de fecha pasada — re-analizar
+                style={{ width: "100%", padding: "14px", fontSize: 14, fontWeight: 700, borderRadius: 10, cursor: "pointer", background: TEAL, color: "#fff", border: "none" }}>
+                ✓ Sí, es un comprobante pasado — re-analizar sin penalizar fecha
               </button>
               <button
                 onClick={() => setStage("done")}
-                style={{ width: "100%", padding: "13px", fontSize: 14, fontWeight: 600, borderRadius: 10, cursor: "pointer", background: "#fff", color: "#854F0B", border: "1.5px solid #F5A623" }}>
-                ✗ No, mantener la alerta y ver el resultado
+                style={{ width: "100%", padding: "14px", fontSize: 14, fontWeight: 600, borderRadius: 10, cursor: "pointer", background: "#fff", color: "#854F0B", border: "1.5px solid #F5A623" }}>
+                ✗ No, analizarlo normalmente
               </button>
             </div>
           </div>
