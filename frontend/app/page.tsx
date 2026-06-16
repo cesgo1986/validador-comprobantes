@@ -37,10 +37,6 @@ interface Resultado {
   mensaje_confirmacion_fecha?: string;
   dias_diferencia?: number;
 }
-  riesgo: RiskLevel; score: number;
-  campos_extraidos: Record<string, string | null>;
-  validaciones: Validacion[]; resumen: string; recomendacion: string;
-}
 
 function validateCLABE(clabe: string) {
   const c = clabe.replace(/\s/g, "");
