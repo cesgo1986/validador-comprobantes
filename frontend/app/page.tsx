@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const TEAL = "#00BFA5";
@@ -20,8 +20,23 @@ const BANKS: Record<string, string> = {
 type RiskLevel = "BAJO" | "MEDIO" | "ALTO" | "INDETERMINADO";
 type Status = "ok" | "warn" | "fail" | "info";
 
-interface Validacion { categoria: string; nombre: string; status: Status; detalle: string; }
+interface Validacion {
+  categoria: string; nombre: string; status: Status; detalle: string;
+  cep_url?: string; peso?: number; impacto?: number; confianza?: number;
+  evidencia?: string; tipo?: string;
+}
 interface Resultado {
+  riesgo: RiskLevel; score: number;
+  confianza_modelo?: number;
+  score_ocr?: number; score_visual?: number; score_contextual?: number; score_bancario?: number;
+  audit_id?: string;
+  coincidencia_fraude?: boolean; nivel_coincidencia?: number;
+  campos_extraidos: Record<string, string | null>;
+  validaciones: Validacion[]; resumen: string; recomendacion: string;
+  requiere_confirmacion_fecha?: boolean;
+  mensaje_confirmacion_fecha?: string;
+  dias_diferencia?: number;
+}
   riesgo: RiskLevel; score: number;
   campos_extraidos: Record<string, string | null>;
   validaciones: Validacion[]; resumen: string; recomendacion: string;
@@ -134,6 +149,45 @@ function ResultScreen({ result, file, onReset }: { result: Resultado; file: File
           <p style={{ margin: 0, fontSize: 13, color: "#64748B", lineHeight: 1.6 }}>{result.resumen}</p>
         </div>
       )}
+
+      {/* Confianza IA + Desglose score */}
+      {(result.confianza_modelo !== undefined || result.score_ocr !== undefined) && (
+        <div style={{ padding: "12px 24px", borderBottom: "1px solid #F0F4F8", display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {result.confianza_modelo !== undefined && (
+            <div style={{ flex: 1, minWidth: 100, background: "#F0FDF4", borderRadius: 10, padding: "10px 12px", border: "1px solid #BBF7D0" }}>
+              <div style={{ fontSize: 10, color: "#166534", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Confianza IA</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#15803D" }}>{Math.round(result.confianza_modelo * 100)}%</div>
+              <div style={{ fontSize: 11, color: "#166534" }}>{result.confianza_modelo >= 0.85 ? "Alta certeza" : result.confianza_modelo >= 0.6 ? "Certeza media" : "Baja certeza"}</div>
+            </div>
+          )}
+          {(result.score_ocr !== undefined || result.score_visual !== undefined) && (
+            <div style={{ flex: 2, minWidth: 160, background: "#F8FAFC", borderRadius: 10, padding: "10px 12px", border: "1px solid #E2E8F0" }}>
+              <div style={{ fontSize: 10, color: "#64748B", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Desglose de riesgo</div>
+              {[["OCR", result.score_ocr], ["Visual", result.score_visual], ["Contextual", result.score_contextual], ["Bancario", result.score_bancario]].filter(([, v]) => v !== undefined).map(([label, val]) => (
+                <div key={String(label)} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#475569", marginBottom: 2 }}>
+                  <span>{label}</span><span style={{ fontWeight: 600 }}>{val}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Alerta fraude histórico */}
+      {result.coincidencia_fraude && (
+        <div style={{ margin: "0 24px 12px", padding: "12px 14px", background: "#FEF2F2", borderRadius: 10, border: "1.5px solid #FCA5A5" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#991B1B", marginBottom: 2 }}>⚠️ Coincidencia con patrón fraudulento conocido</div>
+          <div style={{ fontSize: 12, color: "#7F1D1D" }}>{result.nivel_coincidencia}% similitud con fraudes registrados</div>
+        </div>
+      )}
+
+      {/* Audit ID */}
+      {result.audit_id && (
+        <div style={{ padding: "8px 24px", background: "#F8FAFC", borderBottom: "1px solid #F0F4F8" }}>
+          <div style={{ fontSize: 10, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: "0.06em" }}>ID Auditoría</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", fontFamily: "monospace" }}>{result.audit_id}</div>
+        </div>
+      )}
       {oks.length > 0 && <div style={{ padding: "8px 0" }}>{oks.map((v, i) => <ValidationRow key={i} v={v} />)}</div>}
       {warns.length > 0 && <div style={{ padding: "8px 0" }}>{warns.map((v, i) => <ValidationRow key={i} v={v} />)}</div>}
       {infos.length > 0 && <div style={{ padding: "8px 0" }}>{infos.map((v, i) => <ValidationRow key={i} v={v} />)}</div>}
@@ -180,13 +234,16 @@ export default function Home() {
   const [bankHint, setBankHint] = useState("");
   const [clabeInput, setClabeInput] = useState("");
   const [fechaPasadaConfirmada, setFechaPasadaConfirmada] = useState(false);
-  const [showFechaBanner, setShowFechaBanner] = useState(false);
   const [stage, setStage] = useState<"idle" | "loading" | "done" | "fecha_banner">("idle");
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<Resultado | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => { if (preview) URL.revokeObjectURL(preview); };
+  }, [preview]);
 
   const handleFile = useCallback((f: File) => {
     const ok = ["image/png", "image/jpeg", "image/jpg", "application/pdf"];
