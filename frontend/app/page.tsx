@@ -314,15 +314,6 @@ export default function Home() {
     }
   };
 
-  const reset = () => { setFile(null); setPreview(null); setStage("idle"); setProgress(0); setResult(null); setError(null); setBankHint(""); setClabeInput(""); setFechaPasadaConfirmada(false); setShowFechaBanner(false); };
-
-  const confirmarFechaPasada = async () => {
-    setFechaPasadaConfirmada(true);
-    setShowFechaBanner(false);
-    setStage("loading");
-    setProgress(0);
-    await analyze();
-  };
 
   return (
     <div style={{ minHeight: "100vh", background: `linear-gradient(160deg, ${DARK} 0%, #0D2137 100%)`, fontFamily: "'Inter',system-ui,sans-serif", padding: "0 0 40px" }}>
