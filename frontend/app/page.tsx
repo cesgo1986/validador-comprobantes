@@ -8,6 +8,11 @@ const ORANGE = "#F5A623";
 const RED = "#E53935";
 const GREEN = "#43A047";
 
+// FIX 3: timeout subido de 30s a 60s. El pipeline backend encadena
+// Claude Vision (5-20s) + IAT (<1s) + CEP Banxico (1-10s), y en el peor caso
+// (PDF pesado + CEP lento) se rozaba el límite anterior de 30s.
+const REQUEST_TIMEOUT_MS = 60000;
+
 const BANKS: Record<string, string> = {
   "002":"BBVA","006":"BANCOMEXT","009":"BANOBRAS","012":"HSBC","014":"SANTANDER",
   "021":"HSBC","030":"BAJIO","036":"INBURSA","037":"MULTIVA","044":"SCOTIABANK",
@@ -20,6 +25,7 @@ const BANKS: Record<string, string> = {
 type Stage = "idle" | "loading" | "done" | "fecha_banner";
 type RiskLevel = "BAJO" | "MEDIO" | "ALTO" | "CRITICO" | "INDETERMINADO";
 type Status = "ok" | "warn" | "fail" | "info";
+type CepStatus = "NO_EXISTE" | "EXISTE" | "PARCIAL" | "ERROR" | "TIMEOUT" | "FECHA_INVALIDA";
 
 interface Validacion {
   categoria: string;
@@ -39,7 +45,7 @@ interface ClabeResultado {
 
 interface CepResultado {
   found: boolean;
-  status: string;
+  status: CepStatus | string;
   confidence: number;
   match_monto?: boolean | null;
   cep_sin_monto?: boolean;
@@ -160,31 +166,40 @@ function ValidationRow({ v }: { v: Validacion }) {
 }
 
 // ── Mejora 4: Tarjeta CEP expandida ──────────────────────────────────────────
+// FIX 2 (frontend): ahora distingue explícitamente EXISTE (verificación
+// completa, monto confirmado) de PARCIAL (se localizó la operación pero el
+// monto no se pudo confirmar o no coincide). Antes ambos casos se mostraban
+// como "confirmada", lo cual era impreciso.
 function CepCard({ cep }: { cep: CepResultado }) {
   const [open, setOpen] = useState(false);
+  const status = cep.status as CepStatus;
   const found = cep.found;
   const matchMonto = cep.match_monto;
   const confianza = Math.round((cep.confidence || 0) * 100);
 
-  const bgColor  = found && matchMonto === true  ? "#F0FDF4"
-                 : found && matchMonto === false  ? "#FEF9C3"
-                 : found                          ? "#F0F9FF"
+  const esExiste = status === "EXISTE" && matchMonto === true;
+  const esParcial = status === "PARCIAL";
+  const esMontoDiferente = esParcial && matchMonto === false;
+
+  const bgColor  = esExiste            ? "#F0FDF4"
+                 : esMontoDiferente    ? "#FEF9C3"
+                 : esParcial           ? "#F0F9FF"
                  : "#F8FAFC";
-  const border   = found && matchMonto === true  ? "#86EFAC"
-                 : found && matchMonto === false  ? "#FDE047"
-                 : found                          ? "#BAE6FD"
+  const border   = esExiste            ? "#86EFAC"
+                 : esMontoDiferente    ? "#FDE047"
+                 : esParcial           ? "#BAE6FD"
                  : "#E2E8F0";
-  const titleColor = found && matchMonto === true  ? "#166534"
-                   : found && matchMonto === false  ? "#854D0E"
-                   : found                          ? "#0C4A6E"
+  const titleColor = esExiste          ? "#166534"
+                   : esMontoDiferente  ? "#854D0E"
+                   : esParcial         ? "#0C4A6E"
                    : "#475569";
-  const icon = found && matchMonto === true  ? "✅"
-             : found && matchMonto === false  ? "⚠️"
-             : found                          ? "🔍"
+  const icon = esExiste                ? "✅"
+             : esMontoDiferente        ? "⚠️"
+             : esParcial               ? "🔍"
              : "ℹ️";
-  const titulo = found && matchMonto === true  ? "Transferencia confirmada en Banxico"
-               : found && matchMonto === false  ? "Transferencia encontrada — monto difiere"
-               : found                          ? "Transferencia encontrada en Banxico"
+  const titulo = esExiste              ? "Transferencia confirmada en Banxico"
+               : esMontoDiferente      ? "Transferencia localizada — monto difiere"
+               : esParcial             ? "Operación localizada — verificación parcial"
                : "No encontrada en CEP Banxico";
 
   return (
@@ -194,7 +209,7 @@ function CepCard({ cep }: { cep: CepResultado }) {
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: titleColor }}>{titulo}</div>
           <div style={{ fontSize: 11, color: titleColor, opacity: 0.7, marginTop: 2 }}>
-            Confianza: {confianza}% · Toca para ver detalles
+            {esParcial && !esMontoDiferente ? "Monto sin confirmar · " : ""}Confianza: {confianza}% · Toca para ver detalles
           </div>
         </div>
         <span style={{ fontSize: 14, color: "#CBD5E1" }}>{open ? "▲" : "▼"}</span>
@@ -202,6 +217,11 @@ function CepCard({ cep }: { cep: CepResultado }) {
 
       {open && (
         <div style={{ padding: "0 14px 14px", borderTop: `1px solid ${border}` }}>
+          {esParcial && (
+            <div style={{ marginTop: 10, padding: "8px 10px", background: "rgba(255,255,255,0.7)", borderRadius: 8, fontSize: 11, color: titleColor, fontWeight: 600 }}>
+              ℹ️ "Parcial" significa que la operación existe en Banxico, pero no se pudo confirmar automáticamente que el monto coincide. No es lo mismo que una verificación completa.
+            </div>
+          )}
           {/* Datos de la consulta */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 10 }}>
             {cep.clave_usada && (
@@ -364,7 +384,7 @@ export default function Home() {
   const inputRef                    = useRef<HTMLInputElement>(null);
   // Mejora 2: progress independiente
   const { progress, complete: completeProgress } = useProgress(stage === "loading");
-  // Mejora 3: abort controller para timeout de 30s
+  // Mejora 3 + FIX 3: abort controller para timeout (ahora 60s en vez de 30s)
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -407,8 +427,10 @@ export default function Home() {
     setStage("loading"); setResult(null); setError(null);
     startStageLabels();
 
-    // Mejora 3: timeout de 30 segundos
-    const timeoutId = setTimeout(() => abortRef.current?.abort(), 30000);
+    // FIX 3: timeout subido de 30s a 60s — el pipeline backend
+    // (Claude Vision + IAT + CEP Banxico) puede tardar más de 28s en casos
+    // con PDF pesado + CEP lento, rozando el límite anterior.
+    const timeoutId = setTimeout(() => abortRef.current?.abort(), REQUEST_TIMEOUT_MS);
 
     const fd = new FormData();
     fd.append("file", file);
@@ -448,7 +470,7 @@ export default function Home() {
       stopStageLabels();
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("abort") || msg.includes("AbortError")) {
-        setError("El análisis tardó demasiado (30s). Intenta de nuevo o verifica tu conexión.");
+        setError(`El análisis tardó demasiado (${REQUEST_TIMEOUT_MS / 1000}s). Intenta de nuevo o verifica tu conexión.`);
       } else {
         setError(`Error: ${msg}`);
       }
