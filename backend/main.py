@@ -9,6 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import anthropic
 from dotenv import load_dotenv
 from iat import calculate_iat, fuse_scores, iat_anomalias_to_validaciones
+from services.hash_service import registrar_y_consultar_hash
+from services.auditoria_service import guardar_analisis
+from database import init_db
 
 load_dotenv()
 
@@ -20,6 +23,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Crea las tablas (hashes_documentos, analisis) si no existen y si
+# DATABASE_URL está configurada. Si no está configurada, init_db()
+# devuelve False sin lanzar excepción — la app sigue funcionando, solo
+# sin persistencia (ver database.py y hash_service.py para el detalle
+# de cómo se degrada con gracia).
+try:
+    init_db()
+except Exception as e:
+    print("Aviso: no fue posible inicializar la base de datos:", e)
 
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
@@ -494,6 +507,13 @@ async def analizar(
     fecha_legible = datetime.datetime.now().strftime("%A %d de %B de %Y")
     fecha_confirmada = fecha_pasada_confirmada.lower() == "true"
 
+    # ── Hash SHA-256 del comprobante ───────────────────────────────────────
+    # Se calcula ANTES de enviar nada a Claude. Si DATABASE_URL no está
+    # configurada todavía, esto degrada con gracia (ver hash_service.py):
+    # se calcula y reporta el hash pero no hay detección de reutilización
+    # entre peticiones distintas.
+    hash_info = registrar_y_consultar_hash(contenido)
+
     system_prompt = build_system_prompt(fecha_hoy, fecha_legible, banco_hint, clabe_hint, fecha_confirmada)
 
     if media_type == "application/pdf":
@@ -613,6 +633,35 @@ async def analizar(
             "bank_code": cv.get("bank_code", ""),
         }
 
+    # ── Hash del documento: reutilización ─────────────────────────────────────
+    # Criterio forense importante: el mismo archivo subido más de una vez NO es
+    # prueba de fraude por sí solo (puede ser un reenvío legítimo, una segunda
+    # consulta del mismo usuario, etc.). SHA-256 solo detecta "mismo archivo
+    # exacto" — no detecta una captura recortada distinta ni un PDF regenerado
+    # de la misma transferencia. Por eso esto entra como advertencia (warn) y
+    # suma 10 puntos, nunca escala el riesgo a ALTO de forma automática. La
+    # señal fuerte real vendrá del fingerprint transaccional (Fase 2).
+    result["hash_documento"] = hash_info["hash_documento"]
+    result["veces_visto"] = hash_info["veces_visto"]
+    result["documento_reutilizado"] = hash_info["documento_reutilizado"]
+
+    if hash_info["documento_reutilizado"]:
+        veces = hash_info["veces_visto"]
+        detalle_hash = (
+            "Este comprobante exacto ya fue analizado anteriormente "
+            + str(veces - 1) + " vez(es) (visto " + str(veces) + " veces en total"
+            + (". Primer analisis: " + hash_info["primer_analisis"][:10] if hash_info.get("primer_analisis") else "")
+            + "). Esto no confirma fraude por si solo: puede tratarse de un reenvio "
+            "legitimo o una segunda consulta del mismo comprobante."
+        )
+        result["validaciones"].append({
+            "categoria": "historial",
+            "nombre": "Documento previamente analizado",
+            "status": "warn",
+            "detalle": detalle_hash,
+        })
+        final_score = final_score + 10
+
     # ── Detección de fecha pasada ─────────────────────────────────────────────
     fecha_campo = campos_planos.get("fecha") or ""
     es_pasada, dias_diferencia = fecha_es_pasada(fecha_campo)
@@ -687,6 +736,23 @@ async def analizar(
         result["riesgo"] = "BAJO"
 
     result["campos_extraidos"] = campos_planos
+
+    # ── Auditoría: guardar el análisis completo ────────────────────────────────
+    # Si DATABASE_URL no está configurada, guardar_analisis() devuelve None
+    # sin lanzar excepción y la respuesta se entrega igual al usuario.
+    try:
+        audit_id = guardar_analisis(
+            hash_sha256=hash_info.get("hash_documento"),
+            score_claude=claude_score,
+            score_iat=iat_result["iat_score"],
+            score_final=result["score"],
+            riesgo=result["riesgo"],
+            resultado=result,
+        )
+        if audit_id:
+            result["audit_id"] = audit_id
+    except Exception as e:
+        print("Aviso: no fue posible guardar auditoria:", e)
 
     return result
 
