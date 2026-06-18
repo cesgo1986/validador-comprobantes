@@ -527,3 +527,6 @@ def iat_anomalias_to_validaciones(anomalias: list) -> list:
 def normalize_monto_compare(monto1: str, monto2: str) -> bool:
     """Compara dos montos normalizados. 180 == 180.00"""
     return normalize_monto(monto1) == normalize_monto(monto2)
+
+    return normalize_monto(monto1) == normalize_monto(monto2)
+

@@ -760,3 +760,6 @@ async def analizar(
 @app.get("/")
 def root():
     return {"status": "ok", "servicio": "VerificaPago API v2", "modelo": MODEL_NAME}
+
+    return {"status": "ok", "servicio": "VerificaPago API v2", "modelo": MODEL_NAME}
+
