@@ -1,0 +1,241 @@
+"""
+services/dashboard_service.py — Queries que alimentan los endpoints /api/v1/dashboard/*.
+
+Todos los queries filtran por empresa_id. En este MVP siempre es
+DEFAULT_EMPRESA_ID, pero la firma de cada funcion ya recibe empresa_id
+como parametro para no requerir cambios cuando se active multiempresa
+real con autenticacion.
+"""
+import datetime
+from sqlalchemy import select, func, desc
+from models.analisis import Analisis
+from models.hash_documento import HashDocumento
+from database import get_db_session, DEFAULT_EMPRESA_ID
+
+
+def obtener_stats(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_desde: str | None = None, fecha_hasta: str | None = None) -> dict:
+    """
+    Metricas generales: total de analisis, analisis de hoy, score
+    promedio, y distribucion por nivel de riesgo.
+    """
+    with get_db_session() as db:
+        if db is None:
+            return {
+                "total_analisis": 0, "analisis_hoy": 0, "score_promedio": None,
+                "distribucion_riesgo": [], "documentos_unicos": 0, "documentos_reutilizados": 0,
+            }
+
+        base_filtro = [Analisis.empresa_id == empresa_id, Analisis.deleted_at.is_(None)]
+        if fecha_desde:
+            base_filtro.append(Analisis.fecha >= fecha_desde)
+        if fecha_hasta:
+            base_filtro.append(Analisis.fecha <= fecha_hasta)
+
+        total = db.execute(select(func.count(Analisis.id)).where(*base_filtro)).scalar() or 0
+
+        hoy = datetime.date.today()
+        analisis_hoy = db.execute(
+            select(func.count(Analisis.id)).where(
+                Analisis.empresa_id == empresa_id,
+                Analisis.deleted_at.is_(None),
+                func.date(Analisis.fecha) == hoy,
+            )
+        ).scalar() or 0
+
+        score_promedio = db.execute(select(func.avg(Analisis.score_final)).where(*base_filtro)).scalar()
+
+        distribucion_rows = db.execute(
+            select(Analisis.riesgo, func.count(Analisis.id))
+            .where(*base_filtro)
+            .group_by(Analisis.riesgo)
+        ).all()
+        distribucion_riesgo = [{"riesgo": r or "INDETERMINADO", "total": c} for r, c in distribucion_rows]
+
+        documentos_unicos = db.execute(
+            select(func.count(HashDocumento.id)).where(
+                HashDocumento.empresa_id == empresa_id,
+                HashDocumento.deleted_at.is_(None),
+            )
+        ).scalar() or 0
+
+        documentos_reutilizados = db.execute(
+            select(func.count(HashDocumento.id)).where(
+                HashDocumento.empresa_id == empresa_id,
+                HashDocumento.deleted_at.is_(None),
+                HashDocumento.veces_visto > 1,
+            )
+        ).scalar() or 0
+
+        return {
+            "total_analisis": total,
+            "analisis_hoy": analisis_hoy,
+            "score_promedio": round(float(score_promedio), 2) if score_promedio is not None else None,
+            "distribucion_riesgo": distribucion_riesgo,
+            "documentos_unicos": documentos_unicos,
+            "documentos_reutilizados": documentos_reutilizados,
+        }
+
+
+def listar_analisis(
+    empresa_id: str = DEFAULT_EMPRESA_ID,
+    limit: int = 50,
+    offset: int = 0,
+    riesgo: str | None = None,
+    hash_sha256: str | None = None,
+) -> dict:
+    """Listado paginado de analisis, mas reciente primero."""
+    with get_db_session() as db:
+        if db is None:
+            return {"items": [], "total": 0}
+
+        filtros = [Analisis.empresa_id == empresa_id, Analisis.deleted_at.is_(None)]
+        if riesgo:
+            filtros.append(Analisis.riesgo == riesgo)
+        if hash_sha256:
+            filtros.append(Analisis.hash_sha256 == hash_sha256)
+
+        total = db.execute(select(func.count(Analisis.id)).where(*filtros)).scalar() or 0
+
+        rows = db.execute(
+            select(Analisis)
+            .where(*filtros)
+            .order_by(desc(Analisis.fecha))
+            .limit(limit)
+            .offset(offset)
+        ).scalars().all()
+
+        items = [
+            {
+                "id": str(r.id),
+                "fecha": r.fecha.isoformat() if r.fecha else None,
+                "hash_sha256": r.hash_sha256,
+                "score_claude": float(r.score_claude) if r.score_claude is not None else None,
+                "score_iat": float(r.score_iat) if r.score_iat is not None else None,
+                "score_final": float(r.score_final) if r.score_final is not None else None,
+                "riesgo": r.riesgo,
+                "archivo_nombre": r.archivo_nombre,
+                "banco_detectado": r.banco_detectado,
+                "monto_detectado": float(r.monto_detectado) if r.monto_detectado is not None else None,
+            }
+            for r in rows
+        ]
+        return {"items": items, "total": total}
+
+
+def obtener_analisis_detalle(analisis_id: str, empresa_id: str = DEFAULT_EMPRESA_ID) -> dict | None:
+    """Detalle completo de un analisis, incluyendo el JSONB resultado y el historial del hash."""
+    with get_db_session() as db:
+        if db is None:
+            return None
+
+        registro = db.execute(
+            select(Analisis).where(
+                Analisis.id == analisis_id,
+                Analisis.empresa_id == empresa_id,
+                Analisis.deleted_at.is_(None),
+            )
+        ).scalar_one_or_none()
+
+        if registro is None:
+            return None
+
+        historial_hash = None
+        if registro.hash_sha256:
+            hash_row = db.execute(
+                select(HashDocumento).where(
+                    HashDocumento.empresa_id == empresa_id,
+                    HashDocumento.hash_sha256 == registro.hash_sha256,
+                )
+            ).scalar_one_or_none()
+            if hash_row:
+                historial_hash = {
+                    "veces_visto": hash_row.veces_visto,
+                    "primer_analisis": hash_row.primer_analisis.isoformat(),
+                    "ultimo_analisis": hash_row.ultimo_analisis.isoformat(),
+                }
+
+        return {
+            "id": str(registro.id),
+            "fecha": registro.fecha.isoformat() if registro.fecha else None,
+            "hash_sha256": registro.hash_sha256,
+            "score_claude": float(registro.score_claude) if registro.score_claude is not None else None,
+            "score_iat": float(registro.score_iat) if registro.score_iat is not None else None,
+            "score_final": float(registro.score_final) if registro.score_final is not None else None,
+            "riesgo": registro.riesgo,
+            "archivo_nombre": registro.archivo_nombre,
+            "archivo_tipo": registro.archivo_tipo,
+            "monto_detectado": float(registro.monto_detectado) if registro.monto_detectado is not None else None,
+            "banco_detectado": registro.banco_detectado,
+            "clabe_detectada": registro.clabe_detectada,
+            "resultado": registro.resultado,
+            "historial_hash": historial_hash,
+        }
+
+
+def top_hashes_reutilizados(empresa_id: str = DEFAULT_EMPRESA_ID, min_veces: int = 2, limit: int = 20) -> list:
+    """Hashes con mayor veces_visto -- el primer detector de fraude recurrente."""
+    with get_db_session() as db:
+        if db is None:
+            return []
+
+        rows = db.execute(
+            select(HashDocumento)
+            .where(
+                HashDocumento.empresa_id == empresa_id,
+                HashDocumento.deleted_at.is_(None),
+                HashDocumento.veces_visto >= min_veces,
+            )
+            .order_by(desc(HashDocumento.veces_visto))
+            .limit(limit)
+        ).scalars().all()
+
+        resultado = []
+        for h in rows:
+            riesgo_max_row = db.execute(
+                select(Analisis.riesgo)
+                .where(Analisis.empresa_id == empresa_id, Analisis.hash_sha256 == h.hash_sha256)
+                .order_by(desc(Analisis.score_final))
+                .limit(1)
+            ).scalar_one_or_none()
+
+            resultado.append({
+                "hash_sha256": h.hash_sha256,
+                "veces_visto": h.veces_visto,
+                "primer_analisis": h.primer_analisis.isoformat(),
+                "ultimo_analisis": h.ultimo_analisis.isoformat(),
+                "riesgo_max": riesgo_max_row,
+            })
+        return resultado
+
+
+def tendencia_diaria(empresa_id: str = DEFAULT_EMPRESA_ID, dias: int = 30) -> list:
+    """Serie diaria de totales y score promedio, para graficar tendencias."""
+    with get_db_session() as db:
+        if db is None:
+            return []
+
+        desde = datetime.date.today() - datetime.timedelta(days=dias)
+
+        rows = db.execute(
+            select(
+                func.date(Analisis.fecha).label("dia"),
+                func.count(Analisis.id),
+                func.avg(Analisis.score_final),
+            )
+            .where(
+                Analisis.empresa_id == empresa_id,
+                Analisis.deleted_at.is_(None),
+                Analisis.fecha >= desde,
+            )
+            .group_by(func.date(Analisis.fecha))
+            .order_by(func.date(Analisis.fecha))
+        ).all()
+
+        return [
+            {
+                "fecha": dia.isoformat() if hasattr(dia, "isoformat") else str(dia),
+                "total": total,
+                "score_promedio": round(float(score_avg), 2) if score_avg is not None else None,
+            }
+            for dia, total, score_avg in rows
+        ]

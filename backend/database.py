@@ -6,9 +6,12 @@ con gracia si DATABASE_URL no esta configurada. Ver models/ para el
 schema multiempresa nuevo.
 """
 import os
+from dotenv import load_dotenv
 from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+
+load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 

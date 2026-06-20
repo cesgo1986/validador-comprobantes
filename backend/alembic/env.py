@@ -21,7 +21,10 @@ config = context.config
 # Sobreescribimos la URL del .ini con la de la variable de entorno
 # DATABASE_URL, para no tener que mantener dos lugares sincronizados.
 if DATABASE_URL:
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
+    config.set_main_option(
+    "sqlalchemy.url",
+    DATABASE_URL.replace("%", "%%")
+)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

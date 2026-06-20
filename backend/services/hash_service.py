@@ -1,35 +1,37 @@
 """
-services/hash_service.py — Lógica de hash SHA-256 y detección de reutilización.
+services/hash_service.py — Logica de hash SHA-256 y deteccion de reutilizacion.
 
-Diseñado para no tronar la app si DATABASE_URL todavía no está configurada:
-si get_db_session() cede None (ver database.py), simplemente se omite el
-registro en base de datos y se devuelve el hash con veces_visto=1, sin
-lanzar excepción. Esto permite desplegar el cálculo del hash ANTES de
-tener PostgreSQL aprovisionado en Render, y activar la persistencia
-después sin tocar main.py otra vez.
+Actualizado para multiempresa: ahora se consulta por (empresa_id, hash_sha256)
+en vez de usar hash_sha256 como PK directa. Esto aisla los contadores de
+veces_visto entre empresas distintas -- la empresa A nunca puede inferir,
+ni indirectamente, que la empresa B ya subio el mismo comprobante.
+
+Sigue degradando con gracia si DATABASE_URL no esta configurada.
 """
 import hashlib
 import datetime
+import uuid
+from sqlalchemy import select
 from models.hash_documento import HashDocumento
-from database import get_db_session
+from database import get_db_session, DEFAULT_EMPRESA_ID
 
 
 def calcular_hash(contenido: bytes) -> str:
     return hashlib.sha256(contenido).hexdigest()
 
 
-def registrar_y_consultar_hash(contenido: bytes) -> dict:
+def registrar_y_consultar_hash(contenido: bytes, empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
     """
     Calcula el SHA-256 del archivo, lo registra (o actualiza el contador
-    si ya existía) en hashes_documentos, y devuelve info lista para
-    insertar en el resultado del análisis.
+    si ya existia PARA ESA EMPRESA) en hashes_documentos, y devuelve info
+    lista para insertar en el resultado del analisis.
 
     Retorna:
       {
         "hash_documento": str,
         "veces_visto": int,
-        "documento_reutilizado": bool,  # True si veces_visto > 1
-        "primer_analisis": str | None,  # ISO format, None si es la primera vez
+        "documento_reutilizado": bool,
+        "primer_analisis": str | None,
       }
     """
     hash_doc = calcular_hash(contenido)
@@ -37,9 +39,6 @@ def registrar_y_consultar_hash(contenido: bytes) -> dict:
 
     with get_db_session() as db:
         if db is None:
-            # DATABASE_URL no configurada todavia: degradamos con gracia,
-            # el hash se calcula y se reporta pero no hay persistencia ni
-            # deteccion de reutilizacion entre peticiones.
             return {
                 "hash_documento": hash_doc,
                 "veces_visto": 1,
@@ -47,7 +46,11 @@ def registrar_y_consultar_hash(contenido: bytes) -> dict:
                 "primer_analisis": None,
             }
 
-        existente = db.get(HashDocumento, hash_doc)
+        stmt = select(HashDocumento).where(
+            HashDocumento.empresa_id == empresa_id,
+            HashDocumento.hash_sha256 == hash_doc,
+        )
+        existente = db.execute(stmt).scalar_one_or_none()
 
         if existente:
             existente.veces_visto += 1
@@ -56,6 +59,8 @@ def registrar_y_consultar_hash(contenido: bytes) -> dict:
             veces_visto = existente.veces_visto
         else:
             nuevo = HashDocumento(
+                id=uuid.uuid4(),
+                empresa_id=empresa_id,
                 hash_sha256=hash_doc,
                 primer_analisis=ahora,
                 ultimo_analisis=ahora,
