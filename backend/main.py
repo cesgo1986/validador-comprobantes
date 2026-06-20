@@ -4,14 +4,15 @@ import datetime
 import re
 import os
 import httpx
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, APIRouter, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 import anthropic
 from dotenv import load_dotenv
 from iat import calculate_iat, fuse_scores, iat_anomalias_to_validaciones
 from services.hash_service import registrar_y_consultar_hash
 from services.auditoria_service import guardar_analisis
-from database import init_db
+from services import dashboard_service
+from database import init_db, DEFAULT_EMPRESA_ID
 
 load_dotenv()
 
@@ -512,7 +513,9 @@ async def analizar(
     # configurada todavía, esto degrada con gracia (ver hash_service.py):
     # se calcula y reporta el hash pero no hay detección de reutilización
     # entre peticiones distintas.
-    hash_info = registrar_y_consultar_hash(contenido)
+    # empresa_id usa DEFAULT_EMPRESA_ID mientras no exista autenticación
+    # multiempresa real (ver database.py).
+    hash_info = registrar_y_consultar_hash(contenido, empresa_id=DEFAULT_EMPRESA_ID)
 
     system_prompt = build_system_prompt(fecha_hoy, fecha_legible, banco_hint, clabe_hint, fecha_confirmada)
 
@@ -561,6 +564,18 @@ async def analizar(
 
     banco_origen = campos_planos.get("banco_origen") or banco_hint or None
     iat_result = calculate_iat(campos_planos, banco_origen)
+
+    # ── Columnas desnormalizadas para el dashboard ──────────────────────────
+    # Se calculan aqui (independiente del bloque CEP, que solo corre bajo
+    # ciertas condiciones) para que siempre esten disponibles al guardar la
+    # auditoria, permitiendo filtros rapidos en /api/v1/dashboard/* sin abrir
+    # el JSONB resultado.
+    monto_detectado_general = normalize_monto_float(str(campos_planos.get("monto") or ""))
+    if monto_detectado_general <= 0 and campos_planos.get("monto_texto"):
+        monto_detectado_general = normalize_monto_float(str(campos_planos.get("monto_texto")))
+    clabe_detectada_general = (
+        (campos_planos.get("clabe_parcial") or "").replace(" ", "").replace("*", "").replace(".", "")
+    )[:18] or None
 
     claude_score = result.get("score", 50)
     final_score = fuse_scores(claude_score, iat_result["iat_score"])
@@ -740,6 +755,8 @@ async def analizar(
     # ── Auditoría: guardar el análisis completo ────────────────────────────────
     # Si DATABASE_URL no está configurada, guardar_analisis() devuelve None
     # sin lanzar excepción y la respuesta se entrega igual al usuario.
+    # empresa_id usa DEFAULT_EMPRESA_ID mientras no exista autenticación
+    # multiempresa real (ver database.py).
     try:
         audit_id = guardar_analisis(
             hash_sha256=hash_info.get("hash_documento"),
@@ -748,6 +765,12 @@ async def analizar(
             score_final=result["score"],
             riesgo=result["riesgo"],
             resultado=result,
+            empresa_id=DEFAULT_EMPRESA_ID,
+            archivo_nombre=file.filename,
+            archivo_tipo=media_type,
+            monto_detectado=monto_detectado_general if monto_detectado_general > 0 else None,
+            banco_detectado=campos_planos.get("banco_origen") or banco_hint or None,
+            clabe_detectada=clabe_detectada_general,
         )
         if audit_id:
             result["audit_id"] = audit_id
@@ -757,9 +780,74 @@ async def analizar(
     return result
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# DASHBOARD DE AUDITORIA — /api/v1/dashboard/*
+# ─────────────────────────────────────────────────────────────────────────────
+# Rutas nuevas, versionadas desde el inicio bajo /api/v1/. El endpoint
+# /analizar NO se toca ni se mueve aqui -- ya esta en produccion y conectado
+# al frontend, y no aporta valor romperlo ahora (ver discusion en el chat).
+#
+# Todos los endpoints reciben empresa_id como query param opcional, con
+# default DEFAULT_EMPRESA_ID. Esto permite que, cuando se active
+# multiempresa real con autenticacion, el frontend solo necesite empezar a
+# enviar el empresa_id correcto -- sin que estos endpoints cambien de forma.
+
+dashboard_router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
+
+
+@dashboard_router.get("/stats")
+def dashboard_stats(
+    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    fecha_desde: str | None = Query(default=None),
+    fecha_hasta: str | None = Query(default=None),
+):
+    return dashboard_service.obtener_stats(empresa_id=empresa_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta)
+
+
+@dashboard_router.get("/analisis")
+def dashboard_listar_analisis(
+    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0),
+    riesgo: str | None = Query(default=None),
+    hash_sha256: str | None = Query(default=None),
+):
+    return dashboard_service.listar_analisis(
+        empresa_id=empresa_id, limit=limit, offset=offset, riesgo=riesgo, hash_sha256=hash_sha256
+    )
+
+
+@dashboard_router.get("/analisis/{analisis_id}")
+def dashboard_detalle_analisis(
+    analisis_id: str,
+    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+):
+    detalle = dashboard_service.obtener_analisis_detalle(analisis_id=analisis_id, empresa_id=empresa_id)
+    if detalle is None:
+        raise HTTPException(status_code=404, detail="Analisis no encontrado")
+    return detalle
+
+
+@dashboard_router.get("/hashes")
+def dashboard_top_hashes(
+    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    min_veces: int = Query(default=2),
+    limit: int = Query(default=20, le=100),
+):
+    return dashboard_service.top_hashes_reutilizados(empresa_id=empresa_id, min_veces=min_veces, limit=limit)
+
+
+@dashboard_router.get("/tendencia")
+def dashboard_tendencia(
+    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    dias: int = Query(default=30, le=365),
+):
+    return dashboard_service.tendencia_diaria(empresa_id=empresa_id, dias=dias)
+
+
+app.include_router(dashboard_router)
+
+
 @app.get("/")
 def root():
     return {"status": "ok", "servicio": "VerificaPago API v2", "modelo": MODEL_NAME}
-
-    return {"status": "ok", "servicio": "VerificaPago API v2", "modelo": MODEL_NAME}
-
