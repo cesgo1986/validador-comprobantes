@@ -13,6 +13,10 @@ from services.hash_service import registrar_y_consultar_hash
 from services.auditoria_service import guardar_analisis
 from services import dashboard_service
 from database import init_db, DEFAULT_EMPRESA_ID
+from scoring_v3 import (
+    EstadoOperacion, mapear_estado_cep_a_estado_operacion,
+    evaluar_contexto_temporal, evaluar_verificabilidad, generar_interpretacion,
+)
 
 load_dotenv()
 
@@ -699,6 +703,8 @@ async def analizar(
     monto_texto_str = campos_planos.get("monto_texto") or ""
     fecha_str = campos_planos.get("fecha") or ""
 
+    cep = None  # queda None si no hubo datos suficientes para intentar la consulta
+
     if (clave_rastreo or referencia) and fecha_str:
         monto_num = normalize_monto_float(str(monto_str)) if monto_str else 0.0
         if monto_num <= 0 and monto_texto_str:
@@ -735,11 +741,17 @@ async def analizar(
         result["validaciones"].append(cep_entry)
         result["cep_resultado"] = cep
 
-        # Solo penalizar score si el monto definitivamente no coincide
+        # Solo penalizar score legacy si el monto definitivamente no coincide
         if cep.get("found") and cep.get("match_monto") is False and monto_num > 0:
             final_score = max(final_score, 50)
 
-    # ── Score y riesgo final ──────────────────────────────────────────────────
+    # ── Score y riesgo final (legacy, sin cambios de logica, solo clamping) ────
+    # FIX: se detecto en produccion un score de 101.5 -- ocurria porque las
+    # lineas "final_score = max(final_score, N)" de arriba no tienen techo
+    # si final_score ya superaba 100 antes de esa linea (ej. fusion de
+    # Claude+IAT+ajustes). Se mantiene la logica intacta, solo se agrega
+    # clamping final a [0,100].
+    final_score = max(0.0, min(100.0, final_score))
     result["score"] = round(final_score, 2)
     if final_score >= 81:
         result["riesgo"] = "CRITICO"
@@ -751,6 +763,53 @@ async def analizar(
         result["riesgo"] = "BAJO"
 
     result["campos_extraidos"] = campos_planos
+
+    # ── Scoring v3: 4 dimensiones separadas ─────────────────────────────────────
+    # confianza_documental / verificabilidad / contexto_temporal / estado_operacion.
+    # No reemplazan a score/riesgo (arriba) -- son campos NUEVOS y adicionales.
+    # Ver scoring_v3.py para el detalle de que esta anclado a Circular 14/2017 +
+    # estados oficiales de consulta SPEI, y que es decision de producto.
+    estado_operacion = mapear_estado_cep_a_estado_operacion(
+        status_cep=(cep.get("status") if cep else "NO_EXISTE"),
+        found=bool(cep and cep.get("found")),
+    )
+
+    contexto_temporal_result = evaluar_contexto_temporal(
+        fecha_comprobante=campos_planos.get("fecha"),
+        hora_comprobante=campos_planos.get("hora"),
+        estado_operacion=estado_operacion,
+    )
+
+    verificabilidad_result = evaluar_verificabilidad(
+        campos_planos=campos_planos,
+        estado_operacion=estado_operacion,
+        cep_resultado=cep,
+    )
+
+    # confianza_documental reutiliza el score de Claude (analisis visual/OCR)
+    # ya que esa es exactamente la pregunta que claude_score responde: ?se ve
+    # autentico el documento? No incluye CEP ni tiempo, que es justo lo que
+    # buscabamos separar. claude_score en el prompt actual es una escala de
+    # RIESGO documental (0=riesgo bajo, 100=riesgo critico); confianza_documental
+    # es su inverso, con clamping a [0,100] por si claude_score se desvia del
+    # rango esperado (ver el bug de score>100 detectado en produccion).
+    confianza_documental = max(0.0, min(100.0, 100.0 - claude_score))
+
+    result["confianza_documental"] = confianza_documental
+    result["verificabilidad"] = verificabilidad_result["score"]
+    result["contexto_temporal"] = contexto_temporal_result["score"]
+    result["estado_operacion"] = estado_operacion.value
+    result["contexto_operacional"] = None  # reservado para version futura (MonSPEI/incidentes)
+
+    result["interpretacion"] = generar_interpretacion(
+        confianza_documental=confianza_documental,
+        verificabilidad=verificabilidad_result["score"],
+        contexto_temporal=contexto_temporal_result["score"],
+        estado_operacion=estado_operacion,
+    )
+
+    result["detalle_temporal"] = contexto_temporal_result["explicacion"]
+    result["elementos_verificabilidad"] = verificabilidad_result["elementos_disponibles"]
 
     # ── Auditoría: guardar el análisis completo ────────────────────────────────
     # Si DATABASE_URL no está configurada, guardar_analisis() devuelve None
@@ -850,5 +909,4 @@ app.include_router(dashboard_router)
 
 @app.get("/")
 def root():
-
     return {"status": "ok", "servicio": "VerificaPago API v2", "modelo": MODEL_NAME}
