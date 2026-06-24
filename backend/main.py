@@ -910,3 +910,4 @@ app.include_router(dashboard_router)
 @app.get("/")
 def root():
     return {"status": "ok", "servicio": "VerificaPago API v2", "modelo": MODEL_NAME}
+
