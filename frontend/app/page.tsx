@@ -25,7 +25,9 @@ const BANKS: Record<string, string> = {
 type Stage = "idle" | "loading" | "done" | "fecha_banner";
 type RiskLevel = "BAJO" | "MEDIO" | "ALTO" | "CRITICO" | "INDETERMINADO";
 type Status = "ok" | "warn" | "fail" | "info";
-type CepStatus = "NO_EXISTE" | "EXISTE" | "PARCIAL" | "ERROR" | "TIMEOUT" | "FECHA_INVALIDA";
+type EstadoOperacion =
+  | "acreditada" | "liquidada" | "en_proceso" | "devuelta" | "en_devolucion"
+  | "rechazada" | "cancelada" | "no_liquidada" | "desconocida";
 
 interface Validacion {
   categoria: string;
@@ -45,7 +47,7 @@ interface ClabeResultado {
 
 interface CepResultado {
   found: boolean;
-  status: CepStatus | string;
+  status: string;
   confidence: number;
   match_monto?: boolean | null;
   cep_sin_monto?: boolean;
@@ -58,8 +60,11 @@ interface CepResultado {
 }
 
 interface Resultado {
+  // Legacy -- se mantiene en el tipo por compatibilidad con el JSON del
+  // backend, pero la UI de resultado ya no lo usa como protagonista.
   riesgo: RiskLevel;
   score: number;
+
   campos_extraidos: Record<string, string | null>;
   validaciones: Validacion[];
   resumen: string;
@@ -67,13 +72,24 @@ interface Resultado {
   requiere_confirmacion_fecha?: boolean;
   mensaje_confirmacion_fecha?: string;
   dias_diferencia?: number;
-  // Mejora 1: CLABE ya validada por el backend
   clabe_resultado?: ClabeResultado;
   clabe_comprobante?: { valid: boolean; bank?: string; bank_code?: string };
-  // Mejora 4: CEP completo
   cep_resultado?: CepResultado;
-  confianza_modelo?: number;
   audit_id?: string;
+
+  // Scoring v3 -- las 4 dimensiones reales que muestra la nueva UI.
+  confianza_documental: number;
+  verificabilidad: number;
+  contexto_temporal: number;
+  estado_operacion: EstadoOperacion;
+  contexto_operacional: number | null;
+  interpretacion: string;
+  detalle_temporal?: string;
+  elementos_verificabilidad?: string[];
+
+  hash_documento?: string;
+  veces_visto?: number;
+  documento_reutilizado?: boolean;
 }
 
 // ── Mejora 2: progress independiente del fetch ────────────────────────────────
@@ -101,22 +117,55 @@ function useProgress(active: boolean) {
   return { progress, complete };
 }
 
-function GaugeCircle({ score }: { score: number }) {
-  const pct = Math.min(100, Math.max(0, score));
-  const color = pct <= 33 ? GREEN : pct <= 66 ? ORANGE : RED;
-  const r = 38, circ = 2 * Math.PI * r, arc = circ * 0.75, filled = (pct / 100) * arc;
+// ── Scoring v3: 4 dimensiones separadas, en vez de un solo gauge ────────────
+// Confianza documental, verificabilidad y contexto temporal son scores
+// 0-100. Estado de operación es categórico (no es un score), así que se
+// muestra como badge, no como barra.
+
+const ESTADO_OPERACION_CONFIG: Record<EstadoOperacion, { label: string; color: string; bg: string }> = {
+  acreditada:    { label: "Acreditada en Banxico",     color: GREEN,  bg: `${GREEN}18` },
+  liquidada:     { label: "Liquidada, CEP pendiente",  color: GREEN,  bg: `${GREEN}18` },
+  en_proceso:    { label: "En proceso",                color: TEAL,   bg: `${TEAL}18` },
+  devuelta:      { label: "Devuelta al emisor",        color: ORANGE, bg: `${ORANGE}18` },
+  en_devolucion: { label: "En proceso de devolución",  color: ORANGE, bg: `${ORANGE}18` },
+  rechazada:     { label: "Rechazada por SPEI",        color: RED,    bg: `${RED}18` },
+  cancelada:     { label: "Cancelada antes de liquidar", color: RED,  bg: `${RED}18` },
+  no_liquidada:  { label: "No liquidada en la jornada", color: RED,   bg: `${RED}18` },
+  desconocida:   { label: "Sin información disponible", color: "#9CA3AF", bg: "rgba(156,163,175,0.15)" },
+};
+
+function dimensionColor(score: number): string {
+  if (score >= 75) return GREEN;
+  if (score >= 45) return ORANGE;
+  return RED;
+}
+
+function DimensionCard({
+  label, score, sublabel,
+}: { label: string; score: number; sublabel?: string }) {
+  const color = dimensionColor(score);
   return (
-    <div style={{ position: "relative", width: 100, height: 100, flexShrink: 0 }}>
-      <svg width="100" height="100" viewBox="0 0 100 100">
-        <circle cx="50" cy="58" r={r} fill="none" stroke="#E8EDF5" strokeWidth="8"
-          strokeDasharray={`${arc} ${circ - arc}`} strokeLinecap="round" transform="rotate(135 50 58)" />
-        <circle cx="50" cy="58" r={r} fill="none" stroke={color} strokeWidth="8"
-          strokeDasharray={`${filled} ${circ - filled}`} strokeLinecap="round"
-          transform="rotate(135 50 58)" style={{ transition: "stroke-dasharray 0.3s ease, stroke 0.5s" }} />
-      </svg>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 8 }}>
-        <span style={{ fontSize: 28, fontWeight: 800, color, lineHeight: 1 }}>{Math.round(pct)}</span>
-        <span style={{ fontSize: 12, color: "#9CA3AF", fontWeight: 500 }}>/100</span>
+    <div style={{ flex: 1, minWidth: 0, background: "#F8FAFC", borderRadius: 14, padding: "14px 14px", border: "1px solid #EEF2F7" }}>
+      <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 8 }}>{label}</div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 8 }}>
+        <span style={{ fontSize: 26, fontWeight: 800, color, lineHeight: 1 }}>{Math.round(score)}</span>
+        <span style={{ fontSize: 12, color: "#CBD5E1", fontWeight: 600 }}>/100</span>
+      </div>
+      <div style={{ height: 5, background: "#E8EDF5", borderRadius: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, score))}%`, background: color, borderRadius: 3, transition: "width 0.4s ease" }} />
+      </div>
+      {sublabel && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 6, lineHeight: 1.4 }}>{sublabel}</div>}
+    </div>
+  );
+}
+
+function EstadoOperacionBadge({ estado }: { estado: EstadoOperacion }) {
+  const cfg = ESTADO_OPERACION_CONFIG[estado] || ESTADO_OPERACION_CONFIG.desconocida;
+  return (
+    <div style={{ flex: 1, minWidth: 0, background: "#F8FAFC", borderRadius: 14, padding: "14px 14px", border: "1px solid #EEF2F7" }}>
+      <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 8 }}>Estado de la operación</div>
+      <div style={{ display: "inline-block", padding: "6px 12px", borderRadius: 8, background: cfg.bg, color: cfg.color, fontSize: 13, fontWeight: 700 }}>
+        {cfg.label}
       </div>
     </div>
   );
@@ -172,7 +221,7 @@ function ValidationRow({ v }: { v: Validacion }) {
 // como "confirmada", lo cual era impreciso.
 function CepCard({ cep }: { cep: CepResultado }) {
   const [open, setOpen] = useState(false);
-  const status = cep.status as CepStatus;
+  const status = cep.status;
   const found = cep.found;
   const matchMonto = cep.match_monto;
   const confianza = Math.round((cep.confidence || 0) * 100);
@@ -271,41 +320,55 @@ function CepCard({ cep }: { cep: CepResultado }) {
 }
 
 function ResultScreen({ result, file, onReset }: { result: Resultado; file: File | null; onReset: () => void }) {
-  const riskCfg = {
-    BAJO:          { label: "BAJO",          color: GREEN },
-    MEDIO:         { label: "MEDIO",         color: ORANGE },
-    ALTO:          { label: "ALTO",          color: RED },
-    CRITICO:       { label: "CRÍTICO",       color: RED },
-    INDETERMINADO: { label: "INDETERMINADO", color: "#9CA3AF" },
-  };
-  const rc = riskCfg[result.riesgo] || riskCfg.INDETERMINADO;
   // Separar validaciones — excluir la de CEP porque la mostramos en CepCard
   const validaciones = result.validaciones || [];
   const oks    = validaciones.filter(v => v.status === "ok"   && v.categoria !== "cep");
   const warns  = validaciones.filter(v => (v.status === "warn" || v.status === "fail") && v.categoria !== "cep");
   const infos  = validaciones.filter(v => v.status === "info" && v.categoria !== "cep");
 
+  // Encabezado de una línea: la dimensión más débil de las 3 numéricas
+  // determina el tono general, sin fusionarlas en un solo número.
+  const minDimension = Math.min(result.confianza_documental, result.verificabilidad, result.contexto_temporal);
+  const tonoGeneral = minDimension >= 75 ? GREEN : minDimension >= 45 ? ORANGE : RED;
+
   return (
-    <div style={{ background: "#fff", borderRadius: 24, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.15)", maxWidth: 380, margin: "0 auto" }}>
+    <div style={{ background: "#fff", borderRadius: 24, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.15)", maxWidth: 420, margin: "0 auto" }}>
       {/* Header */}
       <div style={{ background: DARK, padding: "18px 20px", textAlign: "center" }}>
         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>Resultado del análisis</div>
         {file && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>📄 {file.name}</div>}
       </div>
 
-      {/* Score y riesgo */}
-      <div style={{ padding: "24px 24px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #F0F4F8" }}>
-        <div>
-          <div style={{ fontSize: 12, color: "#9CA3AF", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>RIESGO</div>
-          <div style={{ fontSize: 36, fontWeight: 800, color: rc.color, lineHeight: 1, letterSpacing: "-1px" }}>{rc.label}</div>
-        </div>
-        <GaugeCircle score={result.score} />
+      {/* Interpretación: la conclusión en prosa, no un solo número */}
+      <div style={{ padding: "20px 24px 4px" }}>
+        <div style={{ width: 4, height: 18, background: tonoGeneral, borderRadius: 2, display: "inline-block", marginRight: 8, verticalAlign: "middle" }} />
+        <span style={{ fontSize: 14, color: "#1E293B", lineHeight: 1.6, fontWeight: 500 }}>
+          {result.interpretacion || result.resumen}
+        </span>
       </div>
 
-      {/* Resumen */}
-      {result.resumen && (
-        <div style={{ padding: "12px 24px", background: "#F8FAFC", borderBottom: "1px solid #F0F4F8" }}>
-          <p style={{ margin: 0, fontSize: 13, color: "#64748B", lineHeight: 1.6 }}>{result.resumen}</p>
+      {/* Documento reutilizado — señal de advertencia, no de fraude automático */}
+      {result.documento_reutilizado && (
+        <div style={{ margin: "12px 24px 0", padding: "10px 14px", background: `${ORANGE}12`, border: `1px solid ${ORANGE}40`, borderRadius: 10, fontSize: 12, color: "#7C4A0A", lineHeight: 1.5 }}>
+          ⚠️ Este comprobante exacto ya fue analizado antes (visto {result.veces_visto} veces). No es prueba de fraude por sí solo, pero conviene revisarlo.
+        </div>
+      )}
+
+      {/* Las 4 dimensiones — reemplaza al gauge único de riesgo/score */}
+      <div style={{ padding: "16px 24px 8px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10 }}>
+          <DimensionCard label="Confianza documental" score={result.confianza_documental} sublabel="¿Parece auténtico?" />
+          <DimensionCard label="Verificabilidad" score={result.verificabilidad} sublabel="¿Se puede corroborar?" />
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <DimensionCard label="Contexto temporal" score={result.contexto_temporal} sublabel="¿El tiempo es consistente?" />
+          <EstadoOperacionBadge estado={result.estado_operacion} />
+        </div>
+      </div>
+
+      {result.detalle_temporal && (
+        <div style={{ margin: "4px 24px 0", padding: "8px 12px", background: "#F8FAFC", borderRadius: 8, fontSize: 11, color: "#64748B", lineHeight: 1.5 }}>
+          🕐 {result.detalle_temporal}
         </div>
       )}
 
