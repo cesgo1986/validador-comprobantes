@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAnalisis, EstadoOperacion } from "../context/AnalisisContext";
 
@@ -26,9 +26,77 @@ function dimensionColor(score: number): string {
   return RED;
 }
 
+// ── Semáforo categórico ──────────────────────────────────────────────────
+// Deliberadamente NO es un promedio ni una fórmula numérica de las 3
+// dimensiones -- promediar "confianza documental" + "verificabilidad" +
+// "contexto temporal" reintroduce exactamente el problema que separamos
+// al construir el scoring v3 (un documento consistente sin rastro externo
+// terminaría viéndose "mal" en un número único, cuando el problema real
+// es solo ausencia de evidencia, no fraude). En su lugar, son reglas
+// explícitas sobre los valores ya calculados por el backend.
+type NivelSemaforo = "verificado" | "consistente" | "revisar" | "riesgo_alto";
+
+const SEMAFORO_CONFIG: Record<NivelSemaforo, { label: string; color: string; bg: string; desc: string }> = {
+  verificado:   { label: "Verificado",   color: GREEN,  bg: `${GREEN}18`,  desc: "Existe evidencia oficial (CEP con monto confirmado) de que la operación fue acreditada." },
+  consistente:  { label: "Consistente",  color: GREEN,  bg: `${GREEN}18`,  desc: "El documento, la verificabilidad y el contexto temporal son congruentes entre sí." },
+  revisar:      { label: "Revisar",      color: ORANGE, bg: `${ORANGE}18`, desc: "Hay elementos que requieren atención, sin que esto implique fraude." },
+  riesgo_alto:  { label: "Riesgo alto",  color: RED,    bg: `${RED}18`,    desc: "Se detectaron inconsistencias documentales o Banxico contradice lo que afirma el comprobante." },
+};
+
+const ESTADOS_CONTRADICTORIOS: EstadoOperacion[] = ["rechazada", "cancelada", "no_liquidada"];
+const ESTADOS_LIQUIDADOS: EstadoOperacion[] = ["liquidada", "devuelta", "en_devolucion"];
+
+function calcularSemaforo(result: {
+  confianza_documental: number; verificabilidad: number; contexto_temporal: number; estado_operacion: EstadoOperacion;
+}): NivelSemaforo {
+  const { confianza_documental, verificabilidad, contexto_temporal, estado_operacion } = result;
+
+  // Riesgo alto: señal de manipulación documental, o Banxico contradice
+  // directamente lo que el comprobante afirma.
+  if (confianza_documental < 45 || ESTADOS_CONTRADICTORIOS.includes(estado_operacion)) {
+    return "riesgo_alto";
+  }
+
+  // Verificado: el nivel más alto de evidencia que el sistema puede dar
+  // hoy -- CEP con monto confirmado.
+  if (estado_operacion === "acreditada") {
+    return "verificado";
+  }
+
+  // Consistente: todo apunta en la misma dirección (las 3 dimensiones
+  // altas), o Banxico confirma que la operación se procesó (liquidada/
+  // devuelta), aunque no haya CEP completo.
+  const minDimension = Math.min(confianza_documental, verificabilidad, contexto_temporal);
+  if (minDimension >= 75 || ESTADOS_LIQUIDADOS.includes(estado_operacion)) {
+    return "consistente";
+  }
+
+  // Cualquier otro caso: alguna dimensión floja sin contradicción fuerte
+  // -- típicamente, documento ok pero sin rastro externo todavía.
+  return "revisar";
+}
+
+function SemaforoCircle({ nivel }: { nivel: NivelSemaforo }) {
+  const cfg = SEMAFORO_CONFIG[nivel];
+  return (
+    <div style={{ position: "relative", width: 84, height: 84, flexShrink: 0 }}>
+      <svg width="84" height="84" viewBox="0 0 84 84">
+        <circle cx="42" cy="42" r="36" fill="none" stroke="#E8EDF5" strokeWidth="8" />
+        <circle cx="42" cy="42" r="36" fill="none" stroke={cfg.color} strokeWidth="8" strokeLinecap="round" />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontSize: 26, color: cfg.color, fontWeight: 800 }}>
+          {nivel === "verificado" || nivel === "consistente" ? "✓" : nivel === "revisar" ? "!" : "✕"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function Resultado() {
   const router = useRouter();
   const { result, file } = useAnalisis();
+  const [diagnosticoAbierto, setDiagnosticoAbierto] = useState(false);
 
   useEffect(() => {
     if (!result) router.replace("/");
@@ -38,6 +106,8 @@ export default function Resultado() {
 
   const minDimension = Math.min(result.confianza_documental, result.verificabilidad, result.contexto_temporal);
   const tonoGeneral = dimensionColor(minDimension);
+  const nivelSemaforo = calcularSemaforo(result);
+  const semaforoCfg = SEMAFORO_CONFIG[nivelSemaforo];
 
   const descargarReporte = () => {
     const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
@@ -64,14 +134,30 @@ export default function Resultado() {
           </div>
         </div>
 
-        <div style={{ padding: "16px 20px 4px" }}>
-          <div style={{ display: "flex", gap: 8 }}>
-            <span style={{ width: 4, height: 18, background: tonoGeneral, borderRadius: 2, flexShrink: 0, marginTop: 2 }} />
+        {/* Resultado total — semáforo categórico, no un promedio numérico */}
+        <div style={{ padding: "20px 20px 16px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #F0F4F8" }}>
+          <SemaforoCircle nivel={nivelSemaforo} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Resultado total</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: semaforoCfg.color, marginBottom: 4 }}>{semaforoCfg.label}</div>
+            <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.4 }}>{semaforoCfg.desc}</div>
+          </div>
+        </div>
+
+        {/* Diagnóstico escrito — desplegable; las 4 dimensiones de abajo no cambian */}
+        <button onClick={() => setDiagnosticoAbierto(o => !o)}
+          style={{ width: "100%", padding: "14px 20px", display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+          <span style={{ width: 4, height: 18, background: tonoGeneral, borderRadius: 2, flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#334155" }}>Diagnóstico detallado</span>
+          <span style={{ color: "#CBD5E1", fontSize: 14 }}>{diagnosticoAbierto ? "▲" : "▼"}</span>
+        </button>
+        {diagnosticoAbierto && (
+          <div style={{ padding: "0 20px 16px" }}>
             <span style={{ fontSize: 14, color: "#1E293B", lineHeight: 1.6, fontWeight: 500 }}>
               {result.interpretacion || result.resumen}
             </span>
           </div>
-        </div>
+        )}
 
         {result.documento_reutilizado && (
           <div style={{ margin: "12px 20px 0", padding: "10px 14px", background: `${ORANGE}12`, border: `1px solid ${ORANGE}40`, borderRadius: 10, fontSize: 12, color: "#7C4A0A", lineHeight: 1.5 }}>
