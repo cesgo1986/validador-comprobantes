@@ -13,6 +13,8 @@ from services.hash_service import registrar_y_consultar_hash
 from services.auditoria_service import guardar_analisis
 from services import dashboard_service
 from database import init_db, DEFAULT_EMPRESA_ID
+from services.cep_xml_service import parsear_xml_cep, comparar_xml_contra_comprobante, construir_resultado_xml, XMLCepInvalido
+from services.cep_xml_auto_service import datos_suficientes_para_consulta, descargar_xml_cep_automatico
 from scoring_v3 import (
     EstadoOperacion, mapear_estado_cep_a_estado_operacion,
     evaluar_contexto_temporal, evaluar_verificabilidad, generar_interpretacion,
@@ -503,7 +505,8 @@ async def analizar(
     file: UploadFile = File(...),
     banco_hint: str = Form(""),
     clabe_hint: str = Form(""),
-    fecha_pasada_confirmada: str = Form("false")
+    fecha_pasada_confirmada: str = Form("false"),
+    xml_cep: UploadFile | None = File(None),
 ):
     contenido = await file.read()
     b64 = base64.b64encode(contenido).decode()
@@ -811,6 +814,106 @@ async def analizar(
     result["detalle_temporal"] = contexto_temporal_result["explicacion"]
     result["elementos_verificabilidad"] = verificabilidad_result["elementos_disponibles"]
 
+    # ── XML oficial del CEP (Fase 2: manual + Fase 2-B: automatico) ─────────────
+    # Prioridad: si el usuario adjunto el XML manualmente, se usa ese (no se
+    # vuelve a consultar Banxico). Si no lo adjunto, se intenta descargarlo
+    # automaticamente usando los datos que el OCR ya extrajo del comprobante
+    # -- sin pedirle nada nuevo al usuario salvo que falte algun dato.
+    #
+    # La descarga automatica replica una secuencia de Banxico NO documentada
+    # publicamente (GET / -> POST valida.do -> GET descarga.do), investigada
+    # y confirmada en el chat: el campo de captcha que aparece en el HTML del
+    # navegador no se valida del lado del servidor en valida.do. Aun asi, por
+    # ser un endpoint no documentado, todo este flujo puede romperse sin
+    # aviso si Banxico cambia su implementacion -- por eso degrada con gracia
+    # en cualquier punto de fallo, sin afectar el resto del analisis.
+    #
+    # NO se valida la firma digital del XML localmente en ningun caso (manual
+    # o automatico) -- esa via se investigo a fondo y se refuto con una
+    # prueba criptografica real (ver scoring_v3.py / discusion del chat).
+    xml_bytes_a_procesar = None
+    origen_xml = None
+
+    if xml_cep is not None:
+        xml_bytes_a_procesar = await xml_cep.read()
+        origen_xml = "manual"
+    else:
+        chequeo = datos_suficientes_para_consulta(campos_planos)
+        if chequeo["suficiente"]:
+            d = chequeo["datos"]
+            descarga = await descargar_xml_cep_automatico(
+                clave_o_referencia=d["clave_o_referencia"],
+                fecha_ddmmyyyy=d["fecha"],
+                banco_emisor_spei=d["banco_emisor"],
+                banco_receptor_spei=d["banco_receptor"],
+                cuenta=d["cuenta"],
+                monto=d["monto"],
+            )
+            if descarga["exito"]:
+                xml_bytes_a_procesar = descarga["xml_bytes"]
+                origen_xml = "automatico"
+            else:
+                result["cep_xml"] = {
+                    "xml_proporcionado": False,
+                    "intento_automatico": True,
+                    "automatico_exitoso": False,
+                    "razon": descarga["razon"],
+                }
+        else:
+            result["cep_xml"] = {
+                "xml_proporcionado": False,
+                "intento_automatico": False,
+                "datos_faltantes": chequeo["faltantes"],
+            }
+
+    if xml_bytes_a_procesar is not None:
+        try:
+            xml_datos = parsear_xml_cep(xml_bytes_a_procesar)
+            comparacion = comparar_xml_contra_comprobante(xml_datos, campos_planos)
+            result["cep_xml"] = construir_resultado_xml(xml_datos, comparacion)
+            result["cep_xml"]["origen"] = origen_xml
+
+            # Si el XML coincide con el comprobante en todos los campos
+            # comparables, esto es evidencia adicional de verificabilidad
+            # -- pero un boost moderado, no maximo, porque sigue sin ser
+            # una validacion criptografica.
+            if comparacion["discrepancias"] == 0 and comparacion["coincidencias"] >= 3:
+                verificabilidad_result["score"] = min(100, verificabilidad_result["score"] + 10)
+                result["verificabilidad"] = verificabilidad_result["score"]
+                result["elementos_verificabilidad"].append(
+                    f"XML oficial del CEP ({'adjuntado' if origen_xml == 'manual' else 'obtenido automaticamente'}) "
+                    "coincide con los datos del comprobante"
+                )
+            elif comparacion["discrepancias"] > 0:
+                # Discrepancia real entre el XML oficial y el comprobante
+                # visual -- esto SI es una señal fuerte, agregada como
+                # validacion explicita para que aparezca en el detalle.
+                result["validaciones"].append({
+                    "categoria": "cep_xml",
+                    "nombre": "Discrepancia entre XML oficial y comprobante",
+                    "status": "fail",
+                    "detalle": (
+                        f"Se encontraron {comparacion['discrepancias']} discrepancia(s) entre "
+                        "el XML oficial del CEP y los datos visibles en el comprobante. "
+                        "Esto es una señal relevante de posible alteración."
+                    ),
+                })
+        except XMLCepInvalido as e:
+            result["cep_xml"] = {
+                "xml_proporcionado": xml_cep is not None,
+                "origen": origen_xml,
+                "estructura_xml_valida": False,
+                "error": str(e),
+            }
+        except Exception as e:
+            print("Aviso: error al procesar XML del CEP:", e)
+            result["cep_xml"] = {
+                "xml_proporcionado": xml_cep is not None,
+                "origen": origen_xml,
+                "estructura_xml_valida": False,
+                "error": "Error inesperado al procesar el archivo.",
+            }
+
     # ── Auditoría: guardar el análisis completo ────────────────────────────────
     # Si DATABASE_URL no está configurada, guardar_analisis() devuelve None
     # sin lanzar excepción y la respuesta se entrega igual al usuario.
@@ -910,4 +1013,3 @@ app.include_router(dashboard_router)
 @app.get("/")
 def root():
     return {"status": "ok", "servicio": "VerificaPago API v2", "modelo": MODEL_NAME}
-
