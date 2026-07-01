@@ -1,0 +1,63 @@
+{
+  "_comentario": "Catalogo de participantes SPEI. Actualizar cuando Banxico incorpore nuevas instituciones. No requiere cambios de codigo.",
+  "_fuente": "Directorio de participantes SPEI — banxico.org.mx",
+  "_formato": "codigo_clabe_3_digitos -> {nombre, codigo_spei_5_digitos}",
+
+  "cep_flujo": {
+    "_comentario": "Parametros del flujo de consulta del portal CEP. Replicacion del comportamiento observado al momento de implementar este modulo. Puede cambiar sin previo aviso.",
+    "url_base": "https://www.banxico.org.mx/cep/",
+    "endpoint_valida": "valida.do",
+    "endpoint_descarga": "descarga.do",
+    "tipo_criterio_clave_rastreo": "T",
+    "tipo_criterio_referencia": "R",
+    "tipo_consulta_default": "1",
+    "receptor_participante_default": "0",
+    "campo_captcha_valor": "",
+    "timeout_segundos": 15,
+    "senales_exito_valida": [
+      "descarga.do?formato=XML",
+      "descarga.do",
+      "boton-descarga"
+    ],
+    "content_types_xml_validos": [
+      "application/xml",
+      "text/xml",
+      "application/octet-stream"
+    ]
+  },
+
+  "bancos": {
+    "002": {"nombre": "BBVA", "aliases": ["BBVA MEXICO", "BBVA BANCOMER"], "codigo_spei": "40002"},
+    "006": {"nombre": "BANCOMEXT", "aliases": [], "codigo_spei": "40006"},
+    "009": {"nombre": "BANOBRAS", "aliases": [], "codigo_spei": "40009"},
+    "012": {"nombre": "HSBC", "aliases": ["HSBC MEXICO"], "codigo_spei": "40012"},
+    "014": {"nombre": "SANTANDER", "aliases": ["SANTANDER MEXICO"], "codigo_spei": "40014"},
+    "021": {"nombre": "HSBC", "aliases": [], "codigo_spei": "40021"},
+    "030": {"nombre": "BAJIO", "aliases": ["BANCO DEL BAJIO"], "codigo_spei": "40030"},
+    "036": {"nombre": "INBURSA", "aliases": [], "codigo_spei": "40036"},
+    "037": {"nombre": "MULTIVA", "aliases": [], "codigo_spei": "40037"},
+    "044": {"nombre": "SCOTIABANK", "aliases": [], "codigo_spei": "40044"},
+    "058": {"nombre": "BANREGIO", "aliases": [], "codigo_spei": "40058"},
+    "059": {"nombre": "INVEX", "aliases": [], "codigo_spei": "40059"},
+    "062": {"nombre": "AFIRME", "aliases": [], "codigo_spei": "40062"},
+    "072": {"nombre": "BANORTE", "aliases": ["BANORTE IXE"], "codigo_spei": "40072"},
+    "127": {"nombre": "AZTECA", "aliases": ["BANCO AZTECA"], "codigo_spei": "40127"},
+    "128": {"nombre": "AUTOFIN", "aliases": [], "codigo_spei": "40128"},
+    "130": {"nombre": "COMPARTAMOS", "aliases": ["BANCO COMPARTAMOS"], "codigo_spei": "40130"},
+    "137": {"nombre": "BANCOPPEL", "aliases": [], "codigo_spei": "40137"},
+    "145": {"nombre": "BANJERCITO", "aliases": [], "codigo_spei": "40145"},
+    "147": {"nombre": "BANKAOOL", "aliases": [], "codigo_spei": "40147"},
+    "600": {"nombre": "MONEXCB", "aliases": ["MONEX"], "codigo_spei": "40600"},
+    "601": {"nombre": "GBM", "aliases": [], "codigo_spei": "40601"},
+    "646": {"nombre": "STP", "aliases": [], "codigo_spei": "40646"},
+    "706": {"nombre": "ARCUS", "aliases": [], "codigo_spei": "40706"},
+    "722": {"nombre": "MERCADO PAGO", "aliases": ["MERCADOPAGO"], "codigo_spei": "40722"},
+    "723": {"nombre": "CUENCA", "aliases": [], "codigo_spei": "40723"},
+    "728": {"nombre": "SPIN BY OXXO", "aliases": ["SPIN", "OXXO PAY"], "codigo_spei": "40728"},
+    "741": {"nombre": "KLAR", "aliases": [], "codigo_spei": "40741"},
+    "748": {"nombre": "BINEO", "aliases": [], "codigo_spei": "40748"},
+    "90646": {"nombre": "STP", "aliases": ["SISTEMA DE TRANSFERENCIAS"], "codigo_spei": "90646"},
+    "90718": {"nombre": "NU MEXICO", "aliases": ["NU", "NUBANK"], "codigo_spei": "90718"},
+    "90758": {"nombre": "OPENBANK", "aliases": [], "codigo_spei": "90758"}
+  }
+}
