@@ -302,3 +302,113 @@ def generar_interpretacion(confianza_documental: float, verificabilidad: float,
         partes.append("El tiempo transcurrido desde la fecha del comprobante es mayor al esperado para una confirmacion SPEI.")
 
     return " ".join(p for p in partes if p)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MOTOR 1: Estado SPEI (fuente: Banxico) — independiente del análisis documental
+# ─────────────────────────────────────────────────────────────────────────────
+
+class NivelEvidencia(str):
+    """
+    Grado de certeza de la verificacion SPEI.
+    Jerarquia: xml_oficial > cep_html > documental > no_disponible.
+    Un nivel mas alto de evidencia nunca cambia el estado SPEI ya obtenido
+    por un nivel inferior -- solo lo reemplaza si viene de una fuente
+    de mayor jerarquia.
+    """
+    XML_OFICIAL  = "xml_oficial"   # XML descargado directamente de banxico.org.mx/cep/
+    CEP_HTML     = "cep_html"      # Respuesta HTML del scraping de CEP (ya existia antes)
+    DOCUMENTAL   = "documental"    # Inferido del analisis del comprobante, sin consultar Banxico
+    NO_DISPONIBLE = "no_disponible"
+
+
+# Jerarquia numerica para comparar niveles de evidencia
+_JERARQUIA_EVIDENCIA = {
+    NivelEvidencia.XML_OFICIAL:   4,
+    NivelEvidencia.CEP_HTML:      3,
+    NivelEvidencia.DOCUMENTAL:    2,
+    NivelEvidencia.NO_DISPONIBLE: 1,
+}
+
+def evidencia_mas_alta(actual: str, nueva: str) -> bool:
+    """Devuelve True si 'nueva' tiene mayor jerarquia que 'actual'."""
+    return _JERARQUIA_EVIDENCIA.get(nueva, 0) > _JERARQUIA_EVIDENCIA.get(actual, 0)
+
+
+# Tabla de colores del semáforo SPEI (usada en frontend también).
+# Basada en el comportamiento oficial de SPEI según Banxico.
+SEMAFORO_SPEI = {
+    EstadoOperacion.ACREDITADA:    {"color": "verde",        "etiqueta": "Acreditada",          "icono": "✅"},
+    EstadoOperacion.LIQUIDADA:     {"color": "verde",        "etiqueta": "Liquidada",            "icono": "✅"},
+    EstadoOperacion.EN_PROCESO:    {"color": "amarillo",     "etiqueta": "En proceso",           "icono": "🟡"},
+    EstadoOperacion.DEVUELTA:      {"color": "naranja",      "etiqueta": "Devuelta",             "icono": "🟠"},
+    EstadoOperacion.EN_DEVOLUCION: {"color": "naranja",      "etiqueta": "En devolución",        "icono": "🟠"},
+    EstadoOperacion.RECHAZADA:     {"color": "rojo",         "etiqueta": "Rechazada",            "icono": "🔴"},
+    EstadoOperacion.CANCELADA:     {"color": "rojo",         "etiqueta": "Cancelada",            "icono": "🔴"},
+    EstadoOperacion.NO_LIQUIDADA:  {"color": "rojo",         "etiqueta": "No liquidada",         "icono": "🔴"},
+    EstadoOperacion.DESCONOCIDA:   {"color": "gris",         "etiqueta": "No verificado",        "icono": "⚪"},
+}
+
+
+def extraer_estado_de_xml(xml_datos: dict) -> EstadoOperacion:
+    """
+    Extrae el estado SPEI a partir de los datos del XML del CEP.
+    Un XML descargado exitosamente de Banxico implica que la operacion
+    fue procesada por SPEI -- minimo LIQUIDADA. Si el XML tiene un campo
+    de estado explicito, se usa ese; si no, LIQUIDADA es el minimo
+    garantizado por el hecho de que el XML existe.
+    """
+    # El XML del CEP de Banxico actualmente no incluye un campo de estado
+    # textual explicito (al momento de implementar este modulo) -- la
+    # presencia del XML ya es evidencia de que la operacion fue procesada.
+    # Si en el futuro el XML incluye un campo de estado, se puede mapear aqui.
+    estado_raw = xml_datos.get("estado_operacion") or ""
+    mapeo = {
+        "LIQUIDADO": EstadoOperacion.LIQUIDADA,
+        "ACREDITADO": EstadoOperacion.ACREDITADA,
+        "DEVUELTO": EstadoOperacion.DEVUELTA,
+        "RECHAZADO": EstadoOperacion.RECHAZADA,
+        "CANCELADO": EstadoOperacion.CANCELADA,
+        "EN PROCESO": EstadoOperacion.EN_PROCESO,
+    }
+    if estado_raw.upper() in mapeo:
+        return mapeo[estado_raw.upper()]
+    # Sin campo de estado explicito: el XML existe -> operacion fue procesada
+    return EstadoOperacion.LIQUIDADA
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MOTOR 2: Integridad documental (fuente: VerificaPago) — independiente de SPEI
+# ─────────────────────────────────────────────────────────────────────────────
+
+class IntegridadComprobante(str):
+    SIN_OBSERVACIONES   = "sin_observaciones"   # Todo consistente, sin señales de alteración
+    CON_OBSERVACIONES   = "con_observaciones"    # Algunas señales menores, no concluyentes
+    POSIBLE_ALTERACION  = "posible_alteracion"   # Señales fuertes de manipulación documental
+
+
+def calcular_integridad_comprobante(
+    confianza_documental: float,
+    tiene_anomalias_altas: bool = False,
+) -> str:
+    """
+    Determina el estado de integridad documental a partir del Motor 2
+    (confianza_documental de scoring_v3 + anomalias graves del IAT).
+    Este resultado es COMPLETAMENTE independiente del estado SPEI:
+    un comprobante puede ser LIQUIDADA en SPEI y tener observaciones
+    documentales (el dinero llego pero el comprobante fue editado), o
+    puede estar SIN_OBSERVACIONES documentalmente pero DESCONOCIDA en SPEI
+    (comprobante impecable, pero Banxico no lo encontro aun).
+    """
+    if tiene_anomalias_altas or confianza_documental < 45:
+        return IntegridadComprobante.POSIBLE_ALTERACION
+    if confianza_documental >= 75:
+        return IntegridadComprobante.SIN_OBSERVACIONES
+    return IntegridadComprobante.CON_OBSERVACIONES
+
+
+INTEGRIDAD_CONFIG = {
+    IntegridadComprobante.SIN_OBSERVACIONES:  {"color": "verde",  "etiqueta": "Sin observaciones",  "icono": "✅"},
+    IntegridadComprobante.CON_OBSERVACIONES:  {"color": "naranja","etiqueta": "Con observaciones",  "icono": "🟠"},
+    IntegridadComprobante.POSIBLE_ALTERACION: {"color": "rojo",   "etiqueta": "Posible alteración", "icono": "🔴"},
+}

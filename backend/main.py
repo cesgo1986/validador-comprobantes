@@ -18,6 +18,8 @@ from services.cep_xml_auto_service import datos_suficientes_para_consulta, desca
 from scoring_v3 import (
     EstadoOperacion, mapear_estado_cep_a_estado_operacion,
     evaluar_contexto_temporal, evaluar_verificabilidad, generar_interpretacion,
+    NivelEvidencia, evidencia_mas_alta, SEMAFORO_SPEI,
+    extraer_estado_de_xml, calcular_integridad_comprobante, INTEGRIDAD_CONFIG,
 )
 
 load_dotenv()
@@ -772,10 +774,15 @@ async def analizar(
     # No reemplazan a score/riesgo (arriba) -- son campos NUEVOS y adicionales.
     # Ver scoring_v3.py para el detalle de que esta anclado a Circular 14/2017 +
     # estados oficiales de consulta SPEI, y que es decision de producto.
+    # ── Motor 1: Estado SPEI — fuente inicial desde el scraping del CEP HTML ──
+    # La fuente puede ser actualizada a xml_oficial mas adelante en este mismo
+    # endpoint, si el XML se descarga exitosamente. El estado SPEI nunca es
+    # modificado por el Motor 2 (analisis documental de VerificaPago).
     estado_operacion = mapear_estado_cep_a_estado_operacion(
         status_cep=(cep.get("status") if cep else "NO_EXISTE"),
         found=bool(cep and cep.get("found")),
     )
+    fuente_estado = NivelEvidencia.CEP_HTML if (cep and cep.get("found")) else NivelEvidencia.NO_DISPONIBLE
 
     contexto_temporal_result = evaluar_contexto_temporal(
         fecha_comprobante=campos_planos.get("fecha"),
@@ -789,19 +796,37 @@ async def analizar(
         cep_resultado=cep,
     )
 
-    # confianza_documental reutiliza el score de Claude (analisis visual/OCR)
-    # ya que esa es exactamente la pregunta que claude_score responde: ?se ve
-    # autentico el documento? No incluye CEP ni tiempo, que es justo lo que
-    # buscabamos separar. claude_score en el prompt actual es una escala de
-    # RIESGO documental (0=riesgo bajo, 100=riesgo critico); confianza_documental
-    # es su inverso, con clamping a [0,100] por si claude_score se desvia del
-    # rango esperado (ver el bug de score>100 detectado en produccion).
+    # confianza_documental: inverso del score de riesgo documental de Claude.
+    # Es la base del Motor 2 (integridad del comprobante), completamente
+    # independiente del Motor 1 (estado SPEI).
     confianza_documental = max(0.0, min(100.0, 100.0 - claude_score))
+
+    # ── Motor 2: Integridad documental — independiente del estado SPEI ─────────
+    # Determina si el comprobante como documento tiene observaciones,
+    # sin que eso afecte ni contradiga el estado oficial de Banxico.
+    tiene_anomalias_altas = any(
+        a.get("severidad") == "alta"
+        for a in (iat_result.get("anomalias") or [])
+    )
+    integridad_comprobante = calcular_integridad_comprobante(
+        confianza_documental=confianza_documental,
+        tiene_anomalias_altas=tiene_anomalias_altas,
+    )
 
     result["confianza_documental"] = confianza_documental
     result["verificabilidad"] = verificabilidad_result["score"]
     result["contexto_temporal"] = contexto_temporal_result["score"]
+
+    # Motor 1 — campos SPEI (fuente: Banxico, nunca modificados por el Motor 2)
     result["estado_operacion"] = estado_operacion.value
+    result["fuente_estado"] = fuente_estado
+    result["nivel_evidencia"] = fuente_estado
+    result["semaforo_spei"] = SEMAFORO_SPEI.get(estado_operacion, SEMAFORO_SPEI[EstadoOperacion.DESCONOCIDA])
+
+    # Motor 2 — integridad documental (fuente: VerificaPago)
+    result["integridad_comprobante"] = integridad_comprobante
+    result["integridad_config"] = INTEGRIDAD_CONFIG.get(integridad_comprobante, {})
+
     result["contexto_operacional"] = None  # reservado para version futura (MonSPEI/incidentes)
 
     result["interpretacion"] = generar_interpretacion(
@@ -873,10 +898,32 @@ async def analizar(
             result["cep_xml"] = construir_resultado_xml(xml_datos, comparacion)
             result["cep_xml"]["origen"] = origen_xml
 
-            # Si el XML coincide con el comprobante en todos los campos
-            # comparables, esto es evidencia adicional de verificabilidad
-            # -- pero un boost moderado, no maximo, porque sigue sin ser
-            # una validacion criptografica.
+            # ── Motor 1: actualizar estado SPEI desde el XML si tiene mayor jerarquia ──
+            # El XML oficial es la fuente de mayor jerarquia disponible hoy.
+            # Si el XML aporta un estado mas confiable que el que ya teniamos
+            # (del scraping del CEP HTML), lo reemplaza. Esta es la unica forma
+            # en que el estado SPEI puede cambiar: cuando una fuente de evidencia
+            # de mayor nivel lo actualiza. Nunca puede ser cambiado por el Motor 2.
+            nuevo_nivel = NivelEvidencia.XML_OFICIAL
+            if evidencia_mas_alta(result.get("fuente_estado", NivelEvidencia.NO_DISPONIBLE), nuevo_nivel):
+                estado_desde_xml = extraer_estado_de_xml(xml_datos)
+                result["estado_operacion"] = estado_desde_xml.value
+                result["fuente_estado"] = nuevo_nivel
+                result["nivel_evidencia"] = nuevo_nivel
+                result["semaforo_spei"] = SEMAFORO_SPEI.get(
+                    estado_desde_xml, SEMAFORO_SPEI[EstadoOperacion.DESCONOCIDA]
+                )
+                # Actualizar tambien el contexto temporal y el semaforo categorico
+                # con el nuevo estado de mayor certeza.
+                contexto_temporal_result = evaluar_contexto_temporal(
+                    fecha_comprobante=campos_planos.get("fecha"),
+                    hora_comprobante=campos_planos.get("hora"),
+                    estado_operacion=estado_desde_xml,
+                )
+                result["contexto_temporal"] = contexto_temporal_result["score"]
+                result["detalle_temporal"] = contexto_temporal_result["explicacion"]
+
+            # ── Motor 2: comparacion de campos (no afecta el estado SPEI) ──────────
             if comparacion["discrepancias"] == 0 and comparacion["coincidencias"] >= 3:
                 verificabilidad_result["score"] = min(100, verificabilidad_result["score"] + 10)
                 result["verificabilidad"] = verificabilidad_result["score"]
@@ -885,9 +932,6 @@ async def analizar(
                     "coincide con los datos del comprobante"
                 )
             elif comparacion["discrepancias"] > 0:
-                # Discrepancia real entre el XML oficial y el comprobante
-                # visual -- esto SI es una señal fuerte, agregada como
-                # validacion explicita para que aparezca en el detalle.
                 result["validaciones"].append({
                     "categoria": "cep_xml",
                     "nombre": "Discrepancia entre XML oficial y comprobante",
