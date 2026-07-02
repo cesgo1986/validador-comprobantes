@@ -4,12 +4,13 @@ Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago
 
 ## Convenciones de captura (sesiones de trabajo)
 
-Durante las sesiones de trabajo en Verificapago / Verificapago1.1, las decisiones se marcan con uno de dos identificadores para traerlas después a este chat (Arquitecto de Conocimiento):
+Durante las sesiones de trabajo en Verificapago / Verificapago1.1, lo que amerita documentación se marca con uno de tres identificadores, para traerlo después a este chat (Arquitecto de Conocimiento):
 
-- **`#DOC-VP`** — documentación rutinaria: cualquier decisión, hallazgo o ajuste que valga la pena registrar, sin importar el tamaño.
-- **`#ADR-VP`** (Architecture Decision Record) — exclusivo para decisiones que cambian la arquitectura del sistema (ej. cambiar el origen de verdad de un dato, mover lógica entre capas, alterar la jerarquía de evidencia). Formato sugerido al marcarlas: *Decisión* / *Motivo* / *Impacto* / *Documentos afectados*. Toda entrada `#ADR-VP` termina como una entrada de este log igual que las `#DOC-VP` — la diferencia es de énfasis y trazabilidad, no de dónde se registra.
+- **📘 `#DOC-VP`** — documentación rutinaria: cualquier decisión, hallazgo o ajuste que valga la pena registrar, sin importar el tamaño.
+- **🏛️ `#ADR-VP`** (Architecture Decision Record) — exclusivo para decisiones que cambian la arquitectura del sistema (ej. cambiar el origen de verdad de un dato, mover lógica entre capas, alterar la jerarquía de evidencia). Formato sugerido al marcarlas: *Decisión* / *Motivo* / *Impacto* / *Documentos afectados*.
+- **🧪 `#LAB-VP`** — investigaciones o hallazgos experimentales que todavía no son (o nunca llegan a ser) una decisión oficial: experimentos con Banxico, investigación de certificados, pruebas con IA, benchmarks, ideas descartadas. Vive en `LABORATORIO.md`, no en este log — si la investigación termina en un cambio real al sistema, la decisión correspondiente sí se registra aquí (opcionalmente como `#ADR-VP`), referenciando la entrada de `LABORATORIO.md` para el detalle experimental.
 
-`#ADR-VP` no reemplaza a `#DOC-VP`, lo complementa — permite distinguir de un vistazo, con el tiempo, qué entradas de este log fueron decisiones arquitectónicas deliberadas frente a documentación de avance normal.
+Los tres se complementan, no se sustituyen entre sí: permiten distinguir de un vistazo qué fue documentación de avance normal, qué fue una decisión arquitectónica deliberada, y qué fue investigación/exploración sin convertirse (todavía) en decisión.
 
 ---
 

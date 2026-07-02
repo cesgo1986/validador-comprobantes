@@ -4,6 +4,17 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.10.2] — 2026-07 — Tercer nivel de captura: LABORATORIO.md y #LAB-VP
+
+### Agregado
+- `LABORATORIO.md`: nuevo documento para investigaciones y hallazgos experimentales que todavía no son (o nunca llegan a ser) una decisión oficial — experimentos con Banxico, investigación de certificados, pruebas con IA, benchmarks, ideas descartadas. Se retroalimentó con la investigación criptográfica del sello digital del XML (ya documentada en `XML_CEP.md`), como primer ejemplo del formato.
+
+### Documentado (sin cambios de código)
+- `DECISION_LOG.md`: sección de convenciones ampliada a tres marcadores — 📘 `#DOC-VP` (documentación rutinaria), 🏛️ `#ADR-VP` (decisión arquitectónica), 🧪 `#LAB-VP` (investigación/hallazgo experimental, vive en `LABORATORIO.md`).
+- Regla de frontera entre ambos documentos: si una investigación termina en un cambio real al sistema, la decisión vive en `DECISION_LOG.md` y referencia la entrada experimental en `LABORATORIO.md` — no se duplica el detalle técnico entre ambos.
+
+---
+
 ## [0.10.1] — 2026-07 — Convención #ADR-VP y documento futuro PRINCIPIOS_DE_PRODUCTO.md
 
 ### Documentado (sin cambios de código)
