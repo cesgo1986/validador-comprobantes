@@ -61,6 +61,15 @@ export interface Resultado {
   detalle_temporal?: string;
   elementos_verificabilidad?: string[];
 
+  // Motor 1 — Estado SPEI (fuente: Banxico)
+  fuente_estado?: string;
+  nivel_evidencia?: string;
+  semaforo_spei?: { color: string; etiqueta: string; icono: string };
+
+  // Motor 2 — Integridad documental (fuente: VerificaPago)
+  integridad_comprobante?: string;
+  integridad_config?: { color: string; etiqueta: string; icono: string };
+
   hash_documento?: string;
   veces_visto?: number;
   documento_reutilizado?: boolean;
