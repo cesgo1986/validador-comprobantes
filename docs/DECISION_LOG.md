@@ -92,7 +92,50 @@ Una fuente de nivel superior puede actualizar el estado SPEI. Una fuente de nive
 - El backend no cambia — `scoring_v3.py` sigue calculando `integridad_comprobante` y `integridad_config` exactamente igual.
 - La reinterpretación de color vive solo en `app/resultado/page.tsx`, como una decisión de UX, no de scoring. Si se necesita este mismo criterio en otra pantalla (ej. `/resultado/detalle` o el dashboard desktop de Sprint C), debe replicarse explícitamente ahí — no es automático.
 - El subtexto explicativo bajo el indicador de integridad también se ajusta según `esCasoExtremo`, para que el texto sea consistente con el color mostrado.
-- Pendiente evaluar si este criterio (`confianza_documental < 30` OR discrepancia XML) debería subir al backend como un campo explícito (ej. `severidad_integridad`) en vez de vivir como lógica duplicada en el frontend, especialmente antes de construir el dashboard desktop (Sprint C) que también necesitará este semáforo.
+- **Resuelto (2026-07):** se decidió no subir esta lógica al backend todavía. Ver la entrada siguiente, "Regla arquitectónica: la lógica de presentación migra al backend solo con múltiples consumidores", que fija el criterio general para este caso y para futuros similares.
+
+---
+
+## 2026-07 — Regla arquitectónica: la lógica de presentación migra al backend solo con múltiples consumidores
+
+**Decisión:** por ahora, la lógica que decide cómo se presenta un resultado al usuario (colores, iconos, umbrales de severidad, prioridad visual) permanece en el frontend, incluso cuando esa lógica interpreta datos que vienen del backend (ej. el criterio de "evidencia acumulada fuerte" de la entrada anterior). Se fija una regla explícita para saber cuándo debe dejar de ser así:
+
+> Toda regla de presentación utilizada por más de un cliente (Mobile, Desktop, Dashboard, API pública) debe migrar al backend como un motor de presentación compartido. Mientras exista un único consumidor, la lógica visual puede permanecer en el frontend para facilitar la iteración del producto.
+
+**Motivo:** la experiencia visual de `/resultado` todavía está en ajuste activo — posición del bloque, tamaño, color y prioridad visual ya cambiaron varias veces y es previsible que cambien más antes de estabilizarse. Si la severidad se sube al backend ahora mismo, cada ajuste visual implica tocar API, pruebas y despliegue del backend por un cambio que es puramente de presentación. Hoy solo existe un consumidor (Mobile), así que no hay todavía un problema de lógica duplicada que resolver — solo el costo de acoplar iteración visual a un ciclo de release más pesado.
+
+**Paso intermedio (no es el motor de presentación, es preparación para él):** en vez de exponer un campo ya interpretado como `severidad_integridad`, el backend expondrá los **hechos crudos** que hoy se usan para decidir el color, agrupados como `evidencias`:
+
+```json
+{
+  "evidencias": {
+    "xml_valido": true,
+    "xml_discrepancias": 0,
+    "confianza_documental": 85,
+    "verificabilidad": 90,
+    "contexto_temporal": 100,
+    "hash_reutilizado": false
+  }
+}
+```
+
+El frontend sigue decidiendo verde/ámbar/rojo a partir de esto. La diferencia es que la decisión se toma sobre datos explícitos y nombrados, no sobre una combinación de campos legacy (`confianza_documental`, `cep_xml.comparacion_campos.discrepancias`) leídos de forma ad hoc como hoy.
+
+**Consecuencia:**
+- No se crea `severidad_integridad` ni ningún campo de severidad pre-interpretado en esta etapa.
+- El hito de "mover la lógica de presentación al backend" queda formalmente atado a Sprint C, y no como una tarea aislada — porque Sprint C es cuando aparece el segundo consumidor real (Desktop). El roadmap de Sprint C se actualiza para incluir un **Motor de Presentación**, no solo la UI de escritorio (ver `ROADMAP.md`).
+- Cuando ese motor se construya, la forma esperada de la respuesta no es un campo suelto por dimensión, sino un objeto `presentation` con nivel + texto ya resueltos por el backend, consumible igual por Mobile, Desktop, Dashboard y API pública:
+
+```json
+{
+  "presentation": {
+    "integridad": { "nivel": "warning", "texto": "Con observaciones" },
+    "spei": { "nivel": "success", "texto": "Liquidada" }
+  }
+}
+```
+
+- Regla de disparo para revisar esta decisión: en cuanto exista un segundo consumidor real del backend (no un prototipo — un cliente en desarrollo activo), esta decisión debe revisitarse antes de construir ese segundo cliente, no después.
 
 ---
 

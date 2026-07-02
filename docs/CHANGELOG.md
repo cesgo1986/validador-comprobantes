@@ -4,6 +4,15 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.9.2] — 2026-07 — Decisión de arquitectura: lógica de presentación queda en frontend hasta el segundo consumidor
+
+### Documentado (sin cambios de código)
+- `DECISION_LOG.md`: regla de arquitectura — la lógica de presentación (colores, iconos, severidad) migra al backend solo cuando exista más de un consumidor real. Hoy permanece en el frontend para no acoplar la iteración visual al ciclo de release del backend.
+- `DECISION_LOG.md`: se define el paso intermedio `evidencias` (hechos crudos que el backend expondrá) como preparación para el futuro objeto `presentation`, sin crear todavía un campo de severidad pre-interpretado como `severidad_integridad`.
+- `ROADMAP.md`: Sprint C ahora incluye explícitamente el hito **Motor de Presentación** (C.1), no solo la UI de escritorio — es el punto en que Desktop se vuelve el segundo consumidor del backend y dispara la regla anterior.
+
+---
+
 ## [0.9.1] — 2026-07 — Refinamiento del semáforo de integridad en /resultado
 
 ### Agregado

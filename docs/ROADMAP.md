@@ -69,6 +69,23 @@ El núcleo del producto está funcionando en producción:
 
 Desktop cambia el mercado: pasa de "analizo un comprobante" a "analizo 500 comprobantes diarios".
 
+### C.1 — Motor de Presentación (backend)
+
+Desktop es el segundo consumidor real del backend (después de Mobile). Por la regla de arquitectura fijada en `DECISION_LOG.md` ("Regla arquitectónica: la lógica de presentación migra al backend solo con múltiples consumidores"), este es el momento de mover la lógica de colores/iconos/niveles de severidad — hoy vive solo en `app/resultado/page.tsx` — a un objeto `presentation` calculado por el backend:
+
+```json
+{
+  "presentation": {
+    "integridad": { "nivel": "warning", "texto": "Con observaciones" },
+    "spei": { "nivel": "success", "texto": "Liquidada" }
+  }
+}
+```
+
+Antes de este sprint, el paso intermedio es exponer `evidencias` (hechos crudos: `xml_valido`, `xml_discrepancias`, `confianza_documental`, `verificabilidad`, `contexto_temporal`, `hash_reutilizado`) para que Mobile decida sobre datos explícitos mientras se estabiliza la UX — ver `DECISION_LOG.md`.
+
+Sin este motor, Mobile y Desktop terminarían con dos implementaciones distintas del mismo criterio de severidad, con alto riesgo de divergir silenciosamente.
+
 ---
 
 ## Sprint D — Historial y búsqueda
