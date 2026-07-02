@@ -1,5 +1,7 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
+**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+
 ## Estado actual (post Sprint 0)
 
 El núcleo del producto está funcionando en producción:
@@ -51,21 +53,39 @@ Este es el hallazgo clave de la revisión de 2026-07: lo que falta en la Etapa 1
 - Integridad documental mostrada por separado, sin fusionarse con el estado SPEI
 - Jerarquía de evidencia (XML oficial > CEP HTML > no disponible) reflejada en la UI
 
-> ⚠️ **Orden de trabajo decidido (2026-07):** dentro del Sprint A-Final, 1.4 se diseña primero (modelo y estructura, sin código) y 1.2 se escribe después, porque los mensajes contextuales dependen de la estructura que los va a contener. Ver `DECISION_LOG.md`. 1.3 es independiente y puede avanzar en paralelo — es trabajo de frontend puro sobre datos que el backend ya expone.
+> ⚠️ **Orden de trabajo decidido (2026-07, refinado):** el Sprint A-Final sigue esta secuencia completa hasta cerrar el MVP Beta — no por funcionalidad, sino por **experiencia de decisión**: VerificaPago ya sabe analizar, consultar y comparar, pero todavía no explica su decisión de forma consistente.
+
+```
+1.1 ✅ Estado visual (cerrado)
+   ↓
+1.4  Diseñar el flujo de decisión explicable (la "gramática" de VerificaPago)
+   ↓
+1.2  Escribir los mensajes contextuales usando ese flujo
+   ↓
+1.3  Completar la evidencia XML (desglose campo a campo)
+   ↓
+1.5  Robustecer la arquitectura XML backend
+   ↓
+1.6  Observabilidad
+   ↓
+✅ MVP Beta cerrado
+```
+
+1.4 se diseña antes que 1.2 porque los mensajes contextuales dependen de la estructura que los va a contener — ver `DECISION_LOG.md`. 1.3 es independiente y puede avanzar en paralelo con 1.4/1.2, es trabajo de frontend puro sobre datos que el backend ya expone. 1.5 y 1.6 se quedan al final deliberadamente: son infraestructura, y el MVP Beta necesita cerrar primero la capa visible (ver `DECISION_LOG.md`, "Fase de Fundación").
 
 ### 1.2 — Mensajes contextuales por estado SPEI (pendiente — se escribe después de 1.4)
 No se encontró ningún componente que implemente el contenido extendido por estado (qué significa / qué hacer / tiempo esperado / casos comunes). `resultado/page.tsx` solo muestra la etiqueta y el diagnóstico general (`interpretacion`/`resumen`), no un mensaje específico por cada uno de los 9 estados.
 
 **Criterio de cierre (2026-07):** no basta con mostrar el nombre del estado (ej. "En proceso"). El mensaje debe responder directamente la pregunta que el comercio realmente tiene: *¿entrego el producto o no?* Esa respuesta es trabajo de VerificaPago, no del CEP — el CEP solo informa el estado técnico, VerificaPago tiene que traducirlo a una recomendación de acción.
 
-Cada uno de los 9 estados (`acreditada`, `liquidada`, `en_proceso`, `devuelta`, `en_devolucion`, `rechazada`, `cancelada`, `no_liquidada`, `desconocida`) debe explicar:
-- Qué significa
-- Qué hacer (la recomendación de acción explícita)
-- Nivel de evidencia
-- Tiempo esperado
-- Casos comunes
+Cada uno de los 9 estados se redacta siguiendo el flujo de decisión de 1.4 (Resultado → Interpretación → Impacto → Evidencias), no como un texto suelto. Ejemplo (`en_proceso`):
 
-Ejemplo (`en_proceso`): *"La operación aún está siendo procesada por SPEI. Si el comprobante presenta alta integridad documental, es probable que la transferencia concluya correctamente en los próximos minutos."*
+```
+Resultado:       En proceso
+Interpretación:  La operación aún está siendo procesada por SPEI.
+Impacto:         Espera unos minutos antes de considerar la transferencia como fallida.
+Evidencias:      ✓ XML · ✓ CEP
+```
 
 ### 1.3 — Comparación XML en la UI (parcialmente construido — incluido en Sprint A-Final)
 `app/resultado/detalle/page.tsx` ya existe y agrupa `result.validaciones` por categoría (`cep`, `estructural`, `visual`, `temporal`, `contextual`, `semantica`, `reputacion`, `historial`) en acordeones colapsables con estado ok/warn/fail. Esto cubre "fuentes de validación refinadas" en términos generales, pero **no** es todavía el desglose campo a campo que pide este ítem — hoy la categoría `cep` se renderiza como los ítems que el backend meta en `validaciones` (según `API.md`, un único ítem "CEP Banxico - Verificación SPEI"), no como una lista campo por campo de `cep_xml.comparacion_campos`. Falta:
@@ -75,41 +95,30 @@ Ejemplo (`en_proceso`): *"La operación aún está siendo procesada por SPEI. Si
 - ✓ Clave de rastreo coincide
 - ⚠ Discrepancias explícitas cuando existan (ej. "Banco destino diferente")
 
-El backend ya calcula todo esto (`cep_xml.comparacion_campos.comparaciones`, ver `API.md`) — es trabajo puramente de frontend: mapear esos campos a entradas individuales dentro del grupo `cep`, o a una sección propia. Se prioriza en este sprint porque genera confianza inmediata y el costo de cerrarlo es bajo (el dato ya existe).
+El backend ya calcula todo esto (`cep_xml.comparacion_campos.comparaciones`, ver `API.md`) — es trabajo puramente de frontend: mapear esos campos a entradas individuales dentro del grupo `cep`, o a una sección propia. Se prioriza en este sprint porque genera confianza inmediata y el costo de cerrarlo es bajo (el dato ya existe). Corresponde al paso ⑤ Detalle del flujo de decisión de 1.4.
 
-### 1.4 — "¿Cómo se llegó a este resultado?" (antes "Centro de Estado" / "Evidencia de la decisión") — se diseña primero, antes que 1.2
-Ver `DECISION_LOG.md`, entrada "'Evidencia de la decisión' se renombra a '¿Cómo se llegó a este resultado?' y se define su estructura" (2026-07). Es un **patrón visual reutilizable**, no una pantalla nueva, gobernado por una regla de producto: toda conclusión de VerificaPago debe poder justificarse con al menos una evidencia verificable.
+### 1.4 — El flujo de decisión explicable (antes "Centro de Estado" / "Evidencia de la decisión" / "¿Cómo se llegó a este resultado?") — se diseña primero, antes que 1.2
+Ver `DECISION_LOG.md`, entradas "'Evidencia de la decisión' se renombra a '¿Cómo se llegó a este resultado?'..." y "Refinamiento: de las 4 preguntas al flujo de decisión de 5 pasos" (2026-07). Es un **patrón visual reutilizable**, no una pantalla nueva, gobernado por una regla de producto: toda conclusión de VerificaPago debe poder justificarse con al menos una evidencia verificable.
 
-Estructura de referencia (legible en ~5 segundos):
+**El componente ya no se piensa como una lista de datos que responde preguntas — se piensa como una conversación de 5 pasos**, porque el usuario no piensa en preguntas, piensa en "¿qué pasó?":
 
 ```
-¿Cómo se llegó a este resultado?
-
-Estado SPEI
-✓ XML oficial de Banxico
-
-Integridad documental
-✓ OCR
-✓ Inteligencia Artificial
-⚠ Análisis visual
-
-Nivel de evidencia
-Muy alto
-
-Ver detalles →
+① Resultado         Liquidada
+② Interpretación     La transferencia fue liquidada correctamente mediante SPEI.
+③ Impacto            Puedes considerar el pago realizado.
+④ Evidencias         ✓ Estado SPEI · ✓ XML · ✓ Datos · ⚠ Imagen
+⑤ Detalle            (el acordeón existente en /resultado/detalle — ver 1.3)
 ```
 
-Extensible sin cambiar la UI: hoy enumera XML/OCR/IA, mañana puede sumar hash, historial, patrones, alertas o motor antifraude sin rediseñar el componente.
+Esta secuencia es la forma de presentación del modelo de 4 capas ya definido en `MODELO_DECISION_EXPLICABLE.md` (Hechos → Interpretación → Recomendación → Evidencia), con dos ajustes de diseño:
+- **① Resultado** se hace explícito como primer paso, separado de la interpretación — es el dato categórico crudo (ej. "Liquidada"), no todavía una lectura de él.
+- La capa que el modelo llama internamente "Recomendación" se etiqueta de cara al usuario como **③ Impacto** ("¿qué implica para mí?"), un lenguaje menos directivo que "qué debo hacer", pero que cumple la misma función: traducir la interpretación en algo accionable.
 
-Se implementa embebido dentro de `/resultado` (extendiendo el bloque que ya existe para Motor 1 y Motor 2 en `resultado/page.tsx`), no como ruta nueva. Es el primer candidato a estandarizarse dentro del futuro objeto `presentation` del Motor de Presentación (Etapa 5) — la forma de datos objetivo para esa migración (`evidencias: [{tipo, resultado}]`) ya quedó anotada en `DECISION_LOG.md` como referencia de diseño, no como algo implementado hoy.
+Extensible sin cambiar la UI: hoy ④ Evidencias enumera XML/OCR/IA, mañana puede sumar hash, historial, patrones, alertas o motor antifraude sin rediseñar el componente ni el flujo.
 
-**Sesión de diseño pendiente (sin código):** ver `MODELO_DECISION_EXPLICABLE.md`. La sesión ya no se enmarca como "diseñar una pantalla", sino como responder cuatro preguntas del modelo de decisión explicable, en este orden:
-1. ¿Qué hechos conoce VerificaPago? (estado SPEI + fuente, OCR, resultado de imagen, hash, comparación XML campo a campo)
-2. ¿Qué interpreta VerificaPago a partir de esos hechos? (integridad documental y demás interpretaciones categóricas)
-3. ¿Qué recomienda VerificaPago? (la traducción de la interpretación a una acción concreta — "espere unos minutos", "puede continuar", "revise el comprobante")
-4. ¿Qué evidencia respalda esa recomendación? (el propio componente "¿Cómo se llegó a este resultado?")
+Se implementa embebido dentro de `/resultado` (extendiendo el bloque que ya existe para Motor 1 y Motor 2 en `resultado/page.tsx`), no como ruta nueva. Es el primer candidato a estandarizarse dentro del futuro objeto `presentation` del Motor de Presentación (Etapa 5) — la forma de datos objetivo para esa migración (`evidencias: [{tipo, resultado}]`) ya quedó anotada en `DECISION_LOG.md` como referencia de diseño, no como algo implementado hoy. Al definirse como flujo (no como pantalla), se convierte en la "gramática" de VerificaPago — se reutiliza igual en Historial, Dashboard Empresa, Desktop, Alertas Inteligentes y la futura API Enterprise, sin que cada uno reinvente cómo explicar una decisión.
 
-La estructura de presentación resultante es fija para cualquier pantalla o cliente futuro: **Resultado → Recomendación → ¿Cómo se llegó a este resultado? → Ver detalles**.
+**Sesión de diseño pendiente (sin código):** ver `MODELO_DECISION_EXPLICABLE.md`. Se diseña respondiendo, en orden, los 5 pasos del flujo de decisión para cada uno de los 9 estados SPEI — no como preguntas aisladas, sino como la conversación completa: qué resultado se muestra, cómo se interpreta, qué impacto tiene para el usuario, qué evidencias lo respaldan, y qué detalle adicional queda disponible si quiere profundizar.
 
 ### 1.5 — Arquitectura XML backend (pendiente)
 - Reintentos con backoff exponencial cuando `valida.do` falla por timeout
@@ -250,3 +259,11 @@ Sin este motor, Mobile y Desktop terminarían con dos implementaciones distintas
 - **Integración Open Finance:** cuando la regulación mexicana avance
 - **Módulo de contexto operativo:** consulta de estado de SPEI y conectividad de participantes vía MonSPEI (sin API pública hoy, requiere scraping del portal o acuerdo con Banxico)
 - **Motor de reputación:** scoring por CLABE/cuenta basado en historial de análisis propios
+
+---
+
+## Documentos relacionados
+
+- `DECISION_LOG.md` — el porqué detrás de la secuencia de Etapas
+- `MODELO_DECISION_EXPLICABLE.md` — el marco que guía el diseño del ítem 1.4
+- `CHANGELOG.md` — el registro versión por versión de estos cambios

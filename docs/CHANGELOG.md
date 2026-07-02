@@ -6,6 +6,15 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.11.2] — 2026-07 — Refinamiento: flujo de decisión de 5 pasos para 1.4
+
+### Documentado (sin cambios de código)
+- `DECISION_LOG.md`: el componente "¿Cómo se llegó a este resultado?" se rediseña como flujo conversacional de 5 pasos (Resultado → Interpretación → Impacto → Evidencias → Detalle), en vez de una lista de datos que responde 4 preguntas.
+- `MODELO_DECISION_EXPLICABLE.md`: sección "Estructura fija de presentación" actualizada, reconciliando el flujo de 5 pasos con el modelo de 4 capas — el flujo es la forma de presentación del modelo, no un modelo distinto.
+- `ROADMAP.md`: ítem 1.4 actualizado con el flujo de 5 pasos; se agrega el diagrama de secuencia completo del Sprint A-Final (1.1 → 1.4 → 1.2 → 1.3 → 1.5 → 1.6 → MVP Beta cerrado); ejemplo de mensaje contextual (1.2) redactado siguiendo el flujo completo.
+
+---
+
 ## [0.11.1] — 2026-07 — Se declara concluida la Fase de Fundación
 
 ### Documentado (sin cambios de código)

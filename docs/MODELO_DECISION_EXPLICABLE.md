@@ -1,5 +1,7 @@
 # MODELO_DECISION_EXPLICABLE.md — Cómo "piensa" VerificaPago
 
+**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+
 *Documento de arquitectura de producto. Define el modelo mental detrás de cada resultado que VerificaPago presenta, independientemente de cuántos motores o algoritmos incorpore en el futuro. No describe pantallas — describe cómo VerificaPago razona.*
 
 ---
@@ -77,21 +79,26 @@ Es el componente **"¿Cómo se llegó a este resultado?"** (ver `DECISION_LOG.md
 
 ---
 
-## Estructura fija de presentación
+## Estructura fija de presentación: el flujo de decisión
 
-Toda pantalla o componente que muestre un resultado de VerificaPago sigue el mismo orden, sin excepción:
+Toda pantalla o componente que muestre un resultado de VerificaPago sigue el mismo flujo, sin excepción. No se piensa como una lista de datos — se piensa como una conversación, porque el usuario no piensa en preguntas, piensa en *"¿qué pasó?"*:
 
 ```
-Resultado
-   ↓
-Recomendación
-   ↓
-¿Cómo se llegó a este resultado?
-   ↓
-Ver detalles
+① Resultado         Liquidada
+② Interpretación     La transferencia fue liquidada correctamente mediante SPEI.
+③ Impacto            Puedes considerar el pago realizado.
+④ Evidencias         ✓ Estado SPEI · ✓ XML · ✓ Datos · ⚠ Imagen
+⑤ Detalle            (acordeón expandible con el desglose completo)
 ```
 
-Esta estructura es lo que hace que la experiencia se sienta consistente sin importar qué combinación de hechos e interpretaciones haya detrás en un caso particular.
+Este flujo de 5 pasos **es** el modelo de 4 capas de la sección anterior, expresado como experiencia de usuario en vez de como modelo de datos — con dos matices de diseño:
+
+- **① Resultado** se muestra como paso explícito y separado, antes de interpretarlo — es el dato categórico crudo (ej. "Liquidada"), no todavía una lectura de él. En el modelo de 4 capas, es la salida visible de la capa de Hechos (específicamente el hecho principal: el estado SPEI).
+- **③ Impacto** es el nombre de cara al usuario para lo que el modelo llama internamente **Recomendación**. "Impacto" responde "¿qué implica esto para mí?", un lenguaje menos directivo que "qué debo hacer" — pero cumple exactamente la misma función: traducir la interpretación en algo accionable. Los principios de este documento (sección anterior) siguen hablando de "recomendación" como término del modelo; "Impacto" es solo su etiqueta visible.
+- **④ Evidencias** y **② Interpretación** corresponden 1:1 a las capas de Evidencia e Interpretación del modelo.
+- **⑤ Detalle** es nuevo respecto al modelo de 4 capas — es el acordeón expandible (ya existente en `app/resultado/detalle/page.tsx`) para quien quiere profundizar más allá de lo que el flujo muestra por defecto. No es una capa de razonamiento nueva, es el mecanismo de profundidad opcional sobre la capa de Evidencia.
+
+Esta estructura es lo que hace que la experiencia se sienta consistente sin importar qué combinación de hechos e interpretaciones haya detrás en un caso particular. Ver `ROADMAP.md`, ítem 1.4, para el diseño concreto por cada uno de los 9 estados SPEI.
 
 ---
 
@@ -144,3 +151,12 @@ Adicionalmente, antes de agregar cualquier fuente nueva de información al siste
 - ¿Cambia qué se le recomienda al usuario? → se ajusta la capa 3, documentado en el catálogo de mensajes contextuales (ver `ROADMAP.md`, ítem 1.2).
 
 Si una propuesta no encaja claramente en ninguna capa, o intenta saltarse una (por ejemplo, una recomendación sin interpretación que la sustente), es señal de que rompe el modelo y debe reconsiderarse antes de implementarse.
+
+---
+
+## Documentos relacionados
+
+- `MOTOR_DECISIONES.md` — la fuente de las capas 1 y 2 (Hechos e Interpretación)
+- `SCORING.md` — el cálculo detrás de los hechos e interpretaciones
+- `ROADMAP.md` — dónde se aplica este modelo (ítems 1.2 y 1.4 de la Etapa 1)
+- `DECISION_LOG.md` (ver "Modelo de decisión explicable")

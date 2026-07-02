@@ -276,6 +276,24 @@ El frontend sigue decidiendo verde/ámbar/rojo a partir de esto. La diferencia e
 
 ---
 
+## 2026-07 — Refinamiento: de las 4 preguntas al flujo de decisión de 5 pasos
+
+**Decisión:** el componente "¿Cómo se llegó a este resultado?" se rediseña de una lista de datos que responde preguntas a un **flujo de decisión conversacional de 5 pasos**: ① Resultado → ② Interpretación → ③ Impacto → ④ Evidencias → ⑤ Detalle.
+
+**Motivo:** el usuario no piensa en preguntas ("¿qué evidencia hay?"), piensa en "¿qué pasó?". Estructurar el componente como una secuencia narrativa en vez de una lista de datos funciona mejor psicológicamente y es más fácil de redactar de forma consistente entre los 9 estados SPEI.
+
+**Relación con el modelo de 4 capas (`MODELO_DECISION_EXPLICABLE.md`):** este flujo no reemplaza el modelo de Hechos → Interpretación → Recomendación → Evidencia, es su forma de presentación al usuario, con dos ajustes:
+- Se separa explícitamente **① Resultado** (el dato categórico crudo, ej. "Liquidada") como primer paso, antes de interpretarlo.
+- La capa que el modelo llama internamente "Recomendación" se etiqueta de cara al usuario como **③ Impacto** — lenguaje menos directivo ("¿qué implica esto para mí?" en vez de "qué debo hacer"), misma función.
+- **⑤ Detalle** se agrega como el mecanismo de profundidad opcional (el acordeón ya existente en `/resultado/detalle`), no es una capa de razonamiento nueva.
+
+**Consecuencia:**
+- `MODELO_DECISION_EXPLICABLE.md` y `ROADMAP.md` (ítem 1.4) se actualizan con el flujo de 5 pasos como estructura de referencia.
+- Los mensajes contextuales de 1.2 se redactan siguiendo este flujo completo por cada estado, no como un texto suelto — ejemplo (`en_proceso`): Resultado "En proceso" → Interpretación "La operación aún está siendo procesada por SPEI" → Impacto "Espera unos minutos antes de considerar la transferencia como fallida" → Evidencias "✓ XML · ✓ CEP".
+- Se reafirma que, al ser un flujo (no una pantalla), es la "gramática" de VerificaPago — se reutiliza igual en Historial, Dashboard Empresa, Desktop, Alertas Inteligentes y la futura API Enterprise.
+
+---
+
 ## 2026-07 — Se declara concluida la Fase de Fundación de VerificaPago
 
 **Decisión:** se declara concluida la Fase de Fundación de VerificaPago. No porque el proyecto esté terminado, sino porque la arquitectura, la visión de producto, el modelo de decisión, la gobernanza documental y el roadmap alcanzaron un nivel de estabilidad suficiente para que el desarrollo futuro se enfoque prioritariamente en construir funcionalidades, no en redefinir las bases del sistema.
