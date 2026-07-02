@@ -72,16 +72,29 @@ export default function Resultado() {
             ? "Banxico — CEP"
             : "No verificado con Banxico";
 
-          // Integridad documental: solo ícono texto, sin segundo semáforo
+          // Integridad documental: lógica de color revisada.
+          // Rojo solo cuando hay evidencia acumulada fuerte (confianza < 30 O
+          // discrepancia en XML). Ámbar para el caso intermedio habitual.
+          // Esto evita que un usuario vea "🟢 Liquidada + 🔴 Posible alteración"
+          // y concluya que la transferencia no ocurrió.
           const integ = result.integridad_config;
-          const integIcono = integ?.icono === "✅" ? "✓"
-            : integ?.icono === "🟠" ? "⚠"
-            : integ?.icono === "🔴" ? "⛔"
-            : "—";
+          const tieneXmlDiscrepante = (result as {cep_xml?: {comparacion_campos?: {discrepancias?: number}}}).cep_xml?.comparacion_campos?.discrepancias ?? 0 > 0;
+          const esCasoExtremo = result.confianza_documental < 30 || tieneXmlDiscrepante;
+
+          const integIcono = integ?.icono === "✅" ? "✓" : "⚠";
           const colorInteg = integ?.color === "verde" ? GREEN
-            : integ?.color === "naranja" ? ORANGE
-            : integ?.color === "rojo" ? RED
+            : integ?.color === "rojo" && esCasoExtremo ? RED
+            : integ?.color === "rojo" || integ?.color === "naranja" ? "#EAB308"
             : "#9CA3AF";
+
+          // Subtexto explicativo según el estado de integridad
+          const integSubtexto = result.integridad_comprobante === "sin_observaciones"
+            ? "El comprobante es visualmente consistente."
+            : result.integridad_comprobante === "con_observaciones"
+            ? "Se detectaron algunas diferencias menores en el comprobante."
+            : esCasoExtremo
+            ? "Se detectaron diferencias relevantes respecto al comprobante presentado."
+            : "Se detectaron diferencias respecto al comprobante presentado.";
 
           // Fuentes de validación disponibles
           const fuentes: string[] = [];
@@ -121,18 +134,21 @@ export default function Resultado() {
               {/* Separador */}
               <div style={{ height: 1, background: "#F0F4F8", marginBottom: 16 }} />
 
-              {/* Motor 2: Integridad documental — secundario, sin semáforo */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: fuentes.length > 0 ? 12 : 0 }}>
-                <span style={{ fontSize: 15, color: colorInteg, fontWeight: 700 }}>{integIcono}</span>
-                <div>
-                  <span style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Integridad del comprobante — </span>
-                  <span style={{ fontSize: 12, color: colorInteg, fontWeight: 700 }}>{integ?.etiqueta || "—"}</span>
+              {/* Motor 2: Integridad documental — en 2 líneas, sin semáforo */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                  Integridad del comprobante
                 </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, color: colorInteg, fontWeight: 700 }}>{integIcono}</span>
+                  <span style={{ fontSize: 13, color: colorInteg, fontWeight: 700 }}>{integ?.etiqueta || "—"}</span>
+                </div>
+                <div style={{ fontSize: 11, color: "#94A3B8", lineHeight: 1.5 }}>{integSubtexto}</div>
               </div>
 
-              {/* Fuentes de validación — solo si hay más de una */}
+              {/* Fuentes de validación */}
               {fuentes.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
+                <div style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 10, color: "#CBD5E1", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
                     Fuentes de validación
                   </div>
@@ -146,18 +162,18 @@ export default function Resultado() {
                 </div>
               )}
 
+              {/* Aviso de reutilización — después de fuentes, antes del diagnóstico */}
+              {result.documento_reutilizado && (
+                <div style={{ padding: "10px 14px", background: `${ORANGE}12`, border: `1px solid ${ORANGE}40`, borderRadius: 10, fontSize: 12, color: "#7C4A0A", lineHeight: 1.5, marginBottom: 16 }}>
+                  ⚠️ Este comprobante exacto ya fue analizado antes (visto {result.veces_visto} veces).
+                </div>
+              )}
+
               {/* Separador antes del diagnóstico */}
               <div style={{ height: 1, background: "#F0F4F8" }} />
             </div>
           );
         })()}
-
-        {/* Aviso de reutilización */}
-        {result.documento_reutilizado && (
-          <div style={{ margin: "14px 22px 0", padding: "10px 14px", background: `${ORANGE}12`, border: `1px solid ${ORANGE}40`, borderRadius: 10, fontSize: 12, color: "#7C4A0A", lineHeight: 1.5 }}>
-            ⚠️ Este comprobante exacto ya fue analizado antes (visto {result.veces_visto} veces).
-          </div>
-        )}
 
         {/* Diagnóstico detallado — colapsable */}
         <button onClick={() => setDiagnosticoAbierto(o => !o)}
