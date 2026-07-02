@@ -1,0 +1,91 @@
+# DECISION_LOG.md — Registro de decisiones
+
+Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
+
+---
+
+## 2026-06 — Separar Estado SPEI de Integridad Documental
+
+**Decisión:** el resultado de VerificaPago se divide en dos dimensiones completamente independientes: Motor 1 (Estado SPEI, fuente Banxico) y Motor 2 (Integridad del comprobante, fuente VerificaPago).
+
+**Motivo:** un comprobante puede estar visualmente alterado aunque la transferencia SPEI haya existido y se haya liquidado. Mezclar ambas señales en un solo score produce falsos positivos inaceptables — comprobantes reales de BBVA con un concepto "inusual" terminaban clasificados como ALTO RIESGO aunque Banxico confirmara la liquidación.
+
+**Consecuencia:**
+- Banxico responde por la operación. VerificaPago responde por el documento.
+- El estado SPEI nunca puede ser degradado por el análisis documental, ni siquiera si el documento presenta señales graves de alteración.
+- La combinación más importante a comunicarle al usuario es: `LIQUIDADA + Posible alteración` — el dinero llegó, pero el comprobante fue manipulado después.
+
+---
+
+## 2026-06 — No realizar validación criptográfica local del XML del CEP
+
+**Decisión:** VerificaPago parsea el XML oficial del CEP y compara sus campos contra el comprobante visual, pero no valida la firma digital criptográfica del XML de forma local.
+
+**Motivo:** se realizó una prueba criptográfica real (operación RSA pura: `sello^e mod n`) con el certificado cuyo número de serie coincide con el que el XML referencia, descargado del portal del SAT. El bloque resultante no exhibió ninguna estructura de padding reconocida (ni PKCS#1 v1.5 ni RSASSA-PSS). Conclusión: ese certificado del SAT no es la llave que firmó el XML. La llave privada real pertenece a la infraestructura interna de Banxico/SPEI (IES) y no está disponible públicamente.
+
+**Consecuencia:**
+- La validación de firma oficial solo puede obtenerse a través del validador web de Banxico (`banxico.org.mx/validador-cep-spei/`).
+- VerificaPago redirige al usuario a esa herramienta cuando necesita la validación criptográfica formal.
+- El comentario en el código (`cep_xml_auto_service.py`) dice explícitamente: "este comportamiento puede cambiar sin previo aviso" — no "confirmado experimentalmente", para mantener un tono neutral y mantenible.
+
+---
+
+## 2026-06 — Jerarquía de fuentes de evidencia SPEI
+
+**Decisión:** se establece una jerarquía formal de fuentes, implementada como `NivelEvidencia` en `scoring_v3.py`:
+
+```
+XML oficial de Banxico  (nivel máximo)
+        ↓
+CEP HTML / scraping     (nivel alto)
+        ↓
+Análisis documental     (nivel menor)
+        ↓
+No disponible           (sin evidencia externa)
+```
+
+Una fuente de nivel superior puede actualizar el estado SPEI. Una fuente de nivel inferior nunca puede hacerlo.
+
+**Motivo:** garantiza que cuando el sistema obtiene el XML oficial, ese dato siempre prevalece sobre cualquier inferencia previa del scraping del CEP HTML, sin necesidad de lógica condicional compleja dispersa en el código.
+
+**Consecuencia:** el campo `nivel_evidencia` en la respuesta del API le indica al frontend (y a cualquier consumidor futuro del API) exactamente qué tan confiable es el estado SPEI reportado.
+
+---
+
+## 2026-06 — Parámetros de valida.do externalizados a JSON
+
+**Decisión:** `tipoCriterio`, `tipoConsulta`, señales de éxito del HTML, content-types válidos y catálogo de bancos viven en `catalogo_bancos.json`, no hardcodeados en el código Python.
+
+**Motivo:** el endpoint `valida.do` de Banxico no está documentado públicamente. Sus parámetros y el HTML de respuesta pueden cambiar sin aviso. Un string hardcodeado como `"boton-descarga-xml"` rompería silenciosamente la descarga automática del XML si Banxico cambia el nombre de esa clase CSS.
+
+**Consecuencia:** cuando Banxico cambia algo del portal, se actualiza el JSON sin necesidad de un deploy de código. El historial de Git del JSON documenta exactamente cuándo y qué cambió en el comportamiento del portal.
+
+---
+
+## 2026-06 — El captcha del portal CEP no se valida del lado del servidor
+
+**Decisión:** la descarga automática del XML manda el campo `captcha` vacío en el POST a `valida.do`.
+
+**Motivo:** investigación empírica con una instalación de prueba en Render (`banxico-test.onrender.com`): el servidor respondió con éxito (`varHideCaptcha=true` en el HTML) sin que se resolviera ningún captcha. El campo captcha existe en el HTML del formulario, pero la lógica del servidor no lo valida para este flujo específico al momento de implementar este módulo.
+
+**Consecuencia:** este comportamiento puede cambiar. Si Banxico activa la validación del captcha, la descarga automática fallará y el sistema degradará a "no fue posible obtener el XML automáticamente", sin interrumpir el análisis principal. La traza registrada en cada petición (`traza` en la respuesta) permitirá detectar este cambio rápidamente.
+
+---
+
+## 2026-06 — Score legacy mantenido para compatibilidad del frontend
+
+**Decisión:** los campos `score` y `riesgo` siguen existiendo en la respuesta del API aunque el motor v3 usa dimensiones independientes.
+
+**Motivo:** el frontend tenía `GaugeCircle` y lógica de colores basada en `score`/`riesgo`. Eliminarlos hubiera roto producción. Se mantienen calculados a partir de las nuevas dimensiones como un campo de compatibilidad.
+
+**Consecuencia:** en una versión futura, cuando el frontend esté completamente migrado a los 2 motores, estos campos legacy pueden eliminarse del API sin afectar la lógica del motor.
+
+---
+
+## 2026-06 — Arquitectura multiempresa desde el inicio
+
+**Decisión:** el esquema de base de datos incluye `empresa_id` en todas las tablas desde la primera migración, aunque la autenticación multiempresa real no existe todavía.
+
+**Motivo:** agregar `empresa_id` a una tabla con datos existentes en producción es costoso y riesgoso. Hacerlo desde el inicio con un `DEFAULT_EMPRESA_ID` es barato y preserva la opción de activar multiempresa en el futuro sin migraciones destructivas.
+
+**Consecuencia:** todos los endpoints del dashboard ya aceptan `empresa_id` como parámetro. Cuando se implemente autenticación real, los endpoints no necesitan cambiar — solo el frontend necesita empezar a enviar el `empresa_id` correcto.
