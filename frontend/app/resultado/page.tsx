@@ -8,18 +8,6 @@ const GREEN = "#43A047";
 const ORANGE = "#F5A623";
 const RED = "#E53935";
 
-const ESTADO_OPERACION_LABEL: Record<EstadoOperacion, string> = {
-  acreditada: "Acreditada en Banxico",
-  liquidada: "Liquidada, CEP pendiente",
-  en_proceso: "En proceso",
-  devuelta: "Devuelta al emisor",
-  en_devolucion: "En proceso de devolución",
-  rechazada: "Rechazada por SPEI",
-  cancelada: "Cancelada antes de liquidar",
-  no_liquidada: "No liquidada en la jornada",
-  desconocida: "Sin información disponible",
-};
-
 function dimensionColor(score: number): string {
   if (score >= 75) return GREEN;
   if (score >= 45) return ORANGE;
@@ -34,65 +22,6 @@ function dimensionColor(score: number): string {
 // terminaría viéndose "mal" en un número único, cuando el problema real
 // es solo ausencia de evidencia, no fraude). En su lugar, son reglas
 // explícitas sobre los valores ya calculados por el backend.
-type NivelSemaforo = "verificado" | "consistente" | "revisar" | "riesgo_alto";
-
-const SEMAFORO_CONFIG: Record<NivelSemaforo, { label: string; color: string; bg: string; desc: string }> = {
-  verificado:   { label: "Verificado",   color: GREEN,  bg: `${GREEN}18`,  desc: "Existe evidencia oficial (CEP con monto confirmado) de que la operación fue acreditada." },
-  consistente:  { label: "Consistente",  color: GREEN,  bg: `${GREEN}18`,  desc: "El documento, la verificabilidad y el contexto temporal son congruentes entre sí." },
-  revisar:      { label: "Revisar",      color: ORANGE, bg: `${ORANGE}18`, desc: "Hay elementos que requieren atención, sin que esto implique fraude." },
-  riesgo_alto:  { label: "Riesgo alto",  color: RED,    bg: `${RED}18`,    desc: "Se detectaron inconsistencias documentales o Banxico contradice lo que afirma el comprobante." },
-};
-
-const ESTADOS_CONTRADICTORIOS: EstadoOperacion[] = ["rechazada", "cancelada", "no_liquidada"];
-const ESTADOS_LIQUIDADOS: EstadoOperacion[] = ["liquidada", "devuelta", "en_devolucion"];
-
-function calcularSemaforo(result: {
-  confianza_documental: number; verificabilidad: number; contexto_temporal: number; estado_operacion: EstadoOperacion;
-}): NivelSemaforo {
-  const { confianza_documental, verificabilidad, contexto_temporal, estado_operacion } = result;
-
-  // Riesgo alto: señal de manipulación documental, o Banxico contradice
-  // directamente lo que el comprobante afirma.
-  if (confianza_documental < 45 || ESTADOS_CONTRADICTORIOS.includes(estado_operacion)) {
-    return "riesgo_alto";
-  }
-
-  // Verificado: el nivel más alto de evidencia que el sistema puede dar
-  // hoy -- CEP con monto confirmado.
-  if (estado_operacion === "acreditada") {
-    return "verificado";
-  }
-
-  // Consistente: todo apunta en la misma dirección (las 3 dimensiones
-  // altas), o Banxico confirma que la operación se procesó (liquidada/
-  // devuelta), aunque no haya CEP completo.
-  const minDimension = Math.min(confianza_documental, verificabilidad, contexto_temporal);
-  if (minDimension >= 75 || ESTADOS_LIQUIDADOS.includes(estado_operacion)) {
-    return "consistente";
-  }
-
-  // Cualquier otro caso: alguna dimensión floja sin contradicción fuerte
-  // -- típicamente, documento ok pero sin rastro externo todavía.
-  return "revisar";
-}
-
-function SemaforoCircle({ nivel }: { nivel: NivelSemaforo }) {
-  const cfg = SEMAFORO_CONFIG[nivel];
-  return (
-    <div style={{ position: "relative", width: 84, height: 84, flexShrink: 0 }}>
-      <svg width="84" height="84" viewBox="0 0 84 84">
-        <circle cx="42" cy="42" r="36" fill="none" stroke="#E8EDF5" strokeWidth="8" />
-        <circle cx="42" cy="42" r="36" fill="none" stroke={cfg.color} strokeWidth="8" strokeLinecap="round" />
-      </svg>
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ fontSize: 26, color: cfg.color, fontWeight: 800 }}>
-          {nivel === "verificado" || nivel === "consistente" ? "✓" : nivel === "revisar" ? "!" : "✕"}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 export default function Resultado() {
   const router = useRouter();
   const { result, file } = useAnalisis();
@@ -103,11 +32,6 @@ export default function Resultado() {
   }, [result, router]);
 
   if (!result) return null;
-
-  const minDimension = Math.min(result.confianza_documental, result.verificabilidad, result.contexto_temporal);
-  const tonoGeneral = dimensionColor(minDimension);
-  const nivelSemaforo = calcularSemaforo(result);
-  const semaforoCfg = SEMAFORO_CONFIG[nivelSemaforo];
 
   const descargarReporte = () => {
     const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
@@ -134,7 +58,7 @@ export default function Resultado() {
           </div>
         </div>
 
-        {/* ── Motor 1: Estado SPEI — protagonista, fuente Banxico ─────────────── */}
+        {/* ── Motor 1: Estado SPEI — único semáforo, protagonista ────────────── */}
         {(() => {
           const spei = result.semaforo_spei;
           const colorSpei = spei?.color === "verde" ? GREEN
@@ -148,103 +72,127 @@ export default function Resultado() {
             ? "Banxico — CEP"
             : "No verificado con Banxico";
 
+          // Integridad documental: solo ícono texto, sin segundo semáforo
+          const integ = result.integridad_config;
+          const integIcono = integ?.icono === "✅" ? "✓"
+            : integ?.icono === "🟠" ? "⚠"
+            : integ?.icono === "🔴" ? "⛔"
+            : "—";
+          const colorInteg = integ?.color === "verde" ? GREEN
+            : integ?.color === "naranja" ? ORANGE
+            : integ?.color === "rojo" ? RED
+            : "#9CA3AF";
+
+          // Fuentes de validación disponibles
+          const fuentes: string[] = [];
+          if (result.nivel_evidencia === "xml_oficial" || result.nivel_evidencia === "cep_html") {
+            fuentes.push("Estado SPEI");
+          }
+          if (result.nivel_evidencia === "xml_oficial") {
+            fuentes.push("XML oficial CEP");
+            fuentes.push("Comparación de campos");
+          }
+
           return (
-            <div style={{ padding: "20px 20px 0", borderBottom: "1px solid #F0F4F8" }}>
-              <div style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Estado de la transferencia (SPEI)</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 14 }}>
-                {/* Círculo SPEI grande */}
-                <div style={{ position: "relative", width: 72, height: 72, flexShrink: 0 }}>
-                  <svg width="72" height="72" viewBox="0 0 72 72">
-                    <circle cx="36" cy="36" r="30" fill="none" stroke="#E8EDF5" strokeWidth="7" />
-                    <circle cx="36" cy="36" r="30" fill="none" stroke={colorSpei} strokeWidth="7" strokeLinecap="round" />
+            <div style={{ padding: "24px 22px 0" }}>
+
+              {/* Label */}
+              <div style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>
+                Estado de la transferencia (SPEI)
+              </div>
+
+              {/* Semáforo SPEI — centrado, protagonista */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 20 }}>
+                <div style={{ position: "relative", width: 80, height: 80, marginBottom: 12 }}>
+                  <svg width="80" height="80" viewBox="0 0 80 80">
+                    <circle cx="40" cy="40" r="34" fill="none" stroke="#E8EDF5" strokeWidth="7" />
+                    <circle cx="40" cy="40" r="34" fill="none" stroke={colorSpei} strokeWidth="7" strokeLinecap="round" />
                   </svg>
                   <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <span style={{ fontSize: 22 }}>{spei?.icono || "⚪"}</span>
+                    <span style={{ fontSize: 26 }}>{spei?.icono || "⚪"}</span>
                   </div>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: colorSpei, lineHeight: 1.1, marginBottom: 3 }}>
-                    {spei?.etiqueta || "No verificado"}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500 }}>{fuenteLabel}</div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: colorSpei, lineHeight: 1, marginBottom: 4 }}>
+                  {spei?.etiqueta || "No verificado"}
                 </div>
-
-                {/* Motor 2: Integridad documental — ~25% del tamaño del SPEI */}
-                {(() => {
-                  const integ = result.integridad_config;
-                  const colorInteg = integ?.color === "verde" ? GREEN
-                    : integ?.color === "naranja" ? ORANGE
-                    : integ?.color === "rojo" ? RED
-                    : "#9CA3AF";
-                  return (
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                      <div style={{ position: "relative", width: 36, height: 36 }}>
-                        <svg width="36" height="36" viewBox="0 0 36 36">
-                          <circle cx="18" cy="18" r="14" fill="none" stroke="#E8EDF5" strokeWidth="4" />
-                          <circle cx="18" cy="18" r="14" fill="none" stroke={colorInteg} strokeWidth="4" strokeLinecap="round" />
-                        </svg>
-                        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <span style={{ fontSize: 12 }}>{integ?.icono || "⚪"}</span>
-                        </div>
-                      </div>
-                      <div style={{ fontSize: 9, color: "#94A3B8", fontWeight: 600, textAlign: "center", lineHeight: 1.3, maxWidth: 56 }}>
-                        Integridad documental
-                      </div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: colorInteg, textAlign: "center" }}>
-                        {integ?.etiqueta || "—"}
-                      </div>
-                    </div>
-                  );
-                })()}
+                <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500 }}>{fuenteLabel}</div>
               </div>
+
+              {/* Separador */}
+              <div style={{ height: 1, background: "#F0F4F8", marginBottom: 16 }} />
+
+              {/* Motor 2: Integridad documental — secundario, sin semáforo */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: fuentes.length > 0 ? 12 : 0 }}>
+                <span style={{ fontSize: 15, color: colorInteg, fontWeight: 700 }}>{integIcono}</span>
+                <div>
+                  <span style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Integridad del comprobante — </span>
+                  <span style={{ fontSize: 12, color: colorInteg, fontWeight: 700 }}>{integ?.etiqueta || "—"}</span>
+                </div>
+              </div>
+
+              {/* Fuentes de validación — solo si hay más de una */}
+              {fuentes.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 10, color: "#CBD5E1", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                    Fuentes de validación
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    {fuentes.map(f => (
+                      <div key={f} style={{ fontSize: 11, color: "#64748B", display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ color: GREEN, fontWeight: 700, fontSize: 12 }}>✓</span> {f}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Separador antes del diagnóstico */}
+              <div style={{ height: 1, background: "#F0F4F8" }} />
             </div>
           );
         })()}
 
-        {/* Diagnóstico escrito — desplegable; las 4 dimensiones de abajo no cambian */}
+        {/* Aviso de reutilización */}
+        {result.documento_reutilizado && (
+          <div style={{ margin: "14px 22px 0", padding: "10px 14px", background: `${ORANGE}12`, border: `1px solid ${ORANGE}40`, borderRadius: 10, fontSize: 12, color: "#7C4A0A", lineHeight: 1.5 }}>
+            ⚠️ Este comprobante exacto ya fue analizado antes (visto {result.veces_visto} veces).
+          </div>
+        )}
+
+        {/* Diagnóstico detallado — colapsable */}
         <button onClick={() => setDiagnosticoAbierto(o => !o)}
-          style={{ width: "100%", padding: "14px 20px", display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
-          <span style={{ width: 4, height: 18, background: tonoGeneral, borderRadius: 2, flexShrink: 0 }} />
+          style={{ width: "100%", padding: "14px 22px", display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
           <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#334155" }}>Diagnóstico detallado</span>
           <span style={{ color: "#CBD5E1", fontSize: 14 }}>{diagnosticoAbierto ? "▲" : "▼"}</span>
         </button>
         {diagnosticoAbierto && (
-          <div style={{ padding: "0 20px 16px" }}>
-            <span style={{ fontSize: 14, color: "#1E293B", lineHeight: 1.6, fontWeight: 500 }}>
+          <div style={{ padding: "0 22px 16px" }}>
+            <span style={{ fontSize: 13, color: "#475569", lineHeight: 1.7 }}>
               {result.interpretacion || result.resumen}
             </span>
           </div>
         )}
 
-        {result.documento_reutilizado && (
-          <div style={{ margin: "12px 20px 0", padding: "10px 14px", background: `${ORANGE}12`, border: `1px solid ${ORANGE}40`, borderRadius: 10, fontSize: 12, color: "#7C4A0A", lineHeight: 1.5 }}>
-            ⚠️ Este comprobante exacto ya fue analizado antes (visto {result.veces_visto} veces).
-          </div>
-        )}
-
-        <div style={{ padding: "16px 20px 4px", display: "flex", flexDirection: "column", gap: 10 }}>
+        {/* 4 dimensiones */}
+        <div style={{ padding: "4px 22px 4px", display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", gap: 10 }}>
             <DimensionCard label="Confianza documental" score={result.confianza_documental} sublabel="¿Parece auténtico?" />
             <DimensionCard label="Verificabilidad" score={result.verificabilidad} sublabel="¿Se puede corroborar?" />
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <DimensionCard label="Contexto temporal" score={result.contexto_temporal} sublabel="¿El tiempo es consistente?" />
-            <div style={{ flex: 1, minWidth: 0, background: "#F8FAFC", borderRadius: 14, padding: 14, border: "1px solid #EEF2F7" }}>
-              <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 8 }}>Estado de la operación</div>
-              <div style={{ display: "inline-block", padding: "6px 10px", borderRadius: 8, background: "rgba(156,163,175,0.15)", color: "#6B7280", fontSize: 12, fontWeight: 700 }}>
-                {ESTADO_OPERACION_LABEL[result.estado_operacion] || "Sin información"}
-              </div>
-            </div>
+            <DimensionCard label="Confianza fusionada" score={Math.max(0, 100 - result.score)} sublabel="Score general" />
           </div>
         </div>
 
         {result.detalle_temporal && (
-          <div style={{ margin: "4px 20px 16px", padding: "8px 12px", background: "#F8FAFC", borderRadius: 8, fontSize: 11, color: "#64748B", lineHeight: 1.5 }}>
+          <div style={{ margin: "4px 22px 16px", padding: "8px 12px", background: "#F8FAFC", borderRadius: 8, fontSize: 11, color: "#64748B", lineHeight: 1.5 }}>
             🕐 {result.detalle_temporal}
           </div>
         )}
 
-        <div style={{ padding: "0 20px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+        {/* Botones */}
+        <div style={{ padding: "8px 22px 22px", display: "flex", flexDirection: "column", gap: 10 }}>
           <button onClick={() => router.push("/resultado/detalle")}
             style={{ width: "100%", padding: 14, fontSize: 14, fontWeight: 700, borderRadius: 12, cursor: "pointer", background: "#F1F5F9", color: "#334155", border: "none" }}>
             Ver detalles
