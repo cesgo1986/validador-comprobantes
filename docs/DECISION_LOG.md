@@ -2,6 +2,15 @@
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
+## Convenciones de captura (sesiones de trabajo)
+
+Durante las sesiones de trabajo en Verificapago / Verificapago1.1, las decisiones se marcan con uno de dos identificadores para traerlas después a este chat (Arquitecto de Conocimiento):
+
+- **`#DOC-VP`** — documentación rutinaria: cualquier decisión, hallazgo o ajuste que valga la pena registrar, sin importar el tamaño.
+- **`#ADR-VP`** (Architecture Decision Record) — exclusivo para decisiones que cambian la arquitectura del sistema (ej. cambiar el origen de verdad de un dato, mover lógica entre capas, alterar la jerarquía de evidencia). Formato sugerido al marcarlas: *Decisión* / *Motivo* / *Impacto* / *Documentos afectados*. Toda entrada `#ADR-VP` termina como una entrada de este log igual que las `#DOC-VP` — la diferencia es de énfasis y trazabilidad, no de dónde se registra.
+
+`#ADR-VP` no reemplaza a `#DOC-VP`, lo complementa — permite distinguir de un vistazo, con el tiempo, qué entradas de este log fueron decisiones arquitectónicas deliberadas frente a documentación de avance normal.
+
 ---
 
 ## 2026-06 — Separar Estado SPEI de Integridad Documental

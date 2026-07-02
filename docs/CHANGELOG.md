@@ -4,6 +4,15 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.10.1] — 2026-07 — Convención #ADR-VP y documento futuro PRINCIPIOS_DE_PRODUCTO.md
+
+### Documentado (sin cambios de código)
+- `DECISION_LOG.md`: nueva sección de convenciones al inicio del documento — se adopta `#ADR-VP` (Architecture Decision Record) como marcador complementario a `#DOC-VP`, exclusivo para decisiones que cambian la arquitectura del sistema. Formato sugerido: Decisión / Motivo / Impacto / Documentos afectados.
+- `MODELO_DECISION_EXPLICABLE.md`: sección práctica ampliada con las cuatro preguntas de diagnóstico para evaluar ideas nuevas antes de implementarlas (¿aporta hecho o interpreta?, ¿modifica recomendación o solo agrega evidencia?, ¿rompe algún principio?, ¿necesita documento nuevo o pertenece a uno existente?).
+- `ROADMAP.md`: se anota `PRINCIPIOS_DE_PRODUCTO.md` como documento futuro pendiente — reglas innegociables de producto, formato "constitución" corta (1-2 páginas). Deliberadamente pospuesto hasta la entrada a Beta.
+
+---
+
 ## [0.10.0] — 2026-07 — Nuevo documento fundacional: Modelo de decisión explicable
 
 ### Agregado

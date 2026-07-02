@@ -128,7 +128,16 @@ Esta es una nota de diseño para el futuro, no un compromiso de roadmap — ning
 
 ## Cómo se usa este documento en la práctica
 
-Antes de agregar cualquier fuente nueva de información al sistema (un motor nuevo, una integración nueva, una señal nueva), la pregunta de diseño es: *¿en qué capa entra esto?*
+Cuando aparezca una idea nueva — y van a aparecer muchas — antes de implementarla se responden cuatro preguntas de diagnóstico, en este orden:
+
+1. **¿Esta idea aporta un nuevo hecho, o interpreta hechos existentes?** Si es un hecho nuevo, entra en la capa 1 como una evidencia más. Si reinterpreta hechos que ya existen, es un cambio en la capa 2.
+2. **¿Modifica una recomendación, o solo agrega evidencia?** Cambiar qué se le dice al usuario que haga es un cambio de capa 3, con más peso que agregar una línea más al componente de evidencia (capa 4).
+3. **¿Rompe alguno de los principios de este documento?** Revisar contra los cinco principios de la sección anterior antes de construir.
+4. **¿Necesita un documento nuevo, o pertenece a uno existente?** No toda idea justifica un archivo nuevo en `docs/` — la mayoría de las veces la respuesta correcta es una entrada en `DECISION_LOG.md` o un ajuste a `MOTOR_DECISIONES.md`/`SCORING.md`/`ROADMAP.md`. Un documento nuevo se justifica solo cuando la idea define una capa de conocimiento distinta a las que ya existen (ver `PRODUCT_VISION.md` y `MODELO_DECISION_EXPLICABLE.md` como ejemplos de cuándo sí ameritó uno nuevo).
+
+Estas cuatro preguntas son las que mantienen el crecimiento del producto ordenado — no evitan que el producto crezca, evitan que crezca sin disciplina.
+
+Adicionalmente, antes de agregar cualquier fuente nueva de información al sistema (un motor nuevo, una integración nueva, una señal nueva), la pregunta de diseño de fondo sigue siendo: *¿en qué capa entra esto?*
 
 - ¿Es un hecho nuevo? → se agrega a la capa 1, se expone como una evidencia más.
 - ¿Cambia cómo se interpreta un hecho existente? → se ajusta la capa 2, documentado en `MOTOR_DECISIONES.md` o `SCORING.md`.
