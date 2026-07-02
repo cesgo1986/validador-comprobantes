@@ -134,15 +134,72 @@ export default function Resultado() {
           </div>
         </div>
 
-        {/* Resultado total — semáforo categórico, no un promedio numérico */}
-        <div style={{ padding: "20px 20px 16px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #F0F4F8" }}>
-          <SemaforoCircle nivel={nivelSemaforo} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Resultado total</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: semaforoCfg.color, marginBottom: 4 }}>{semaforoCfg.label}</div>
-            <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.4 }}>{semaforoCfg.desc}</div>
-          </div>
-        </div>
+        {/* ── Motor 1: Estado SPEI — protagonista, fuente Banxico ─────────────── */}
+        {(() => {
+          const spei = result.semaforo_spei;
+          const colorSpei = spei?.color === "verde" ? GREEN
+            : spei?.color === "amarillo" ? "#EAB308"
+            : spei?.color === "naranja" ? ORANGE
+            : spei?.color === "rojo" ? RED
+            : "#9CA3AF";
+          const fuenteLabel = result.nivel_evidencia === "xml_oficial"
+            ? "Banxico — XML oficial"
+            : result.nivel_evidencia === "cep_html"
+            ? "Banxico — CEP"
+            : "No verificado con Banxico";
+
+          return (
+            <div style={{ padding: "20px 20px 0", borderBottom: "1px solid #F0F4F8" }}>
+              <div style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Estado de la transferencia (SPEI)</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 14 }}>
+                {/* Círculo SPEI grande */}
+                <div style={{ position: "relative", width: 72, height: 72, flexShrink: 0 }}>
+                  <svg width="72" height="72" viewBox="0 0 72 72">
+                    <circle cx="36" cy="36" r="30" fill="none" stroke="#E8EDF5" strokeWidth="7" />
+                    <circle cx="36" cy="36" r="30" fill="none" stroke={colorSpei} strokeWidth="7" strokeLinecap="round" />
+                  </svg>
+                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontSize: 22 }}>{spei?.icono || "⚪"}</span>
+                  </div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: colorSpei, lineHeight: 1.1, marginBottom: 3 }}>
+                    {spei?.etiqueta || "No verificado"}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500 }}>{fuenteLabel}</div>
+                </div>
+
+                {/* Motor 2: Integridad documental — ~25% del tamaño del SPEI */}
+                {(() => {
+                  const integ = result.integridad_config;
+                  const colorInteg = integ?.color === "verde" ? GREEN
+                    : integ?.color === "naranja" ? ORANGE
+                    : integ?.color === "rojo" ? RED
+                    : "#9CA3AF";
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <div style={{ position: "relative", width: 36, height: 36 }}>
+                        <svg width="36" height="36" viewBox="0 0 36 36">
+                          <circle cx="18" cy="18" r="14" fill="none" stroke="#E8EDF5" strokeWidth="4" />
+                          <circle cx="18" cy="18" r="14" fill="none" stroke={colorInteg} strokeWidth="4" strokeLinecap="round" />
+                        </svg>
+                        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <span style={{ fontSize: 12 }}>{integ?.icono || "⚪"}</span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 9, color: "#94A3B8", fontWeight: 600, textAlign: "center", lineHeight: 1.3, maxWidth: 56 }}>
+                        Integridad documental
+                      </div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: colorInteg, textAlign: "center" }}>
+                        {integ?.etiqueta || "—"}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Diagnóstico escrito — desplegable; las 4 dimensiones de abajo no cambian */}
         <button onClick={() => setDiagnosticoAbierto(o => !o)}

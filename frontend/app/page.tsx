@@ -71,16 +71,30 @@ export default function Home() {
               </div>
               <div>
                 <label style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", display: "block", marginBottom: 6 }}>
-                  🔢 CLABE o número de cuenta <span style={{ color: "rgba(255,255,255,0.3)" }}>(opcional)</span>
+                  🔢 CLABE, número de cuenta o tarjeta <span style={{ color: "rgba(255,255,255,0.3)" }}>(opcional)</span>
                 </label>
                 <input value={clabeInput} onChange={e => setClabeInput(e.target.value.replace(/\D/g, ""))}
-                  placeholder="18 dígitos CLABE o número de cuenta" maxLength={18}
-                  style={{ width: "100%", padding: "12px 14px", fontSize: 14, borderRadius: 12, border: `1px solid ${clabeInput.length > 0 && clabeInput.length !== 18 ? "rgba(229,57,53,0.5)" : clabeInput.length === 18 ? "rgba(0,191,165,0.5)" : "rgba(255,255,255,0.15)"}`, background: "rgba(255,255,255,0.08)", color: "#fff", boxSizing: "border-box", fontFamily: "monospace", letterSpacing: "0.05em" }} />
+                  placeholder="CLABE, número de cuenta o tarjeta"
+                  maxLength={18}
+                  style={{ width: "100%", padding: "12px 14px", fontSize: 14, borderRadius: 12, border: `1px solid ${
+                    clabeInput.length === 0 ? "rgba(255,255,255,0.15)"
+                    : clabeInput.length === 16 || clabeInput.length === 18 ? "rgba(0,191,165,0.5)"
+                    : "rgba(255,255,255,0.2)"
+                  }`, background: "rgba(255,255,255,0.08)", color: "#fff", boxSizing: "border-box", fontFamily: "monospace", letterSpacing: "0.05em" }} />
                 {clabeInput.length > 0 && (
-                  <div style={{ fontSize: 12, marginTop: 4, color: clabeInput.length === 18 ? TEAL : "rgba(229,57,53,0.8)" }}>
-                    {clabeInput.length === 18 ? "✓ Longitud correcta" : `${clabeInput.length}/18 dígitos`}
+                  <div style={{ fontSize: 12, marginTop: 4, color:
+                    clabeInput.length === 18 ? TEAL
+                    : clabeInput.length === 16 ? TEAL
+                    : "rgba(255,255,255,0.4)"
+                  }}>
+                    {clabeInput.length === 18 ? "✓ CLABE (18 dígitos)"
+                      : clabeInput.length === 16 ? "✓ Tarjeta (16 dígitos)"
+                      : `${clabeInput.length} dígitos`}
                   </div>
                 )}
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 6, lineHeight: 1.5 }}>
+                  ⓘ Este dato permite realizar una validación más completa cuando esté disponible. Corrobora la operación mediante la información oficial del CEP de Banxico.
+                </div>
               </div>
             </div>
             <button onClick={irAAnalizar} style={{ marginTop: 14, width: "100%", padding: 15, fontSize: 15, fontWeight: 700, borderRadius: 14, cursor: "pointer", background: TEAL, color: "#fff", border: "none" }}>
