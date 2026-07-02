@@ -8,7 +8,7 @@
 
 VerificaPago es una plataforma de verificación de transferencias SPEI que responde dos preguntas independientes:
 
-**¿Qué dice Banxico?** — La transferencia existió, fue liquidada, devuelta o no se encontró.  
+**¿Qué dice Banxico?** — La transferencia existió, fue liquidada, devuelta o no se encontró.
 **¿Qué dice VerificaPago?** — El comprobante presentado es consistente, tiene observaciones o posibles alteraciones.
 
 Son dos preguntas distintas con fuentes distintas. Nunca se mezclan. Esa separación es la identidad del producto.
@@ -38,19 +38,19 @@ VerificaPago cierra esa brecha: cualquier comercio, freelancer o empresa puede s
 
 ## Principios del producto
 
-**1. Honestidad epistémica**  
+**1. Honestidad epistémica**
 VerificaPago solo afirma lo que puede demostrar. Si no pudo consultar Banxico, dice "no verificado". No infla la confianza para parecer más capaz de lo que es.
 
-**2. Dos motores, dos preguntas**  
+**2. Dos motores, dos preguntas**
 El estado SPEI (Motor 1, fuente: Banxico) nunca puede ser modificado por el análisis documental (Motor 2, fuente: VerificaPago). Un comprobante alterado no convierte una transferencia real en falsa.
 
-**3. Degradación elegante**  
+**3. Degradación elegante**
 Si falla la descarga del XML, el análisis continúa. Si falla el CEP, el OCR sigue corriendo. El usuario siempre obtiene el mejor resultado posible con la información disponible.
 
-**4. Explicabilidad**  
+**4. Explicabilidad**
 Cada resultado se explica. No un número opaco, sino: "La transferencia fue liquidada por SPEI. El comprobante presenta observaciones menores en el formato del folio." El comercio puede tomar una decisión informada.
 
-**5. Arquitectura que respeta la fuente**  
+**5. Arquitectura que respeta la fuente**
 Banxico responde por la operación. VerificaPago responde por el documento. Esa línea nunca se cruza en el código ni en la interfaz.
 
 ---

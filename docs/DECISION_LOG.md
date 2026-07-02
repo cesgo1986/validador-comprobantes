@@ -82,6 +82,20 @@ Una fuente de nivel superior puede actualizar el estado SPEI. Una fuente de nive
 
 ---
 
+## 2026-07 — Semáforo de integridad documental: el rojo se reserva para evidencia acumulada fuerte
+
+**Decisión:** en la pantalla `/resultado`, el color del indicador de integridad documental (Motor 2) ya no se mapea 1:1 desde `integridad_config.color`. Se agrega una regla de frontend: el color rojo solo se muestra cuando hay evidencia acumulada fuerte — `confianza_documental < 30` **o** el XML oficial reporta discrepancias de campo. El caso `integridad_config.color = "rojo"` sin esas condiciones (o `"naranja"`) se muestra en ámbar, no en rojo.
+
+**Motivo:** un usuario que ve simultáneamente "🟢 Liquidada" (Motor 1) y "🔴 Posible alteración" (Motor 2) tiende a leer la combinación como contradictoria y concluye erróneamente que la transferencia no ocurrió, aunque Banxico ya la haya confirmado. Esto es el mismo problema de falsos positivos que motivó separar los dos motores (ver entrada de 2026-06 "Separar Estado SPEI de Integridad Documental"), pero manifestado en la capa de presentación en vez de en el cálculo del score.
+
+**Consecuencia:**
+- El backend no cambia — `scoring_v3.py` sigue calculando `integridad_comprobante` y `integridad_config` exactamente igual.
+- La reinterpretación de color vive solo en `app/resultado/page.tsx`, como una decisión de UX, no de scoring. Si se necesita este mismo criterio en otra pantalla (ej. `/resultado/detalle` o el dashboard desktop de Sprint C), debe replicarse explícitamente ahí — no es automático.
+- El subtexto explicativo bajo el indicador de integridad también se ajusta según `esCasoExtremo`, para que el texto sea consistente con el color mostrado.
+- Pendiente evaluar si este criterio (`confianza_documental < 30` OR discrepancia XML) debería subir al backend como un campo explícito (ej. `severidad_integridad`) en vez de vivir como lógica duplicada en el frontend, especialmente antes de construir el dashboard desktop (Sprint C) que también necesitará este semáforo.
+
+---
+
 ## 2026-06 — Arquitectura multiempresa desde el inicio
 
 **Decisión:** el esquema de base de datos incluye `empresa_id` en todas las tablas desde la primera migración, aunque la autenticación multiempresa real no existe todavía.

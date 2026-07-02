@@ -4,6 +4,17 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.9.1] — 2026-07 — Refinamiento del semáforo de integridad en /resultado
+
+### Agregado
+- `PRODUCT_VISION.md`: documento de visión estratégica (modelo de negocio, roadmap a 3 años, métricas), separado de `PRODUCT.md` (definición técnica del producto)
+
+### Cambiado
+- `app/resultado/page.tsx`: el color del indicador de integridad documental ya no viene 1:1 de `integridad_config.color`. El rojo se reserva para evidencia acumulada fuerte (`confianza_documental < 30` o discrepancia en el XML); el resto de los casos de riesgo se muestran en ámbar, para evitar que el usuario lea "🟢 Liquidada + 🔴 Posible alteración" como una contradicción. Ver `DECISION_LOG.md`.
+- Subtexto explicativo bajo el indicador de integridad ajustado para ser consistente con el nuevo criterio de color.
+
+---
+
 ## [0.9.0] — 2026-07 — Documentación fundacional y Sprint A en curso
 
 ### Agregado
