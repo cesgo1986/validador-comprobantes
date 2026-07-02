@@ -1,6 +1,25 @@
 # CHANGELOG.md — Historial de versiones
 
+**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.11.0] — 2026-07 — Consolidación documental: README, versionado, referencias cruzadas y congelamiento de estructura
+
+### Agregado
+- `README.md`: índice maestro de `/docs` — estructura por categorías (Producto, Arquitectura, Decisiones, Evolución, Laboratorio), orden recomendado de lectura, tabla de convenciones de captura (incluye el marcador reservado 🎯 `#PDR-VP`, no activo todavía), y la política de versionado documental.
+
+### Cambiado
+- Los 12 documentos de `/docs` ahora incluyen un encabezado de versión (`Versión del documento` / `Última actualización`) y una sección final "Documentos relacionados" con referencias cruzadas explícitas — la documentación pasa de ser archivos aislados a una red navegable.
+
+### Documentado (sin cambios de código)
+- `DECISION_LOG.md`: principio de gobernanza documental — una única fuente de verdad por pieza de conocimiento; las decisiones referencian investigaciones sin duplicarlas.
+- `DECISION_LOG.md`: estructura documental congelada — no se crean documentos nuevos salvo dominio propio y reutilizable. Se posponen explícitamente `PRINCIPIOS_DE_PRODUCTO.md`, `BETA_PLAN.md`, `SEGURIDAD.md`, `HISTORIAL.md` hasta que exista superficie real.
+- Se anota, sin activar, un cuarto marcador de captura reservado: 🎯 `#PDR-VP` (Product Decision Record).
+
+Esta versión marca el cierre de la ronda de trabajo dedicada a `/docs` — de aquí en adelante, la documentación se actualiza solo ante eventos concretos (módulo nuevo, cambio de arquitectura, decisión importante, investigación relevante), no como tarea de expansión activa.
 
 ---
 
@@ -227,3 +246,10 @@ Sube a versión MINOR (`0.9.x` → `0.10.0`) en vez de PATCH porque agrega un do
 - Frontend Next.js con una sola pantalla
 - Backend FastAPI en Render
 - Base de datos Supabase (PostgreSQL)
+
+---
+
+## Documentos relacionados
+
+- `DECISION_LOG.md` — el detalle completo de cada decisión resumida aquí
+- `ROADMAP.md` — el plan que estos cambios van cerrando

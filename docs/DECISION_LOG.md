@@ -1,5 +1,7 @@
 # DECISION_LOG.md — Registro de decisiones
 
+**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
 ## Convenciones de captura (sesiones de trabajo)
@@ -271,3 +273,39 @@ El frontend sigue decidiendo verde/ámbar/rojo a partir de esto. La diferencia e
 **Motivo:** agregar `empresa_id` a una tabla con datos existentes en producción es costoso y riesgoso. Hacerlo desde el inicio con un `DEFAULT_EMPRESA_ID` es barato y preserva la opción de activar multiempresa en el futuro sin migraciones destructivas.
 
 **Consecuencia:** todos los endpoints del dashboard ya aceptan `empresa_id` como parámetro. Cuando se implemente autenticación real, los endpoints no necesitan cambiar — solo el frontend necesita empezar a enviar el `empresa_id` correcto.
+
+---
+
+## 2026-07 — Principio de gobernanza documental: una única fuente de verdad por pieza de conocimiento
+
+**Decisión:** cada pieza de conocimiento del proyecto tiene una única fuente de verdad. Las decisiones (`DECISION_LOG.md`) referencian investigaciones (`LABORATORIO.md`), pero no las duplican; los documentos especializados profundizan en su propio dominio, y el resto de los documentos solo enlaza o resume cuando hace falta, en vez de repetir el contenido.
+
+**Motivo:** es la generalización formal de una regla que ya se venía aplicando de facto (ej. la entrada de `XML_CEP.md` sobre la investigación criptográfica del sello digital no se duplicó al crear `LABORATORIO.md`, solo se indexó). Sin esta regla explícita, el riesgo con 12 documentos y creciendo es que el mismo hecho técnico termine descrito de tres formas ligeramente distintas en tres archivos, y que nadie sepa cuál es la vigente cuando algo cambie.
+
+**Consecuencia:**
+- Cada documento nuevo o actualizado debe preguntarse, antes de escribir contenido: ¿esto ya vive en otro documento? Si sí, se referencia, no se repite.
+- Se agrega una sección "Documentos relacionados" al final de cada archivo de `/docs`, con referencias explícitas a los documentos con los que tiene relación de contenido — ver `README.md` para el mapa completo.
+
+---
+
+## 2026-07 — Estructura documental congelada
+
+**Decisión:** no se crean documentos nuevos en `/docs` salvo que representen un dominio propio y reutilizable — el mismo criterio que ya se aplicó al crear `MODELO_DECISION_EXPLICABLE.md` y `LABORATORIO.md`. Toda funcionalidad nueva se integra primero a la estructura documental existente (una sección nueva, una entrada de decisión, una entrada de investigación) antes de considerar un archivo nuevo.
+
+**Motivo:** con 12 documentos ya en su lugar, el riesgo deja de ser "falta documentación" y pasa a ser "la documentación crece de forma desordenada" — el escenario clásico de terminar con `XML2.md`, `XML_FINAL.md`, `XML_V2.md` porque nadie se detuvo a decidir si algo merecía un archivo nuevo o una sección dentro de uno existente.
+
+**Consecuencia:**
+- `README.md` documenta esta regla como parte de la política de mantenimiento de `/docs`.
+- `MODELO_DECISION_EXPLICABLE.md` ya tenía una pregunta de diagnóstico equivalente ("¿necesita un documento nuevo, o pertenece a uno existente?") — esta decisión la eleva de criterio de diseño de producto a regla de gobernanza documental explícita.
+- Documentos explícitamente pospuestos y no creados en esta ronda, por no tener superficie real todavía: `PRINCIPIOS_DE_PRODUCTO.md`, `BETA_PLAN.md`, `SEGURIDAD.md`, `HISTORIAL.md`. Se seguirán postergando hasta que el módulo correspondiente exista de verdad.
+- Queda anotado, sin activar, un cuarto marcador de captura: 🎯 `#PDR-VP` (Product Decision Record), para decisiones de producto que no son arquitectura ni investigación (renombrar un concepto, reordenar el roadmap, mover un entregable entre etapas). No se activa hasta que la necesidad de distinguirlo de `#DOC-VP` se vuelva recurrente en la práctica — ver `README.md`.
+- A partir de esta versión, `/docs` deja de tratarse como una tarea de expansión activa y pasa a actualizarse solo ante eventos concretos: módulo nuevo, cambio de arquitectura, decisión importante, o investigación relevante — es decir, exclusivamente a través de los tres marcadores activos.
+
+---
+
+## Documentos relacionados
+
+- Referenciado por prácticamente todos los documentos de `/docs` — es el registro central del "por qué".
+- `LABORATORIO.md` — destino de las investigaciones que respaldan algunas decisiones marcadas aquí.
+- `README.md` — mapa completo de convenciones y estructura documental.
+- `MODELO_DECISION_EXPLICABLE.md`, `MOTOR_DECISIONES.md`, `ROADMAP.md` — documentos cuyas decisiones más recientes están detalladas en este log.
