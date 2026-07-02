@@ -6,6 +6,18 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.12.0] — 2026-07 — ADR: se formaliza la capa de Recomendación; catálogo final de los 9 mensajes contextuales
+
+### Cambiado (arquitectura del modelo — MINOR por ser cambio de modelo, no patch)
+- `MODELO_DECISION_EXPLICABLE.md`: el modelo pasa de 4 a 5 capas — se separa **Impacto** ("¿qué implica esto para mí?", siempre presente) de **Recomendación** ("¿qué hago ahora?", capa opcional). Estructura de presentación actualizada de 5 a 6 pasos (se agrega ④ Recomendación inmediata). Principios del modelo reescritos, incorporando explícitamente "nunca inducir al usuario a una acción cuando la evidencia todavía no lo permite".
+- `DECISION_LOG.md`: registrado como 🏛️ `#ADR-VP` — motivo, impacto en el resto del producto (Historial, Dashboard, Alertas, Desktop, API Enterprise) y documentos afectados.
+
+### Completado (texto, pendiente de código)
+- `ROADMAP.md`, ítem 1.2: catálogo final de los 9 mensajes contextuales, con wording revisado (más precisos en `acreditada`, `liquidada`, `en_proceso`, `devuelta`, `no_liquidada`, `desconocida`) y el campo "Recomendación inmediata" agregado donde aplica (`en_proceso`, `devuelta`, `en_devolucion`, `desconocida`).
+- `ROADMAP.md`, ítem 1.4: el diseño de texto queda completo; lo pendiente se reduce exclusivamente a la implementación en `resultado/page.tsx`.
+
+---
+
 ## [0.11.2] — 2026-07 — Refinamiento: flujo de decisión de 5 pasos para 1.4
 
 ### Documentado (sin cambios de código)

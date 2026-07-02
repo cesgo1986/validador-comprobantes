@@ -276,6 +276,27 @@ El frontend sigue decidiendo verde/ámbar/rojo a partir de esto. La diferencia e
 
 ---
 
+## 2026-07 — 🏛️ ADR: se formaliza la capa de Recomendación, distinta de Impacto, en el Modelo de Decisión Explicable
+
+**Decisión:** el Modelo de Decisión Explicable pasa de 4 a 5 capas. La capa que antes se llamaba "Recomendación" se divide en dos capas distintas y secuenciales:
+
+```
+1. Hechos → 2. Interpretación → 3. Impacto → 4. Recomendación (solo si aplica) → 5. Evidencia
+```
+
+- **Impacto** (capa 3): traduce la interpretación a una consecuencia concreta para el usuario — "¿qué implica esto para mí?". Siempre está presente.
+- **Recomendación** (capa 4): una acción explícita e inmediata, solo cuando agrega algo más allá del Impacto — "¿qué hago ahora?". Es opcional; su ausencia también es información (no hace falta ninguna acción adicional).
+
+**Motivo:** al escribir el catálogo completo de los 9 mensajes contextuales (`ROADMAP.md`, ítem 1.2), quedó claro que "qué implica esto" y "qué debo hacer" son preguntas distintas que antes se estaban resolviendo en un solo campo. Casos como `en_proceso` ("esperar y volver a consultar"), `devuelta` ("solicitar un nuevo comprobante") o `desconocida` ("verificar nuevamente los datos") tienen una acción concreta que dar, mientras que `liquidada` o `acreditada` no la necesitan — el Impacto ya es autosuficiente. Forzar una "Recomendación" en todos los casos generaba relleno; no tenerla nunca dejaba una pregunta sin responder exactamente cuando más importaba.
+
+**Impacto de esta decisión en el proyecto:** al ser una capa del modelo (no solo texto), esta distinción se replica consistentemente en Historial, Dashboard Empresa, Alertas Inteligentes, Desktop y la futura API Enterprise — todos podrán responder "qué implica" y, cuando aplique, "qué hacer" de la misma forma, en vez de que cada superficie decida por su cuenta si mezclar ambas cosas.
+
+**Documentos afectados:**
+- `MODELO_DECISION_EXPLICABLE.md` — modelo actualizado de 4 a 5 capas; estructura de presentación actualizada de 5 a 6 pasos (se agrega ④ Recomendación inmediata); principios del modelo reescritos, incorporando explícitamente la regla *"nunca inducir al usuario a una acción cuando la evidencia todavía no lo permite"*.
+- `ROADMAP.md` — catálogo de los 9 mensajes contextuales (ítem 1.2) reescrito con el wording final revisado (más preciso en `acreditada`, `liquidada`, `en_proceso`, `devuelta`, `no_liquidada`, `desconocida`) y el campo "Recomendación inmediata" añadido donde aplica.
+
+---
+
 ## 2026-07 — Refinamiento: de las 4 preguntas al flujo de decisión de 5 pasos
 
 **Decisión:** el componente "¿Cómo se llegó a este resultado?" se rediseña de una lista de datos que responde preguntas a un **flujo de decisión conversacional de 5 pasos**: ① Resultado → ② Interpretación → ③ Impacto → ④ Evidencias → ⑤ Detalle.

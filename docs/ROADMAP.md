@@ -78,14 +78,65 @@ No se encontró ningún componente que implemente el contenido extendido por est
 
 **Criterio de cierre (2026-07):** no basta con mostrar el nombre del estado (ej. "En proceso"). El mensaje debe responder directamente la pregunta que el comercio realmente tiene: *¿entrego el producto o no?* Esa respuesta es trabajo de VerificaPago, no del CEP — el CEP solo informa el estado técnico, VerificaPago tiene que traducirlo a una recomendación de acción.
 
-Cada uno de los 9 estados se redacta siguiendo el flujo de decisión de 1.4 (Resultado → Interpretación → Impacto → Evidencias), no como un texto suelto. Ejemplo (`en_proceso`):
+Cada uno de los 9 estados se redacta siguiendo el flujo de decisión completo (Resultado → Interpretación → Impacto → Recomendación inmediata *si aplica* → Evidencias), no como un texto suelto — ver `MODELO_DECISION_EXPLICABLE.md` para el modelo de 5 capas detrás de este flujo. Regla de fondo aplicada a los nueve: **nunca inducir al usuario a una acción cuando la evidencia todavía no lo permite.**
 
-```
-Resultado:       En proceso
-Interpretación:  La operación aún está siendo procesada por SPEI.
-Impacto:         Espera unos minutos antes de considerar la transferencia como fallida.
-Evidencias:      ✓ XML · ✓ CEP
-```
+**Catálogo final (2026-07):**
+
+**Acreditada** 🟢
+- Interpretación: El banco receptor confirmó que los recursos fueron acreditados al beneficiario. Es la evidencia oficial de mayor certeza disponible.
+- Impacto: Puedes considerar el pago confirmado y entregar el producto o servicio con confianza.
+- Recomendación inmediata: *(no aplica)*
+- Evidencias: ✓ CEP Banxico
+
+**Liquidada** 🟢
+- Interpretación: La operación fue liquidada correctamente en SPEI y forma parte del registro oficial de Banxico.
+- Impacto: Puedes considerar el pago realizado. Es seguro continuar con la operación.
+- Recomendación inmediata: *(no aplica)*
+- Evidencias: ✓ XML oficial (o ✓ CEP, según el nivel de evidencia disponible)
+
+**En proceso** 🟡
+- Interpretación: La operación aún está siendo procesada por SPEI; todavía no hay confirmación de liquidación.
+- Impacto: Espera unos minutos y vuelve a consultar antes de emitir un juicio sobre la operación. Si el comprobante presenta alta integridad documental, es una señal favorable, aunque todavía no constituye confirmación oficial.
+- Recomendación inmediata: Esperar y volver a consultar.
+- Evidencias: ✓ Consulta a Banxico en curso
+
+**Devuelta** 🟠
+- Interpretación: La operación existió, pero los recursos fueron devueltos al banco emisor.
+- Impacto: No consideres el pago como realizado. Pide al comprador que verifique con su banco por qué se devolvió.
+- Recomendación inmediata: Solicitar un nuevo comprobante.
+- Evidencias: ✓ Estado SPEI confirmado
+
+**En devolución** 🟠
+- Interpretación: La devolución de esta operación está en curso — el proceso todavía no concluye.
+- Impacto: No consideres el pago como realizado todavía. Espera a que el proceso de devolución termine.
+- Recomendación inmediata: Esperar a que concluya la devolución.
+- Evidencias: ✓ Estado SPEI confirmado
+
+**Rechazada** 🔴
+- Interpretación: SPEI rechazó la operación — la transferencia no se procesó.
+- Impacto: No entregues el producto o servicio. Esta transferencia no ocurrió.
+- Recomendación inmediata: *(no aplica — el Impacto ya es la acción)*
+- Evidencias: ✓ Estado SPEI confirmado
+
+**Cancelada** 🔴
+- Interpretación: El banco emisor canceló la operación antes de que se liquidara.
+- Impacto: No entregues el producto o servicio. La transferencia no se completó.
+- Recomendación inmediata: *(no aplica — el Impacto ya es la acción)*
+- Evidencias: ✓ Estado SPEI confirmado
+
+**No liquidada** 🔴
+- Interpretación: La operación no logró liquidarse dentro del proceso establecido por SPEI.
+- Impacto: No consideres el pago como realizado. Solicita un comprobante actualizado o verifica directamente con el banco del comprador.
+- Recomendación inmediata: *(no aplica — el Impacto ya incluye la acción)*
+- Evidencias: ✓ Estado SPEI confirmado
+
+**Desconocida (No verificado)** ⚪
+- Interpretación: No fue posible obtener una confirmación oficial del estado de esta operación con Banxico. Esto puede deberse a datos insuficientes, indisponibilidad temporal del servicio o a que la operación aún no esté disponible para consulta.
+- Impacto: La ausencia de confirmación oficial no implica que la transferencia sea falsa ni que sea válida. Antes de entregar un producto o servicio, considera la integridad del comprobante y, si el monto lo amerita, verifica directamente con el banco o espera una nueva consulta.
+- Recomendación inmediata: Verificar nuevamente los datos del comprobante.
+- Evidencias: solo integridad documental (sin evidencia SPEI)
+
+Este es probablemente el estado que más aparecerá durante la Beta — es el que recibe más cuidado de redacción porque es donde más fácil es que alguien tome una mala decisión: ni afirma que la transferencia es falsa, ni que es válida, solo orienta.
 
 ### 1.3 — Comparación XML en la UI (parcialmente construido — incluido en Sprint A-Final)
 `app/resultado/detalle/page.tsx` ya existe y agrupa `result.validaciones` por categoría (`cep`, `estructural`, `visual`, `temporal`, `contextual`, `semantica`, `reputacion`, `historial`) en acordeones colapsables con estado ok/warn/fail. Esto cubre "fuentes de validación refinadas" en términos generales, pero **no** es todavía el desglose campo a campo que pide este ítem — hoy la categoría `cep` se renderiza como los ítems que el backend meta en `validaciones` (según `API.md`, un único ítem "CEP Banxico - Verificación SPEI"), no como una lista campo por campo de `cep_xml.comparacion_campos`. Falta:
@@ -97,28 +148,27 @@ Evidencias:      ✓ XML · ✓ CEP
 
 El backend ya calcula todo esto (`cep_xml.comparacion_campos.comparaciones`, ver `API.md`) — es trabajo puramente de frontend: mapear esos campos a entradas individuales dentro del grupo `cep`, o a una sección propia. Se prioriza en este sprint porque genera confianza inmediata y el costo de cerrarlo es bajo (el dato ya existe). Corresponde al paso ⑤ Detalle del flujo de decisión de 1.4.
 
-### 1.4 — El flujo de decisión explicable (antes "Centro de Estado" / "Evidencia de la decisión" / "¿Cómo se llegó a este resultado?") — se diseña primero, antes que 1.2
-Ver `DECISION_LOG.md`, entradas "'Evidencia de la decisión' se renombra a '¿Cómo se llegó a este resultado?'..." y "Refinamiento: de las 4 preguntas al flujo de decisión de 5 pasos" (2026-07). Es un **patrón visual reutilizable**, no una pantalla nueva, gobernado por una regla de producto: toda conclusión de VerificaPago debe poder justificarse con al menos una evidencia verificable.
+### 1.4 — El flujo de decisión explicable (antes "Centro de Estado" / "Evidencia de la decisión" / "¿Cómo se llegó a este resultado?") — diseño de texto completo, pendiente de código
+Ver `DECISION_LOG.md`, entradas "'Evidencia de la decisión' se renombra a '¿Cómo se llegó a este resultado?'...", "Refinamiento: de las 4 preguntas al flujo de decisión de 5 pasos" y "🏛️ ADR: se formaliza la capa de Recomendación, distinta de Impacto" (2026-07). Es un **patrón visual reutilizable**, no una pantalla nueva, gobernado por una regla de producto: toda conclusión de VerificaPago debe poder justificarse con al menos una evidencia verificable, y nunca debe inducir a una acción cuando la evidencia todavía no lo permite.
 
-**El componente ya no se piensa como una lista de datos que responde preguntas — se piensa como una conversación de 5 pasos**, porque el usuario no piensa en preguntas, piensa en "¿qué pasó?":
+**El componente ya no se piensa como una lista de datos que responde preguntas — se piensa como una conversación de 6 pasos**, porque el usuario no piensa en preguntas, piensa en "¿qué pasó?":
 
 ```
-① Resultado         Liquidada
-② Interpretación     La transferencia fue liquidada correctamente mediante SPEI.
-③ Impacto            Puedes considerar el pago realizado.
-④ Evidencias         ✓ Estado SPEI · ✓ XML · ✓ Datos · ⚠ Imagen
-⑤ Detalle            (el acordeón existente en /resultado/detalle — ver 1.3)
+① Resultado                Liquidada
+② Interpretación            La transferencia fue liquidada correctamente mediante SPEI.
+③ Impacto                   Puedes considerar el pago realizado.
+④ Recomendación inmediata   (solo si aplica — no en este caso)
+⑤ Evidencias                ✓ Estado SPEI · ✓ XML · ✓ Datos · ⚠ Imagen
+⑥ Detalle                   (el acordeón existente en /resultado/detalle — ver 1.3)
 ```
 
-Esta secuencia es la forma de presentación del modelo de 4 capas ya definido en `MODELO_DECISION_EXPLICABLE.md` (Hechos → Interpretación → Recomendación → Evidencia), con dos ajustes de diseño:
-- **① Resultado** se hace explícito como primer paso, separado de la interpretación — es el dato categórico crudo (ej. "Liquidada"), no todavía una lectura de él.
-- La capa que el modelo llama internamente "Recomendación" se etiqueta de cara al usuario como **③ Impacto** ("¿qué implica para mí?"), un lenguaje menos directivo que "qué debo hacer", pero que cumple la misma función: traducir la interpretación en algo accionable.
+Esta secuencia es la forma de presentación del modelo de 5 capas definido en `MODELO_DECISION_EXPLICABLE.md` (Hechos → Interpretación → Impacto → Recomendación → Evidencia). Impacto y Recomendación son capas distintas, no un alias entre sí — ver el ADR referenciado arriba.
 
-Extensible sin cambiar la UI: hoy ④ Evidencias enumera XML/OCR/IA, mañana puede sumar hash, historial, patrones, alertas o motor antifraude sin rediseñar el componente ni el flujo.
+Extensible sin cambiar la UI: hoy ⑤ Evidencias enumera XML/OCR/IA, mañana puede sumar hash, historial, patrones, alertas o motor antifraude sin rediseñar el componente ni el flujo.
 
 Se implementa embebido dentro de `/resultado` (extendiendo el bloque que ya existe para Motor 1 y Motor 2 en `resultado/page.tsx`), no como ruta nueva. Es el primer candidato a estandarizarse dentro del futuro objeto `presentation` del Motor de Presentación (Etapa 5) — la forma de datos objetivo para esa migración (`evidencias: [{tipo, resultado}]`) ya quedó anotada en `DECISION_LOG.md` como referencia de diseño, no como algo implementado hoy. Al definirse como flujo (no como pantalla), se convierte en la "gramática" de VerificaPago — se reutiliza igual en Historial, Dashboard Empresa, Desktop, Alertas Inteligentes y la futura API Enterprise, sin que cada uno reinvente cómo explicar una decisión.
 
-**Sesión de diseño pendiente (sin código):** ver `MODELO_DECISION_EXPLICABLE.md`. Se diseña respondiendo, en orden, los 5 pasos del flujo de decisión para cada uno de los 9 estados SPEI — no como preguntas aisladas, sino como la conversación completa: qué resultado se muestra, cómo se interpreta, qué impacto tiene para el usuario, qué evidencias lo respaldan, y qué detalle adicional queda disponible si quiere profundizar.
+**Estado del diseño (2026-07):** el texto de los 9 estados ya está redactado y revisado — ver el catálogo completo en el ítem 1.2. Lo que falta de 1.4 es exclusivamente la implementación en `resultado/page.tsx`: renderizar los 6 pasos (con ④ condicional) a partir de ese catálogo.
 
 ### 1.5 — Arquitectura XML backend (pendiente)
 - Reintentos con backoff exponencial cuando `valida.do` falla por timeout
