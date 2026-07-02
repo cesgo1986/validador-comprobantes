@@ -4,6 +4,58 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.10.0] — 2026-07 — Nuevo documento fundacional: Modelo de decisión explicable
+
+### Agregado
+- `MODELO_DECISION_EXPLICABLE.md`: documento de arquitectura de producto que formaliza cómo "piensa" VerificaPago — el modelo de 4 capas (Hechos → Interpretación → Recomendación → Evidencia) y la estructura de presentación fija (Resultado → Recomendación → ¿Cómo se llegó a este resultado? → Ver detalles), aplicable a cualquier pantalla o cliente presente y futuro.
+
+### Documentado (sin cambios de código)
+- `DECISION_LOG.md`: decisión de formalizar el modelo, con sus 5 principios (toda conclusión deriva de hechos verificables; hechos independientes de interpretaciones; recomendaciones derivan de interpretaciones; toda recomendación es trazable a evidencias; la interfaz nunca muestra una conclusión sin explicar cómo se obtuvo).
+- `ROADMAP.md`: la sesión de diseño pendiente del ítem 1.4 se reformula como las 4 preguntas del modelo (qué hechos conoce, qué interpreta, qué recomienda, qué evidencia respalda la recomendación), no como diseño de pantalla.
+
+Sube a versión MINOR (`0.9.x` → `0.10.0`) en vez de PATCH porque agrega un documento de arquitectura de producto — un hito estructural, no un ajuste incremental sobre trabajo ya registrado.
+
+---
+
+## [0.9.6] — 2026-07 — "Evidencia de la decisión" se renombra a "¿Cómo se llegó a este resultado?"; se fija estructura y orden de trabajo
+
+### Documentado (sin cambios de código)
+- `DECISION_LOG.md`: renombre final del patrón (habla el idioma del usuario, no del ingeniero), estructura de referencia legible en ~5 segundos, y la regla de producto "toda conclusión debe poder justificarse con al menos una evidencia verificable".
+- `DECISION_LOG.md`: se fija el orden de trabajo del Sprint A-Final — el componente (1.4) se diseña antes que los mensajes contextuales (1.2), porque el copy depende de la estructura que lo contiene. 1.3 se mantiene independiente y puede avanzar en paralelo.
+- `DECISION_LOG.md`: se anota la forma de datos objetivo (`evidencias: [{tipo, resultado}]`) como preparación de diseño para el futuro Motor de Presentación — no implementada todavía.
+- `PRODUCT_VISION.md` y `ROADMAP.md`: nombre del patrón actualizado en el principio de Explicabilidad y en el ítem 1.4 respectivamente.
+
+---
+
+## [0.9.5] — 2026-07 — "Centro de Estado" evoluciona a "Evidencia de la decisión"
+
+### Documentado (sin cambios de código)
+- `DECISION_LOG.md`: el ítem 1.4 de la Etapa 1 deja de ser una pantalla ("Centro de Estado") y pasa a ser un patrón visual reutilizable ("Evidencia de la decisión") que acompaña cada conclusión (estado SPEI, integridad documental, nivel de evidencia) con su fuente explícita.
+- `PRODUCT_VISION.md`: el principio de Explicabilidad se amplía para nombrar explícitamente este patrón como la materialización concreta de "VerificaPago nunca dice créeme, dice aquí está por qué".
+- `ROADMAP.md`: Etapa 1 se renombra internamente como **Sprint A-Final**, con objetivo explícito ("que cualquier persona entienda el resultado en menos de 10 segundos"). Los ítems 1.2 y 1.3 se mantienen pendientes pero con criterio de cierre más preciso (1.2 debe responder "¿entrego o no?"; 1.3 es trabajo de frontend puro, el backend ya expone los datos). 1.4 se redefine como patrón, no pantalla.
+
+---
+
+## [0.9.4] — 2026-07 — Estado de Etapa 1 confirmado contra código real
+
+### Documentado (sin cambios de código)
+- `ROADMAP.md`: 1.1 (Estado SPEI protagonista + integridad separada) confirmado como completado, verificado contra `app/resultado/page.tsx`.
+- `ROADMAP.md`: 1.3 (Detalle XML en la UI) reclasificado de "pendiente" a "parcialmente construido — no cumple el criterio original". `app/resultado/detalle/page.tsx` ya agrupa validaciones por categoría en acordeones, pero no desglosa `cep_xml.comparacion_campos` campo por campo como pide el criterio original.
+- `ROADMAP.md`: 1.2 (mensajes contextuales por estado) y 1.4 (Centro de Estado) confirmados como no iniciados — sin código compartido que los implemente.
+
+---
+
+## [0.9.3] — 2026-07 — Roadmap reestructurado en Etapas secuenciales
+
+### Documentado (sin cambios de código)
+- `DECISION_LOG.md`: decisión de cerrar funcionalmente el MVP Beta (Etapa 1) antes de iniciar desarrollos de escalabilidad — Dashboard, Alertas, Desktop y Seguridad se reordenan como consecuencia.
+- `ROADMAP.md`: reestructurado de Sprints A-E (etiquetado plano) a una secuencia de Etapas 1-7: Cierre del MVP Beta → Historial real → Alertas inteligentes → Dashboard Empresa → Desktop (incluye Motor de Presentación) → Seguridad → Multiempresa real. Ningún contenido técnico de los Sprints anteriores se eliminó, solo se reubicó.
+- `ROADMAP.md`: Seguridad (antes Sprint B, la segunda prioridad) pasa a Etapa 6, al final de la secuencia — ver justificación en `DECISION_LOG.md`.
+- Se anota `BETA_PLAN.md` como documento de producto pendiente de redactar (objetivos del beta, KPIs, criterios de salida), sin crear el archivo todavía.
+- Los ítems de la Etapa 1 (1.1 Estado SPEI protagonista + integridad separada) se marcan como "reportado como cerrado, pendiente confirmar" — no se dan por completados en la documentación hasta verificar contra el código en producción.
+
+---
+
 ## [0.9.2] — 2026-07 — Decisión de arquitectura: lógica de presentación queda en frontend hasta el segundo consumidor
 
 ### Documentado (sin cambios de código)

@@ -50,6 +50,8 @@ Si falla la descarga del XML, el análisis continúa. Si falla el CEP, el OCR si
 **4. Explicabilidad**
 Cada resultado se explica. No un número opaco, sino: "La transferencia fue liquidada por SPEI. El comprobante presenta observaciones menores en el formato del folio." El comercio puede tomar una decisión informada.
 
+VerificaPago nunca dice "créeme" — siempre dice "aquí está por qué llegué a esta conclusión". Este principio se materializa como **"¿Cómo se llegó a este resultado?"** (concepto conocido internamente durante su diseño como "Evidencia de la decisión"): un patrón visual reutilizable, no una pantalla aislada, que acompaña cada conclusión — estado SPEI, integridad documental, nivel de evidencia general — con su fuente explícita (XML oficial, CEP, OCR, IA, análisis visual, hash único, etc.), legible en unos cinco segundos. Rige una regla de producto: toda conclusión de VerificaPago debe poder justificarse con al menos una evidencia verificable. Al ser un patrón y no una pantalla, se replica igual en Mobile, Desktop, Dashboard y la futura API Enterprise, sin que cada cliente invente su propia forma de justificar un resultado. Ver `DECISION_LOG.md` ("'Evidencia de la decisión' se renombra a '¿Cómo se llegó a este resultado?' y se define su estructura").
+
 **5. Arquitectura que respeta la fuente**
 Banxico responde por la operación. VerificaPago responde por el documento. Esa línea nunca se cruza en el código ni en la interfaz.
 

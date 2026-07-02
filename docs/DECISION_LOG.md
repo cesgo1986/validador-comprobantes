@@ -82,6 +82,121 @@ Una fuente de nivel superior puede actualizar el estado SPEI. Una fuente de nive
 
 ---
 
+## 2026-07 — Modelo de decisión explicable (Explainable Decision Model)
+
+**Decisión:** se formaliza el modelo mental detrás de cada resultado que VerificaPago presenta, como documento fundacional independiente: `MODELO_DECISION_EXPLICABLE.md`. El modelo define cuatro capas estrictas — **Hechos → Interpretación → Recomendación → Evidencia** — y una estructura de presentación fija (**Resultado → Recomendación → ¿Cómo se llegó a este resultado? → Ver detalles**) que aplica a cualquier pantalla o cliente que muestre un resultado.
+
+**Motivo:** el proyecto evolucionó, sin que se planeara así explícitamente, de validador de comprobantes → motor de análisis documental (2 motores independientes + scoring v3) → motor de decisión explicable (el objetivo ya no es solo calcular bien, es que cualquier persona entienda cómo se llegó al resultado y qué hacer con él). Ese salto necesitaba quedar nombrado y con reglas propias, no disperso entre `MOTOR_DECISIONES.md` (que describe el cálculo) y las decisiones puntuales de UI ya registradas (semáforo de integridad, "¿Cómo se llegó a este resultado?").
+
+**Principios fijados (ver el documento completo para el desarrollo de cada uno):**
+1. Toda conclusión debe derivarse de hechos verificables.
+2. Los hechos son independientes de las interpretaciones.
+3. Las recomendaciones derivan de las interpretaciones, no de los hechos crudos directamente.
+4. Toda recomendación debe ser trazable a sus evidencias.
+5. La interfaz nunca muestra una conclusión sin explicar cómo se obtuvo.
+
+**Consecuencia:**
+- El componente "¿Cómo se llegó a este resultado?" (capa 4) deja de ser solo una pieza de UI aislada — es la manifestación visible de un modelo completo de cuatro capas que también gobierna cómo se escriben los mensajes contextuales (capa 3, ítem 1.2 de `ROADMAP.md`) y cómo se documentan futuras interpretaciones (capa 2, en `MOTOR_DECISIONES.md`/`SCORING.md`).
+- Se deja documentado (no planeado como roadmap, es nota de diseño a futuro) que fuentes de evidencia adicionales — historial del emisor/beneficiario, patrón de pagos, frecuencia, riesgo por cuenta, motor antifraude — entran al modelo sin rediseñar la interfaz: cada una es una evidencia más en la capa 4, no un módulo nuevo de UI.
+- Antes de agregar cualquier fuente de información nueva al sistema, el criterio de diseño pasa a ser explícito: identificar en qué capa entra (hecho, interpretación o recomendación) antes de implementarla. Ver la sección "Cómo se usa este documento en la práctica" en `MODELO_DECISION_EXPLICABLE.md`.
+- La próxima sesión de diseño del componente 1.4 se enmarca dentro de este modelo — ya no se diseña como pantalla, se diseña respondiendo las cuatro preguntas del modelo (qué hechos conoce, qué interpreta, qué recomienda, qué evidencia respalda la recomendación). Ver `ROADMAP.md`.
+
+---
+
+## 2026-07 — "Evidencia de la decisión" se renombra a "¿Cómo se llegó a este resultado?" y se define su estructura
+
+**Decisión:** el patrón definido en la entrada anterior ("Evidencia de la decisión") se renombra a **"¿Cómo se llegó a este resultado?"**, y se fija su estructura y una regla de producto que lo gobierna, antes de escribir cualquier código o copy.
+
+**Regla de producto:** *toda conclusión de VerificaPago debe poder justificarse con al menos una evidencia verificable.* Ninguna etiqueta (estado SPEI, integridad documental, nivel de evidencia) se muestra sin que el componente pueda enumerar de dónde sale.
+
+**Motivo del renombre:** "Evidencia de la decisión" habla el idioma de quien construye el producto. Un comerciante, cajero o analista no piensa "muéstrame la evidencia de la decisión" — piensa "¿por qué me salió este resultado?". El nombre del componente debe hablar el idioma de quien lo usa, no el del equipo de ingeniería.
+
+**Estructura de referencia (legible en ~5 segundos, no es un bloque grande):**
+
+```
+¿Cómo se llegó a este resultado?
+
+Estado SPEI
+✓ XML oficial de Banxico
+
+Integridad documental
+✓ OCR
+✓ Inteligencia Artificial
+⚠ Análisis visual
+
+Nivel de evidencia
+Muy alto
+
+Ver detalles →
+```
+
+**Por qué esta estructura y no otra:** es deliberadamente extensible sin cambiar la UI. Hoy enumera XML, OCR e IA; el día que se agreguen hash, historial, patrones, alertas o un motor antifraude, esos ítems se agregan a la misma lista sin rediseñar el componente.
+
+**Orden de trabajo decidido para Sprint A-Final:** se diseña primero este componente (modelo y estructura, sin código todavía) y **después** se escriben los mensajes contextuales de 1.2 — no al revés. Motivo: los mensajes de 1.2 dependen de la estructura que los va a contener; si se escriben primero, es muy probable que haya que reescribirlos en cuanto se decida qué evidencias mostrarse y cómo. Con el patrón definido primero, cada mensaje de 1.2 ya sabe de qué evidencia proviene (ejemplo: estado `liquidada` → mensaje "La transferencia fue liquidada correctamente por SPEI" → evidencia `✓ XML Banxico`), y 1.2 se vuelve, en buena medida, trabajo de redacción sobre una estructura ya resuelta.
+
+**Preparación explícita para el Motor de Presentación (Etapa 5):** esta estructura anticipa que el backend, en el futuro, solo debería enviar hechos — el frontend decide cómo renderizarlos. Forma de referencia para esa migración futura (no implementada todavía, es solo el objetivo de diseño):
+
+```json
+{
+  "estado_spei": "LIQUIDADA",
+  "fuente_estado": "xml",
+  "integridad": "OBSERVACIONES",
+  "evidencias": [
+    { "tipo": "xml", "resultado": "ok" },
+    { "tipo": "ocr", "resultado": "ok" },
+    { "tipo": "visual", "resultado": "warning" }
+  ]
+}
+```
+
+**Consecuencia:**
+- Antes de escribir código para el Sprint A-Final, se dedica una sesión exclusivamente a diseñar este componente — se trata como un elemento característico de VerificaPago, al mismo nivel que el semáforo de SPEI.
+- `ROADMAP.md` actualiza el nombre de 1.4 y fija el orden de trabajo: diseño del componente primero, luego 1.2.
+- `PRODUCT_VISION.md` actualiza el nombre del patrón en el principio de Explicabilidad.
+
+---
+
+## 2026-07 — Evolución del concepto "Centro de Estado" a "Evidencia de la decisión"
+
+**Decisión:** el concepto inicialmente denominado "Centro de Estado" (ítem 1.4 de la Etapa 1, ver `ROADMAP.md`) evoluciona a **"Evidencia de la decisión"**. Deja de planearse como una pantalla nueva y pasa a ser un **patrón visual reutilizable**: para cada conclusión que VerificaPago presenta (estado SPEI, integridad documental, nivel de evidencia general), se muestra explícitamente de dónde sale esa conclusión.
+
+Ejemplo de forma:
+
+```
+Estado SPEI: Liquidada
+Fuente: ✓ XML oficial Banxico
+
+Integridad documental: Con observaciones
+Fuente: ✓ OCR · ✓ IA · ✓ Comparación visual
+
+Nivel de evidencia: Muy alto
+Porque: ✓ XML oficial · ✓ CEP · ✓ Hash único · ✓ Consistencia documental
+```
+
+**Motivo:** la filosofía de VerificaPago no es únicamente emitir un resultado, es explicar de forma transparente las fuentes que lo sustentan — VerificaPago nunca dice "créeme", dice "aquí está por qué llegué a esta conclusión" (ver `PRODUCT_VISION.md`, principio de Explicabilidad). "Centro de Estado" sonaba a una pantalla más del flujo; "Evidencia de la decisión" nombra lo que realmente es: la trazabilidad de cada conclusión hasta su origen.
+
+**Consecuencia:**
+- Al ser un patrón, no una pantalla, se vuelve reutilizable entre Mobile, Desktop, Dashboard y la futura API Enterprise — todos los consumidores explican sus resultados de la misma forma, en vez de que cada cliente invente su propia manera de mostrar "por qué".
+- Este patrón es candidato natural a vivir dentro del futuro objeto `presentation` del Motor de Presentación (ver la entrada "Regla arquitectónica: la lógica de presentación migra al backend solo con múltiples consumidores" y Etapa 5 en `ROADMAP.md`) — cuando exista el segundo consumidor real, "Evidencia de la decisión" es de los primeros candidatos a estandarizarse ahí.
+- `ROADMAP.md`, ítem 1.4, se renombra de "Centro de Estado" a "Evidencia de la decisión" y se redefine como patrón visual embebido en `/resultado`, no como pantalla independiente.
+- `PRODUCT_VISION.md` incorpora este concepto como parte explícita del principio de Explicabilidad, para que la próxima persona que lea el documento entienda que no es solo una idea de UX, es una decisión de identidad de producto que debe sostenerse en el tiempo.
+
+---
+
+## 2026-07 — Cierre funcional del MVP Beta antes de escalar
+
+**Decisión:** antes de iniciar desarrollos orientados a escalabilidad (Dashboard Empresa, Desktop, Motor de Presentación, arquitectura Enterprise), el proyecto completa primero el cierre funcional del MVP Beta: la experiencia completa de resultados — Centro de Estado SPEI, mensajes contextuales por estado, visualización de evidencia XML y explicación de las fuentes de validación.
+
+**Motivo:** crecer en varias direcciones a la vez (seguir ajustando la pantalla de resultados mientras se construye historial, alertas y dashboard) diluye el foco y deja funcionalidades empresariales construidas sobre un flujo de usuario todavía incompleto. Terminar un flujo excelente primero, y ampliar el producto después, es la secuencia que da mejores resultados.
+
+**Consecuencia:**
+- `ROADMAP.md` se reorganiza en una secuencia de Etapas que reemplaza la numeración plana de Sprints A-E: Etapa 1 (cierre del MVP Beta) → Etapa 2 (Historial real) → Etapa 3 (Alertas inteligentes) → Etapa 4 (Dashboard Empresa) → Etapa 5 (Desktop, incluye el Motor de Presentación) → Etapa 6 (Seguridad). El contenido técnico de los Sprints anteriores no se pierde — se reubica dentro de esta secuencia.
+- **Seguridad (antes Sprint B) se mueve al final de la secuencia**, no porque deje de importar, sino porque JWT, API Keys, rate limiting y auditoría van a cambiar de forma conforme se definan Historial, Alertas y Dashboard — implementarla antes sería construir sobre superficies que todavía se van a mover.
+- Se planea un nuevo documento, `BETA_PLAN.md` (pendiente de redactar): objetivos del beta, número de usuarios, KPIs, criterios para salir de beta, mecanismo de reporte de errores y métricas a observar. Es documento de producto, no técnico — se activa cuando el proyecto empiece a invitar empresas reales.
+- No se marca ningún ítem de la Etapa 1 como completado en `ROADMAP.md` hasta confirmar contra el estado real del código en producción — ver nota en la entrada de `ROADMAP.md` correspondiente.
+
+---
+
 ## 2026-07 — Semáforo de integridad documental: el rojo se reserva para evidencia acumulada fuerte
 
 **Decisión:** en la pantalla `/resultado`, el color del indicador de integridad documental (Motor 2) ya no se mapea 1:1 desde `integridad_config.color`. Se agrega una regla de frontend: el color rojo solo se muestra cuando hay evidencia acumulada fuerte — `confianza_documental < 30` **o** el XML oficial reporta discrepancias de campo. El caso `integridad_config.color = "rojo"` sin esas condiciones (o `"naranja"`) se muestra en ámbar, no en rojo.
