@@ -276,6 +276,21 @@ El frontend sigue decidiendo verde/ámbar/rojo a partir de esto. La diferencia e
 
 ---
 
+## 2026-07 — Se declara concluida la Fase de Fundación de VerificaPago
+
+**Decisión:** se declara concluida la Fase de Fundación de VerificaPago. No porque el proyecto esté terminado, sino porque la arquitectura, la visión de producto, el modelo de decisión, la gobernanza documental y el roadmap alcanzaron un nivel de estabilidad suficiente para que el desarrollo futuro se enfoque prioritariamente en construir funcionalidades, no en redefinir las bases del sistema.
+
+**Motivo:** con `/docs` en v0.11.0 (estructura congelada, versionado, referencias cruzadas) y con el Modelo de Decisión Explicable formalizado, el proyecto dejó de necesitar sesiones dedicadas a diseñar sus fundamentos. El riesgo ya no es "falta base", es "dejar de construir sobre lo que ya está bien definido".
+
+**Impacto:** a partir de esta decisión:
+- Toda nueva documentación surge como **consecuencia** de cambios funcionales, decisiones de arquitectura o investigaciones — no como actividad propia. El flujo pasa a ser: se desarrolla una funcionalidad → se prueba → si amerita documentación, se marca `#DOC-VP` / `#ADR-VP` / `#LAB-VP` → se actualiza únicamente el documento afectado.
+- No se abren nuevas fases de documentación general salvo que exista un cambio estratégico real del producto.
+- Se adopta como hábito de trabajo la regla **"No romper la arquitectura"**: antes de desarrollar cualquier idea nueva, responder cuatro preguntas — ¿ya existe algo que resuelva esto? ¿pertenece a un documento existente? ¿rompe algún ADR? ¿afecta el Modelo de Decisión Explicable? Si las cuatro respuestas son "no", se procede. Esta regla complementa (no sustituye) las cuatro preguntas de diagnóstico ya definidas en `MODELO_DECISION_EXPLICABLE.md` para decidir en qué capa entra una idea — esa se enfoca en el modelo de decisión del producto; esta se enfoca en si la idea rompe algo que ya existe, a nivel de todo el proyecto.
+
+**Observación registrada, sin cambio de documento todavía:** durante esta fase, la definición de VerificaPago evolucionó de forma orgánica — de "validador de comprobantes" a "motor de análisis documental" y ahora se describe informalmente como *"un motor de confianza para pagos por transferencia"*, o de forma aún más condensada: *VerificaPago convierte evidencia técnica compleja en una decisión comprensible para cualquier persona.* Esta frase no sustituye todavía la definición formal en `PRODUCT.md` ni `PRODUCT_VISION.md` — queda anotada aquí como observación de hacia dónde apunta la identidad del producto, pendiente de una decisión explícita si se quiere adoptar como definición oficial.
+
+---
+
 ## 2026-07 — Principio de gobernanza documental: una única fuente de verdad por pieza de conocimiento
 
 **Decisión:** cada pieza de conocimiento del proyecto tiene una única fuente de verdad. Las decisiones (`DECISION_LOG.md`) referencian investigaciones (`LABORATORIO.md`), pero no las duplican; los documentos especializados profundizan en su propio dominio, y el resto de los documentos solo enlaza o resume cuando hace falta, en vez de repetir el contenido.

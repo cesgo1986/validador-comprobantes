@@ -6,6 +6,15 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.11.1] — 2026-07 — Se declara concluida la Fase de Fundación
+
+### Documentado (sin cambios de código)
+- `DECISION_LOG.md`: ADR de cierre de la Fase de Fundación de VerificaPago — arquitectura, visión, modelo de decisión, gobernanza documental y roadmap alcanzan estabilidad suficiente para priorizar funcionalidades sobre redefinir bases.
+- `DECISION_LOG.md`: se adopta el hábito "No romper la arquitectura" — cuatro preguntas antes de desarrollar cualquier idea nueva (¿ya existe algo que lo resuelva? ¿pertenece a un documento existente? ¿rompe algún ADR? ¿afecta el Modelo de Decisión Explicable?).
+- `DECISION_LOG.md`: se anota, sin adoptarla todavía formalmente en `PRODUCT.md`/`PRODUCT_VISION.md`, la definición emergente de VerificaPago como "motor de confianza para pagos por transferencia" — pendiente de decisión explícita.
+
+---
+
 ## [0.11.0] — 2026-07 — Consolidación documental: README, versionado, referencias cruzadas y congelamiento de estructura
 
 ### Agregado
