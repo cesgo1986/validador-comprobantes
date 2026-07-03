@@ -94,6 +94,43 @@ Una fuente de nivel superior puede actualizar el estado SPEI. Una fuente de nive
 
 ---
 
+## 2026-07 — 🏛️ ADR: se elimina la visualización del campo `recomendacion` legacy por contradecir el estado SPEI confirmado
+
+**Decisión:** se elimina de `app/resultado/detalle/page.tsx` el bloque que mostraba `result.recomendacion` (etiquetado siempre como "Recomendación: Revisar manualmente"). El campo sigue existiendo en la respuesta del backend por compatibilidad, pero ya no se muestra en ninguna pantalla.
+
+**Motivo:** `result.recomendacion` es un campo que Claude Vision genera como parte de su análisis inicial del comprobante — **antes** de que el backend consulte a Banxico y determine el estado SPEI final. Se detectó un caso real: una transferencia con estado SPEI `Liquidada` (confirmado vía CEP) mostraba, en `/resultado`, el mensaje correcto ("Puedes considerar el pago realizado"), pero en `/resultado/detalle` mostraba simultáneamente "Revisar manualmente... No entregar producto o servicio hasta confirmar que los fondos fueron efectivamente acreditados" — una recomendación generada sin conocimiento del resultado que el propio sistema ya había confirmado.
+
+Esto viola dos principios ya establecidos:
+- **Independencia de los 2 motores** (`MOTOR_DECISIONES.md`): el Motor 2 (documental) no debe poder emitir una instrucción que contradiga al Motor 1 (SPEI, fuente Banxico) ya confirmado.
+- **"Nunca inducir al usuario a una acción cuando la evidencia todavía no lo permite"** (`MODELO_DECISION_EXPLICABLE.md`, principio 4): aquí ocurría el caso inverso — se inducía a *no actuar* (no entregar) cuando la evidencia sí lo permitía.
+
+**Por qué no se corrige el texto en vez de eliminarlo:** el flujo de decisión de 1.4 (`Interpretación → Impacto → Recomendación inmediata`, ver `ROADMAP.md` ítem 1.2) ya resuelve exactamente esta necesidad — y lo hace correctamente, porque se calcula *después* de conocer el estado SPEI final. El campo legacy quedó huérfano cuando se construyó ese flujo, mostrando una recomendación redundante y, en casos como este, directamente contradictoria. No había necesidad de mantener dos fuentes de "qué hacer" en la misma app.
+
+**Consecuencia:**
+- `app/resultado/detalle/page.tsx` ya no renderiza `result.recomendacion`.
+- El campo se mantiene en el backend (`main.py`, dentro del JSON que devuelve Claude) sin consumidor activo — candidato a eliminarse del `system_prompt` en una limpieza futura, no urgente porque no causa daño si nadie lo muestra.
+- Antes de agregar cualquier mensaje de "qué hacer" en el futuro (Historial, Dashboard, Alertas), la fuente única debe ser el flujo de decisión de 1.4 (`mensajesContextuales.ts`), nunca un campo generado por el análisis documental de forma aislada.
+
+---
+
+## 2026-07 — 🏛️ ADR: externalización de servicios transversales (Cache y Metrics)
+
+**Decisión:** el caché y las métricas dejan de vivir dentro de `cep_xml_auto_service.py` (donde surgió la necesidad, ítem 1.5) y se extraen a dos servicios propios y genéricos: `services/cache_service.py` (interfaz `get`/`set`/`delete`, con TTL por entrada) y `services/metrics_service.py` (`registrar_evento`, `registrar_exito`, `registrar_error`, `registrar_reintento`, `registrar_cache_hit`, `registrar_cache_miss`, `obtener_metricas`), namespaced por servicio (ej. `"xml"`).
+
+**Motivo:** el caché y las métricas de descarga del XML no son necesidades exclusivas de ese flujo — Historial, Dashboard Empresa, validación por QR, XML manual, OCR, o el propio Motor de Presentación (Etapa 5) van a necesitar cachear resultados y medir su desempeño de la misma forma. Implementarlo dentro de `cep_xml_auto_service.py` habría significado, en unos meses, `_METRICAS_OCR`, `_METRICAS_XML`, `_METRICAS_HISTORIAL` dispersas en archivos distintos sin una interfaz común — exactamente el tipo de acoplamiento que el proyecto ha evitado desde la Fase de Fundación (servicios especializados con responsabilidad única).
+
+**Impacto:**
+- Reduce el acoplamiento: `cep_xml_auto_service.py` vuelve a ocuparse solo de hablar con Banxico (más los reintentos con backoff, que sí son lógica específica de ese flujo HTTP).
+- Facilita una futura migración a Redis (cache) o Prometheus/Grafana (métricas) — el cambio queda contenido en un solo archivo por servicio, sin tocar a ningún consumidor.
+- Mantiene la arquitectura modular ya establecida: `XML Service → Cache Service → Metrics Service → Banxico`, en vez de que el XML Service cargue con caché, métricas, reintentos y la llamada a Banxico todo junto.
+- El endpoint de métricas se expone bajo `/api/v1/dashboard/metricas/xml`, anticipando que existirán `/metricas/ocr`, `/metricas/claude`, `/metricas/usuarios`, etc. bajo la misma estructura — no como una ruta suelta (`/xml-metricas`).
+- El TTL del caché se fija en 30 minutos (no 5): un comprobante ya analizado prácticamente nunca cambia, así que el TTL prioriza ahorrar llamadas a Banxico y reducir riesgo de rate limit por encima de "frescura" del dato, que aquí no aporta valor real.
+- El backoff entre reintentos usa una progresión explícita (200ms, 500ms, 1000ms) en vez de una fórmula exponencial pura, con un máximo de 3 intentos — Banxico normalmente responde en segundos, insistir más allá de eso no tiene sentido.
+
+**Documentos afectados:** `ARQUITECTURA.md` (agrega `cache_service.py` y `metrics_service.py` a la estructura de `services/`), `ROADMAP.md` (ítem 1.5).
+
+---
+
 ## 2026-07 — Modelo de decisión explicable (Explainable Decision Model)
 
 **Decisión:** se formaliza el modelo mental detrás de cada resultado que VerificaPago presenta, como documento fundacional independiente: `MODELO_DECISION_EXPLICABLE.md`. El modelo define cuatro capas estrictas — **Hechos → Interpretación → Recomendación → Evidencia** — y una estructura de presentación fija (**Resultado → Recomendación → ¿Cómo se llegó a este resultado? → Ver detalles**) que aplica a cualquier pantalla o cliente que muestre un resultado.

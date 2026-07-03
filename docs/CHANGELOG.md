@@ -6,6 +6,16 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.13.1] — 2026-07 — Fix: recomendación legacy contradecía el estado SPEI confirmado
+
+### Corregido (pendiente de deploy)
+- `app/resultado/detalle/page.tsx`: se elimina el bloque "Recomendación: Revisar manualmente", que mostraba `result.recomendacion` (generado por Claude Vision antes de conocer el estado SPEI final). Caso detectado: transferencia `Liquidada` confirmada, mientras este bloque instruía "no entregar hasta confirmar acreditación" — contradicción directa entre motores.
+
+### Documentado
+- `DECISION_LOG.md`: 🏛️ ADR completo — motivo, por qué se elimina en vez de corregirse el texto, y consecuencia (el flujo de decisión de 1.4 es ahora la única fuente de "qué hacer").
+
+---
+
 ## [0.13.0] — 2026-07 — ✅ Etapa 1 (MVP Beta, experiencia de resultados) completa
 
 ### Desplegado en producción
