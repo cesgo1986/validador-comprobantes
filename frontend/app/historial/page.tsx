@@ -120,6 +120,24 @@ export default function Historial() {
     return params.toString();
   }, [busqueda, riesgo, fechaDesde, fechaHasta, hashBusqueda]);
 
+  // Item 2.4: misma lógica de filtros que construirQuery(), pero sin
+  // limit/offset -- la exportación trae TODO lo que coincide con los
+  // filtros, no solo la página cargada en pantalla.
+  const construirQueryExport = useCallback(() => {
+    const params = new URLSearchParams();
+    if (busqueda.trim()) params.set("q", busqueda.trim());
+    if (riesgo) params.set("riesgo", riesgo);
+    if (fechaDesde) params.set("fecha_desde", fechaDesde);
+    if (fechaHasta) params.set("fecha_hasta", fechaHasta);
+    if (hashBusqueda.trim()) params.set("hash_sha256", hashBusqueda.trim());
+    return params.toString();
+  }, [busqueda, riesgo, fechaDesde, fechaHasta, hashBusqueda]);
+
+  const exportarCSV = () => {
+    const url = `${API_URL}/api/v1/dashboard/analisis/exportar?${construirQueryExport()}`;
+    window.open(url, "_blank");
+  };
+
   const cargarStats = useCallback(async () => {
     try {
       const resp = await fetch(`${API_URL}/api/v1/dashboard/stats`);
@@ -241,6 +259,10 @@ export default function Historial() {
               Limpiar filtros
             </button>
           )}
+          <button onClick={exportarCSV}
+            style={{ padding: "10px", borderRadius: 8, background: "#fff", border: "1.5px solid #E2E8F0", color: "#334155", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            ⬇ Exportar a CSV (con estos filtros)
+          </button>
         </div>
       )}
 
