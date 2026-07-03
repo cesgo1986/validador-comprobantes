@@ -1,6 +1,8 @@
 # API.md — Documentación de endpoints
 
-Base URL producción: `https://validador-comprobantes.onrender.com`  
+**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+
+Base URL producción: `https://validador-comprobantes.onrender.com`
 Base URL local: `http://localhost:8000`
 
 Todos los endpoints devuelven `application/json`. No requieren autenticación por ahora (Sprint B implementará JWT y API Keys).
@@ -182,25 +184,40 @@ Estadísticas generales de análisis.
 
 Lista paginada de análisis realizados.
 
-**Query params:** `empresa_id`, `limit` (máx. 200, default 50), `offset`, `riesgo`, `hash_sha256`
+**Query params:** `empresa_id`, `limit` (máx. 200, default 50), `offset`, `riesgo`, `estado_operacion` (Motor 1), `hash_sha256`, `banco` (filtro exacto/parcial avanzado), `fecha_desde`, `fecha_hasta`, `q` (búsqueda unificada — agregado en Etapa 2, ítem 2.2: compara contra `banco_detectado`, `clave_rastreo`, `referencia`, `clabe_detectada` con `OR`, y contra `monto_detectado` si el texto es interpretable como número; el usuario no necesita saber en qué campo está buscando)
 
 ```json
 {
   "items": [
     {
       "id": "uuid",
-      "created_at": "2026-06-17T00:15:14Z",
+      "fecha": "2026-06-17T00:15:14Z",
       "riesgo": "BAJO",
+      "estado_operacion": "liquidada",
+      "fuente_estado": "xml_oficial",
+      "nivel_evidencia": "xml_oficial",
+      "clave_rastreo": "MBAN01002606170065727438",
+      "referencia": "0307218423",
+      "tipo_transferencia": "SPEI",
+      "score_claude": 15.0,
+      "score_iat": 22.0,
       "score_final": 18.5,
       "archivo_nombre": "comprobante.png",
       "banco_detectado": "BBVA",
       "monto_detectado": 20.0,
-      "hash_sha256": "ad85f0c4..."
+      "hash_sha256": "ad85f0c4...",
+      "veces_visto": 1
     }
   ],
   "total": 142
 }
 ```
+
+**Corrección (2026-07):** el campo de fecha se llama `fecha`, no `created_at` — esta sección tenía un nombre de campo desactualizado respecto al código real (`dashboard_service.py`).
+
+**Agregado (2026-07, Etapa 2 ítem 2.1):** `estado_operacion`, `fuente_estado` y `nivel_evidencia` (Motor 1, ver `DECISION_LOG.md` — ADR de desnormalización) y `veces_visto` (vía join con `hashes_documentos`).
+
+**Agregado (2026-07, Etapa 2 ítem 2.2):** `clave_rastreo`, `referencia`, `tipo_transferencia` (sembrada, hoy siempre `"SPEI"`) y el parámetro de búsqueda unificada `q` — ver `DECISION_LOG.md`, ADR "los campos usados para búsqueda, correlación o analítica deben existir como columnas desnormalizadas".
 
 ---
 
@@ -246,6 +263,59 @@ Volumen de análisis por día en los últimos N días.
 
 ---
 
+## GET /api/v1/dashboard/metricas/xml
+
+Métricas de la descarga automática del XML del CEP (Etapa 1, ítem 1.5). En memoria del proceso — se reinician si el servidor reinicia, no reflejan histórico persistente.
+
+```json
+{
+  "servicio": "xml",
+  "consultas_totales": 40,
+  "exitos": 35,
+  "fallos": 5,
+  "cache_hits": 12,
+  "cache_miss": 28,
+  "reintentos": 3,
+  "timeouts": 1,
+  "duracion_promedio_ms": 842.3,
+  "duracion_minima_ms": 210.5,
+  "duracion_maxima_ms": 3100.2,
+  "tasa_exito_pct": 87.5,
+  "eventos": { "xml_descargado": 35, "xml_no_encontrado": 4, "xml_con_error": 1 },
+  "nota": "Metricas en memoria del proceso, no distribuidas ni persistentes entre reinicios."
+}
+```
+
+---
+
+## GET /api/v1/dashboard/metricas/cep
+
+Métricas del scraping HTML del CEP — `verify_cep()` (Etapa 1, ítem 1.6). Misma forma que `/metricas/xml`, namespace `"cep"`. Distinto de `/metricas/xml`: este mide el scraping del HTML, no la descarga del XML oficial.
+
+---
+
+## GET /api/v1/dashboard/metricas/analizar
+
+Métricas del endpoint `/analizar` completo de punta a punta (Etapa 1, ítem 1.6) — OCR + IAT + CEP + XML + persistencia. Misma forma que `/metricas/xml`, namespace `"analizar"`.
+
+---
+
+## GET /api/v1/dashboard/metricas/scores-por-banco
+
+Distribución de scores de Claude Vision por banco detectado (Etapa 1, ítem 1.6). A diferencia de los tres anteriores, **consulta la base de datos** — refleja histórico completo, no solo lo ocurrido desde el último reinicio del servidor.
+
+**Query params:** `empresa_id`, `dias` (máx. 365, default 30), `min_analisis` (default 1)
+
+```json
+[
+  { "banco": "BBVA", "total_analisis": 42, "score_claude_promedio": 12.4, "score_final_promedio": 15.1 }
+]
+```
+
+Nota de nomenclatura: `score_claude` es el score de riesgo visual/documental de Claude Vision (0=bajo riesgo, 100=crítico) — no es una métrica de confianza de OCR en sí misma.
+
+---
+
 ## Códigos de error
 
 | Status | Descripción |
@@ -266,3 +336,11 @@ Los errores de análisis (ej. Claude no pudo extraer datos, Banxico no respondi�
 - Sprint E activará el aislamiento completo por `empresa_id`
 - El endpoint `/api/v1/dashboard/*` ya acepta `empresa_id` como query param — preparado para multiempresa
 - CEP por lotes (`banxico.org.mx/cep-scl/`) está documentado y es viable para volúmenes altos (ver XML_CEP.md)
+
+---
+
+## Documentos relacionados
+
+- `SCORING.md` — el significado de cada campo numérico de la respuesta
+- `MOTOR_DECISIONES.md` — el significado de los campos categóricos (estado_operacion, integridad_comprobante)
+- `ARQUITECTURA.md` — dónde vive el backend que expone estos endpoints

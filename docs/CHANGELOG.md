@@ -6,6 +6,21 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.13.7] — 2026-07 — Etapa 2, 2.2: búsqueda unificada + ADR de columnas desnormalizadas — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar — incluye migración de base de datos)
+- Nueva migración de Alembic: `clave_rastreo`, `referencia` (indexadas) y `tipo_transferencia` (sembrada, sin uso activo) en `analisis`.
+- `models/analisis.py`, `services/auditoria_service.py`, `main.py`: actualizados para persistir los 3 campos nuevos.
+- `services/dashboard_service.py`: `listar_analisis()` con parámetro `q` de búsqueda unificada (banco, clave de rastreo, referencia, CLABE, y monto si el texto es numérico); `obtener_analisis_detalle()` incluye los campos nuevos.
+- `main.py`: endpoint `/api/v1/dashboard/analisis` con el parámetro `q`.
+- `app/historial/page.tsx`: caja de búsqueda simple pasa de "Buscar por banco..." a búsqueda unificada.
+
+### Documentado
+- `DECISION_LOG.md`: 🏛️ ADR — los campos usados para búsqueda/correlación/analítica deben existir como columnas desnormalizadas, como regla general (no solo para esta migración).
+- `ARQUITECTURA.md`, `API.md`: esquema y forma de `/api/v1/dashboard/analisis` actualizados.
+
+---
+
 ## [0.13.6] — 2026-07 — 2.3 cerrado: vista de detalle histórico desplegada, fix de navegación
 
 ### Desplegado en producción

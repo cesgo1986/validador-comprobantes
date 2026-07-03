@@ -1,5 +1,7 @@
 # ARQUITECTURA.md — Arquitectura técnica de VerificaPago
 
+**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+
 ## Visión general
 
 ```
@@ -36,8 +38,12 @@ app/
 │   ├── page.tsx                 ← Pantalla 3: semáforo + 4 dimensiones
 │   ├── detalle/page.tsx         ← Pantalla 4: validaciones colapsables
 │   └── comprobante/page.tsx     ← Pantalla 5/6: vista comprobante + OCR
-├── historial/page.tsx           ← Placeholder (Sprint D)
-├── alertas/page.tsx             ← Placeholder (Sprint D)
+├── historial/
+│   ├── page.tsx                 ← Lista con filtros y divulgación progresiva (Etapa 2, ítem 2.1 ✅)
+│   └── [id]/page.tsx            ← Detalle de análisis histórico (Etapa 2, ítem 2.3 ✅) — hidrata AnalisisContext, reutiliza /resultado/detalle
+├── lib/
+│   └── estadoSpei.ts            ← Espejo de SEMAFORO_SPEI (backend), única fuente de verdad de color/etiqueta/icono fuera de /resultado
+├── alertas/page.tsx             ← Placeholder (Etapa 3)
 ├── perfil/page.tsx              ← Placeholder (Sprint E)
 ├── context/AnalisisContext.tsx  ← Estado compartido entre pantallas
 ├── components/BottomNav.tsx     ← Navegación inferior fija
@@ -70,7 +76,9 @@ backend/
 │   ├── auditoria_service.py     ← Persistencia del análisis completo
 │   ├── dashboard_service.py     ← Queries del dashboard
 │   ├── cep_xml_service.py       ← Parseo y comparación del XML del CEP
-│   └── cep_xml_auto_service.py  ← Descarga automática del XML desde Banxico
+│   ├── cep_xml_auto_service.py  ← Descarga automática del XML desde Banxico
+│   ├── cache_service.py         ← Cache genérico en memoria (get/set/delete + TTL), reutilizable por cualquier servicio
+│   └── metrics_service.py       ← Métricas genéricas en memoria por namespace de servicio, reutilizable por cualquier servicio
 └── alembic/
     └── versions/
         └── ade15461db9e_*.py    ← Migración inicial multiempresa
@@ -80,15 +88,15 @@ backend/
 
 ## Base de datos
 
-**Motor:** PostgreSQL (Supabase).  
-**Migraciones:** Alembic exclusivamente — `Base.metadata.create_all()` solo en desarrollo aislado.  
+**Motor:** PostgreSQL (Supabase).
+**Migraciones:** Alembic exclusivamente — `Base.metadata.create_all()` solo en desarrollo aislado.
 **Comando de start en Render:** `alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT`
 
 **Esquema:**
 ```
 empresas          ← multiempresa (DEFAULT_EMPRESA_ID mientras no hay auth real)
 usuarios          ← por empresa
-analisis          ← resultado completo en JSONB + columnas desnormalizadas para filtros rápidos
+analisis          ← resultado completo en JSONB + columnas desnormalizadas para filtros rápidos (estado_operacion/fuente_estado/nivel_evidencia y clave_rastreo/referencia/tipo_transferencia — Motor 1 e identificadores, desde 2026-07)
 hashes_documentos ← UNIQUE(empresa_id, hash_sha256) — detecta reutilización entre análisis
 ```
 
@@ -155,3 +163,12 @@ hashes_documentos ← UNIQUE(empresa_id, hash_sha256) — detecta reutilización
 - **Alembic** corre automáticamente al inicio de cada deploy en Render
 
 No hay pipeline de CI separado — los deploys a producción son directos desde `main`. Para cambios de riesgo se recomienda usar una rama de feature y hacer merge después de probar localmente.
+
+---
+
+## Documentos relacionados
+
+- `MOTOR_DECISIONES.md` — el motor de evaluación descrito a nivel de negocio
+- `SCORING.md` — el detalle de las 4 dimensiones
+- `XML_CEP.md` — el detalle de la integración con Banxico
+- `DECISION_LOG.md` — por qué la arquitectura es como es

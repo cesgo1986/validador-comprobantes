@@ -94,6 +94,63 @@ Una fuente de nivel superior puede actualizar el estado SPEI. Una fuente de nive
 
 ---
 
+## 2026-07 — 🏛️ ADR: todas las vistas de análisis (nuevo e histórico) reutilizan el mismo modelo de presentación y el mismo `AnalisisContext`
+
+**Decisión:** toda pantalla que muestre un análisis de VerificaPago —recién ejecutado o histórico— debe consumir el mismo modelo de datos (`AnalisisContext`) y el mismo modelo de decisión (`MODELO_DECISION_EXPLICABLE.md`), independientemente de su origen. `app/historial/[id]/page.tsx` (ítem 2.3) hidrata `AnalisisContext` con el resultado obtenido de `GET /api/v1/dashboard/analisis/{id}` exactamente igual que `/resultado` lo hace tras un análisis en vivo — así, `/resultado/detalle` se reutiliza sin ninguna modificación ni bifurcación de lógica.
+
+**Motivo:** sin esta regla, cada pantalla nueva que muestre un análisis (Dashboard Empresa, Desktop, futuras integraciones) corre el riesgo de reimplementar su propia versión del modelo de decisión — y si el Modelo de Decisión Explicable cambia en el futuro, habría que actualizar múltiples implementaciones en vez de una.
+
+**Consecuencia:**
+- Fuente única de verdad de "cómo se presenta un análisis": `AnalisisContext` + `mensajesContextuales.ts` + `MODELO_DECISION_EXPLICABLE.md`.
+- **Deuda técnica reconocida, no bloqueante:** `app/historial/[id]/page.tsx` duplica una porción significativa del JSX de `app/resultado/page.tsx` (semáforo, bloque "¿Qué significa esto?", panel de detalles expandible). No se extrajo a un componente compartido en 2.3 para no modificar un archivo estable en producción bajo presión de tiempo. Queda registrado en `ROADMAP.md` como refactor pendiente — candidatos de extracción: `ResultadoHeader`, `ResultadoExplicacion`, `ResultadoEvidencias`. Se debe resolver **antes** de que exista un tercer consumidor (Dashboard Empresa, Etapa 4), para no triplicar la duplicación.
+
+---
+
+## 2026-07 — 🏛️ ADR: la divulgación progresiva es un principio transversal del producto
+
+**Decisión:** la divulgación progresiva —ya aplicada en `/resultado` (Nivel 1 fijo: Resultado + Impacto; Nivel 2+ bajo demanda: integridad, evidencias, dimensiones, diagnóstico técnico)— se adopta formalmente como principio transversal, no exclusivo de esa pantalla. Todo módulo de VerificaPago (Historial, Dashboard Empresa, Alertas Inteligentes, Desktop, futuras APIs) debe presentar primero la información necesaria para una decisión inmediata, dejando el detalle técnico disponible bajo demanda.
+
+**Motivo:** sin este principio explícito, cada módulo nuevo reinventa su propia jerarquía de información — el riesgo real detectado al diseñar Historial (una pantalla que mezclaba lista, estadísticas, filtros avanzados y estados de error todos al mismo peso visual, la misma saturación que ya se corrigió en `/resultado`).
+
+**Consecuencia:**
+- `app/historial/page.tsx` se rediseña: búsqueda simple + lista cronológica agrupada por día como Nivel 1; filtros avanzados (riesgo, fecha, hash) y "Resumen de actividad" colapsados por defecto como Nivel 2+.
+- Cualquier pantalla nueva que se diseñe de aquí en adelante (Etapas 2-5) parte de esta regla por defecto, no como una decisión de diseño a discutir caso por caso.
+- Se renombra "Estadísticas resumidas" a **"Resumen de actividad"** — lenguaje de producto, no de ingeniería, consistente con la decisión ya tomada de que VerificaPago habla el idioma del usuario (ver `PRODUCT_VISION.md`).
+
+---
+
+## 2026-07 — 🏛️ ADR: los campos usados para búsqueda, correlación o analítica deben existir como columnas desnormalizadas
+
+**Decisión:** todo campo que vaya a usarse para búsqueda, filtros, estadísticas, correlación o reglas de negocio futuras debe existir como columna propia en la tabla `analisis`, además de permanecer íntegro dentro del JSONB `resultado`. Se generaliza el criterio ya aplicado con `estado_operacion`/`fuente_estado`/`nivel_evidencia` (ver ADR anterior) a una regla de arquitectura permanente, no solo a esa migración puntual.
+
+**Aplicación inmediata (ítem 2.2, Etapa 2):** se agregan `clave_rastreo` y `referencia` (indexadas, para la búsqueda unificada del Historial) y se siembra `tipo_transferencia` (sin uso activo — hoy siempre `"SPEI"`, pero evita otra migración cuando VerificaPago soporte SPID/TEF/transferencias internas).
+
+**Motivo:** sin esta regla, cada etapa que necesite un identificador para buscar/filtrar/correlacionar (Alertas Inteligentes, Dashboard Empresa, Motor Antifraude, Analítica) descubre la falta de columna cuando ya la necesita con urgencia, y termina resolviéndolo con una consulta sobre JSONB (lenta, sin índice) o con una migración de emergencia. Es más barato decidirlo como regla general ahora que resolverlo caso por caso después.
+
+**Consecuencia:**
+- Antes de cerrar cualquier ítem futuro que introduzca un dato nuevo del análisis, la pregunta de diseño pasa a ser explícita: *¿este campo se va a buscar, filtrar, correlacionar o agregar en el futuro?* Si la respuesta es sí, se desnormaliza en la misma migración que lo introduce — no después.
+- `services/dashboard_service.py`, `listar_analisis()`: nuevo parámetro `q` (búsqueda unificada) — combina `banco_detectado`, `clave_rastreo`, `referencia` y `clabe_detectada` con `OR` (coincidencia parcial), y compara contra `monto_detectado` si el texto es interpretable como número. El usuario escribe una sola cosa; el sistema decide dónde buscarla — mismo principio que ya rige el Modelo de Decisión Explicable (el usuario expresa intención, el sistema interpreta).
+- `app/historial/page.tsx`: la caja de búsqueda simple (Nivel 1) pasa de "Buscar por banco..." a una búsqueda unificada ("🔎 Banco, clave de rastreo, cuenta o monto...").
+- Documentos afectados: `ARQUITECTURA.md` (esquema de `analisis`), `API.md` (parámetro `q` en `/api/v1/dashboard/analisis`), `ROADMAP.md` (2.2).
+
+---
+
+## 2026-07 — 🏛️ ADR: se desnormaliza `estado_operacion`, `fuente_estado` y `nivel_evidencia` en la tabla `analisis`
+
+**Decisión:** se agregan tres columnas desnormalizadas a la tabla `analisis` — `estado_operacion`, `fuente_estado` y `nivel_evidencia` — además de las ya existentes (`banco_detectado`, `monto_detectado`, `clabe_detectada`). Los tres campos ya se calculan durante el análisis (Motor 1 y `MODELO_DECISION_EXPLICABLE.md`) pero hoy solo viven dentro del JSONB `resultado`, sin columna propia.
+
+**Motivo — se descarta explícitamente la alternativa más rápida:** se evaluó usar el campo legacy `riesgo` (Motor 2, documental) como color/protagonista de la lista de Historial, por ser lo único ya desnormalizado. Se rechaza: repetiría exactamente el error que la Etapa 1 corrigió — dejar que el análisis documental sea la señal protagonista en vez del estado SPEI confirmado (Motor 1). Habría sido incoherente con toda la arquitectura de 2 motores independientes ya documentada en `MOTOR_DECISIONES.md`.
+
+**Por qué ahora y por qué los tres campos juntos:** Historial es el primer módulo que necesita `estado_operacion` fuera de `/resultado`, pero no será el último — Dashboard Empresa, Alertas Inteligentes, API Enterprise y Analítica/BI también van a necesitar consultarlo. Sin columna propia, cada uno terminaría leyendo y filtrando sobre JSONB — consultas más lentas, índices más complicados, SQL más difícil de mantener. Es la migración más barata posible ahora; se vuelve más cara cuantos más módulos dependan del JSONB directamente. `fuente_estado` y `nivel_evidencia` se agregan en la misma migración porque ya existen conceptualmente (jerarquía de evidencia, ver `MOTOR_DECISIONES.md`) y habilitan filtros futuros de alto valor sin otra migración — ej. "mostrar solo operaciones confirmadas por XML oficial", o estadísticas tipo "80% de los análisis fueron confirmados por XML".
+
+**Consecuencia:**
+- Nueva migración de Alembic agregando las 3 columnas a `analisis`.
+- `models/analisis.py`, `services/auditoria_service.py` (función `guardar_analisis`) y la llamada correspondiente en `main.py` se actualizan para persistir los 3 campos — ya se calculan en el endpoint `/analizar`, no requiere lógica nueva, solo pasarlos a la capa de persistencia.
+- `services/dashboard_service.py`: `listar_analisis()` se actualiza para devolver `estado_operacion` en vez de (o además de) `riesgo`, y `app/historial/page.tsx` colorea/etiqueta cada fila por `estado_operacion` (Motor 1), consistente con `/resultado`.
+- Documentos afectados: `ARQUITECTURA.md` (esquema de `analisis`), `API.md` (forma de `/api/v1/dashboard/analisis` y `/analisis/{id}`).
+
+---
+
 ## 2026-07 — 🏛️ ADR: se elimina la visualización del campo `recomendacion` legacy por contradecir el estado SPEI confirmado
 
 **Decisión:** se elimina de `app/resultado/detalle/page.tsx` el bloque que mostraba `result.recomendacion` (etiquetado siempre como "Recomendación: Revisar manualmente"). El campo sigue existiendo en la respuesta del backend por compatibilidad, pero ya no se muestra en ninguna pantalla.
