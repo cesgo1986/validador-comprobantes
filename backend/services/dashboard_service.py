@@ -239,3 +239,52 @@ def tendencia_diaria(empresa_id: str = DEFAULT_EMPRESA_ID, dias: int = 30) -> li
             }
             for dia, total, score_avg in rows
         ]
+
+
+def distribucion_scores_por_banco(empresa_id: str = DEFAULT_EMPRESA_ID, dias: int = 30, min_analisis: int = 1) -> list:
+    """
+    Item 1.6 (Observabilidad): distribucion de scores por banco detectado,
+    de los ultimos `dias`.
+
+    Nota de nomenclatura importante: "score_claude" es el score de riesgo
+    visual/documental que devuelve Claude Vision (0=bajo riesgo,
+    100=critico) -- no es una metrica de confianza de OCR en si misma. La
+    confianza de extraccion por campo vive dentro de campos_extraidos
+    (JSONB, por campo) y no esta agregada en una columna propia; agregarla
+    requeriria parsear el JSONB de cada fila, que se deja fuera de este
+    query por costo. Se usa score_claude como la señal mas cercana
+    disponible sin ese costo adicional.
+    """
+    with get_db_session() as db:
+        if db is None:
+            return []
+
+        desde = datetime.date.today() - datetime.timedelta(days=dias)
+
+        rows = db.execute(
+            select(
+                Analisis.banco_detectado,
+                func.count(Analisis.id),
+                func.avg(Analisis.score_claude),
+                func.avg(Analisis.score_final),
+            )
+            .where(
+                Analisis.empresa_id == empresa_id,
+                Analisis.deleted_at.is_(None),
+                Analisis.fecha >= desde,
+                Analisis.banco_detectado.is_not(None),
+            )
+            .group_by(Analisis.banco_detectado)
+            .having(func.count(Analisis.id) >= min_analisis)
+            .order_by(desc(func.count(Analisis.id)))
+        ).all()
+
+        return [
+            {
+                "banco": banco,
+                "total_analisis": total,
+                "score_claude_promedio": round(float(score_claude_avg), 2) if score_claude_avg is not None else None,
+                "score_final_promedio": round(float(score_final_avg), 2) if score_final_avg is not None else None,
+            }
+            for banco, total, score_claude_avg, score_final_avg in rows
+        ]

@@ -3,6 +3,7 @@ import base64
 import datetime
 import re
 import os
+import time
 import httpx
 from fastapi import FastAPI, UploadFile, File, Form, APIRouter, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -377,10 +378,18 @@ async def verify_cep(clave_rastreo: str, referencia: str, fecha: str, monto: flo
                     (CEP no expuso el monto en el HTML estatico, o el monto no coincide)
       ERROR      -> fallo la consulta (excepcion)
       TIMEOUT    -> Banxico no respondio a tiempo
+
+    Item 1.6 (Observabilidad): cada rama registra su duracion y un evento de
+    dominio en metrics_service bajo el namespace "cep" (distinto del
+    namespace "xml" de cep_xml_auto_service.py -- este mide el scraping del
+    HTML del CEP, no la descarga del XML oficial).
     """
+    t_inicio = time.time()
     try:
         fecha_clean = re.sub(r"[^\d]", "", fecha)
         if len(fecha_clean) < 8:
+            metrics_service.registrar_evento("cep", "cep_fecha_invalida")
+            metrics_service.registrar_error("cep", duracion_ms=(time.time() - t_inicio) * 1000)
             return {"found": False, "status": "FECHA_INVALIDA", "confidence": 0,
                     "detalle": "No fue posible normalizar la fecha: " + fecha}
         fecha_banxico = fecha_clean[:8]
@@ -405,6 +414,8 @@ async def verify_cep(clave_rastreo: str, referencia: str, fecha: str, monto: flo
 
         if not found_html:
             claves_intentadas = ", ".join(c for _, c in claves_a_intentar)
+            metrics_service.registrar_evento("cep", "cep_no_existe")
+            metrics_service.registrar_exito("cep", duracion_ms=(time.time() - t_inicio) * 1000)
             return {
                 "found": False,
                 "status": "NO_EXISTE",
@@ -478,6 +489,9 @@ async def verify_cep(clave_rastreo: str, referencia: str, fecha: str, monto: flo
                 "Se recomienda confirmar manualmente en: " + cep_url
             )
 
+        metrics_service.registrar_evento("cep", "cep_existe" if status == "EXISTE" else "cep_parcial")
+        metrics_service.registrar_exito("cep", duracion_ms=(time.time() - t_inicio) * 1000)
+
         return {
             "found": True,
             "status": status,
@@ -493,9 +507,13 @@ async def verify_cep(clave_rastreo: str, referencia: str, fecha: str, monto: flo
         }
 
     except httpx.TimeoutException:
+        metrics_service.registrar_evento("cep", "cep_timeout")
+        metrics_service.registrar_error("cep", duracion_ms=(time.time() - t_inicio) * 1000, timeout=True)
         return {"found": False, "status": "TIMEOUT", "confidence": 0,
                 "detalle": "Tiempo de espera agotado al consultar CEP de Banxico."}
     except Exception as e:
+        metrics_service.registrar_evento("cep", "cep_error")
+        metrics_service.registrar_error("cep", duracion_ms=(time.time() - t_inicio) * 1000)
         return {"found": False, "status": "ERROR", "confidence": 0,
                 "detalle": "Error al consultar CEP: " + str(e)}
 
@@ -513,6 +531,7 @@ async def analizar(
     xml_cep: UploadFile | None = File(None),
 ):
     contenido = await file.read()
+    t_inicio_analizar = time.time()
     b64 = base64.b64encode(contenido).decode()
     media_type = file.content_type
     fecha_hoy = datetime.date.today().isoformat()
@@ -552,6 +571,8 @@ async def analizar(
 
     match = re.search(r'\{[\s\S]*\}', raw)
     if not match:
+        metrics_service.registrar_evento("analizar", "documento_no_reconocido")
+        metrics_service.registrar_error("analizar", duracion_ms=(time.time() - t_inicio_analizar) * 1000)
         return {
             "riesgo": "INDETERMINADO",
             "score": 0,
@@ -1016,6 +1037,7 @@ async def analizar(
     except Exception as e:
         print("Aviso: no fue posible guardar auditoria:", e)
 
+    metrics_service.registrar_exito("analizar", duracion_ms=(time.time() - t_inicio_analizar) * 1000)
     return result
 
 
@@ -1095,6 +1117,45 @@ def dashboard_metricas_xml():
     /metricas/usuarios, etc. seguirán la misma estructura a futuro.
     """
     return metrics_service.obtener_metricas("xml")
+
+
+@dashboard_router.get("/metricas/cep")
+def dashboard_metricas_cep():
+    """
+    Métricas del scraping HTML del CEP (item 1.6) -- distinto de
+    /metricas/xml, que mide la descarga del XML oficial. Este mide
+    verify_cep(): tasa de éxito, eventos (cep_existe, cep_parcial,
+    cep_no_existe, cep_timeout, cep_error), duración.
+    """
+    return metrics_service.obtener_metricas("cep")
+
+
+@dashboard_router.get("/metricas/analizar")
+def dashboard_metricas_analizar():
+    """
+    Métricas del endpoint /analizar completo (item 1.6): tiempo promedio de
+    análisis de punta a punta (OCR + IAT + CEP + XML + persistencia), tasa
+    de éxito, casos de documento no reconocido.
+    """
+    return metrics_service.obtener_metricas("analizar")
+
+
+@dashboard_router.get("/metricas/scores-por-banco")
+def dashboard_scores_por_banco(
+    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    dias: int = Query(default=30, le=365),
+    min_analisis: int = Query(default=1),
+):
+    """
+    Item 1.6 (Observabilidad): distribución de scores de Claude Vision por
+    banco detectado. A diferencia de /metricas/xml, /metricas/cep y
+    /metricas/analizar (en memoria del proceso), esta consulta va contra
+    la base de datos -- refleja el histórico completo, no solo lo ocurrido
+    desde el último reinicio del servidor.
+    """
+    return dashboard_service.distribucion_scores_por_banco(
+        empresa_id=empresa_id, dias=dias, min_analisis=min_analisis
+    )
 
 
 app.include_router(dashboard_router)
