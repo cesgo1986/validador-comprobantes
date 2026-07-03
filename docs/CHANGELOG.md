@@ -6,6 +6,30 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.13.6] — 2026-07 — 2.3 cerrado: vista de detalle histórico desplegada, fix de navegación
+
+### Desplegado en producción
+- `app/historial/[id]/page.tsx`: vista de detalle de análisis histórico, verificada funcionando (badge, ficha de auditoría, reutilización de `/resultado/detalle`).
+- `app/historial/page.tsx`: fix — el `onClick` de navegación a `/historial/[id]` no había quedado aplicado en el primer despliegue (el archivo se subió sin los cambios pendientes de guardar). Corregido reemplazando el archivo completo.
+
+### Cerrado
+- `ROADMAP.md`: ítem **2.3** de la Etapa 2 pasa a ✅.
+
+---
+
+## [0.13.5] — 2026-07 — Etapa 2, 2.3: vista de detalle histórico — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `app/historial/[id]/page.tsx` (nuevo): vista de detalle de un análisis histórico. Hidrata `AnalisisContext` con el resultado obtenido de `GET /api/v1/dashboard/analisis/{id}`, reutilizando `/resultado/detalle` sin modificarlo. Incluye badge "Análisis archivado", ficha de auditoría antes del semáforo, espacio reservado "Actividad relacionada", y nota de privacidad reencuadrada.
+- `app/historial/page.tsx`: tarjetas de la lista ahora navegan a `/historial/[id]` al tocarlas.
+
+### Documentado
+- `DECISION_LOG.md`: 🏛️ ADR — todas las vistas de análisis (nuevo e histórico) reutilizan el mismo modelo de presentación y el mismo `AnalisisContext`. Incluye deuda técnica reconocida: `historial/[id]/page.tsx` duplica JSX de `resultado/page.tsx`, refactor pendiente antes del tercer consumidor (Dashboard Empresa).
+- `ARQUITECTURA.md`: rutas `historial/page.tsx`, `historial/[id]/page.tsx` y `lib/estadoSpei.ts` actualizadas (ya no placeholders).
+- `ROADMAP.md`: ítem 2.3 detallado; refactor pendiente registrado explícitamente como deuda técnica no bloqueante.
+
+---
+
 ## [0.13.4] — 2026-07 — 2.1 cerrado: Historial desplegado con divulgación progresiva
 
 ### Desplegado en producción
