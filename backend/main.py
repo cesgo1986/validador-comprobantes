@@ -12,6 +12,7 @@ from iat import calculate_iat, fuse_scores, iat_anomalias_to_validaciones
 from services.hash_service import registrar_y_consultar_hash
 from services.auditoria_service import guardar_analisis
 from services import dashboard_service
+from services import metrics_service
 from database import init_db, DEFAULT_EMPRESA_ID
 from services.cep_xml_service import parsear_xml_cep, comparar_xml_contra_comprobante, construir_resultado_xml, XMLCepInvalido
 from services.cep_xml_auto_service import datos_suficientes_para_consulta, descargar_xml_cep_automatico
@@ -874,6 +875,7 @@ async def analizar(
                 banco_receptor_spei=d["banco_receptor"],
                 cuenta=d["cuenta"],
                 monto=d["monto"],
+                hash_sha256=hash_info.get("hash_documento"),
             )
             if descarga["exito"]:
                 xml_bytes_a_procesar = descarga["xml_bytes"]
@@ -1080,6 +1082,19 @@ def dashboard_tendencia(
     dias: int = Query(default=30, le=365),
 ):
     return dashboard_service.tendencia_diaria(empresa_id=empresa_id, dias=dias)
+
+
+@dashboard_router.get("/metricas/xml")
+def dashboard_metricas_xml():
+    """
+    Métricas de la descarga automática del XML del CEP (item 1.6,
+    Observabilidad, parcial): consultas, éxitos/fallos, cache hits/miss,
+    reintentos, timeouts, duración. En memoria del proceso, no
+    distribuidas ni persistentes -- ver metrics_service.py. Ruta anidada
+    bajo /metricas/ a propósito: /metricas/ocr, /metricas/claude,
+    /metricas/usuarios, etc. seguirán la misma estructura a futuro.
+    """
+    return metrics_service.obtener_metricas("xml")
 
 
 app.include_router(dashboard_router)
