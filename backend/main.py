@@ -925,24 +925,54 @@ async def analizar(
                 result["detalle_temporal"] = contexto_temporal_result["explicacion"]
 
             # ── Motor 2: comparacion de campos (no afecta el estado SPEI) ──────────
+            # Ver ROADMAP.md item 1.3: en vez de un mensaje agregado unico, se
+            # genera una entrada de validacion POR CAMPO comparado, para que la
+            # UI pueda mostrar el desglose (Monto coincide / Banco coincide /
+            # etc.) en vez de un solo veredicto opaco. cep_xml_service.py ya
+            # calcula esto en comparacion["comparaciones"] -- aqui solo se
+            # traduce cada entrada a una validacion legible.
+            NOMBRES_CAMPO_XML = {
+                "monto": "Monto",
+                "fecha": "Fecha",
+                "clave_rastreo": "Clave de rastreo",
+                "banco_destino": "Banco receptor",
+                "cuenta_destino_ultimos_digitos": "Cuenta destino",
+            }
+            origen_xml_texto = "adjuntado" if origen_xml == "manual" else "obtenido automáticamente"
+
+            for c in comparacion["comparaciones"]:
+                nombre_campo = NOMBRES_CAMPO_XML.get(c["campo"], c["campo"])
+                if c["coincide"] is True:
+                    status = "ok"
+                    detalle = f"{nombre_campo} coincide con el XML oficial del CEP ({origen_xml_texto})."
+                elif c["coincide"] is False:
+                    status = "fail"
+                    detalle = (
+                        f"{nombre_campo} NO coincide: comprobante='{c['valor_comprobante']}' "
+                        f"/ XML oficial='{c['valor_xml']}'."
+                    )
+                else:
+                    # coincide is None -- ej. fecha, formato variable entre bancos,
+                    # se reporta como informativo, no como fallo ni acierto.
+                    status = "info"
+                    detalle = (
+                        f"{nombre_campo} en el comprobante: '{c['valor_comprobante']}'. "
+                        f"{nombre_campo} en el XML oficial: '{c['valor_xml']}'. "
+                        "El formato varía entre bancos — revisa manualmente si es necesario."
+                    )
+                result["validaciones"].append({
+                    "categoria": "cep_xml",
+                    "nombre": nombre_campo,
+                    "status": status,
+                    "detalle": detalle,
+                })
+
             if comparacion["discrepancias"] == 0 and comparacion["coincidencias"] >= 3:
                 verificabilidad_result["score"] = min(100, verificabilidad_result["score"] + 10)
                 result["verificabilidad"] = verificabilidad_result["score"]
                 result["elementos_verificabilidad"].append(
-                    f"XML oficial del CEP ({'adjuntado' if origen_xml == 'manual' else 'obtenido automaticamente'}) "
-                    "coincide con los datos del comprobante"
+                    f"XML oficial del CEP ({origen_xml_texto}) coincide con los datos del comprobante"
                 )
-            elif comparacion["discrepancias"] > 0:
-                result["validaciones"].append({
-                    "categoria": "cep_xml",
-                    "nombre": "Discrepancia entre XML oficial y comprobante",
-                    "status": "fail",
-                    "detalle": (
-                        f"Se encontraron {comparacion['discrepancias']} discrepancia(s) entre "
-                        "el XML oficial del CEP y los datos visibles en el comprobante. "
-                        "Esto es una señal relevante de posible alteración."
-                    ),
-                })
         except XMLCepInvalido as e:
             result["cep_xml"] = {
                 "xml_proporcionado": xml_cep is not None,
