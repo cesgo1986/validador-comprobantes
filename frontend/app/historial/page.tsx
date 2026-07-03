@@ -20,6 +20,9 @@ interface AnalisisItem {
   estado_operacion: string | null;
   fuente_estado: string | null;
   nivel_evidencia: string | null;
+  clave_rastreo: string | null;
+  referencia: string | null;
+  tipo_transferencia: string | null;
   archivo_nombre: string | null;
   banco_detectado: string | null;
   monto_detectado: number | null;
@@ -94,7 +97,10 @@ export default function Historial() {
   const [resumenAbierto, setResumenAbierto] = useState(false);
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
 
-  const [busqueda, setBusqueda] = useState("");       // Nivel 1: búsqueda simple → mapea a "banco"
+  // Búsqueda unificada (item 2.2) -- el backend decide dónde buscar
+  // (banco, clave de rastreo, referencia, CLABE o monto) sin que el
+  // usuario tenga que elegir el campo.
+  const [busqueda, setBusqueda] = useState("");
   const [riesgo, setRiesgo] = useState("");             // Nivel 2 (Motor 2, avanzado)
   const [fechaDesde, setFechaDesde] = useState("");     // Nivel 2
   const [fechaHasta, setFechaHasta] = useState("");     // Nivel 2
@@ -106,7 +112,7 @@ export default function Historial() {
     const params = new URLSearchParams();
     params.set("limit", String(LIMIT));
     params.set("offset", String(offsetActual));
-    if (busqueda.trim()) params.set("banco", busqueda.trim());
+    if (busqueda.trim()) params.set("q", busqueda.trim());
     if (riesgo) params.set("riesgo", riesgo);
     if (fechaDesde) params.set("fecha_desde", fechaDesde);
     if (fechaHasta) params.set("fecha_hasta", fechaHasta);
@@ -172,12 +178,12 @@ export default function Historial() {
         <span style={{ color: "#fff", fontWeight: 700, fontSize: 18 }}>Historial</span>
       </div>
 
-      {/* Nivel 1: búsqueda simple + entrada a filtros */}
+      {/* Nivel 1: búsqueda unificada + entrada a filtros */}
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
         <input
           value={busqueda}
           onChange={e => setBusqueda(e.target.value)}
-          placeholder="Buscar por banco..."
+          placeholder="🔎 Banco, clave de rastreo, cuenta o monto..."
           style={{ flex: 1, padding: "12px 14px", borderRadius: 12, border: "1.5px solid #E2E8F0", background: "#fff", fontSize: 13 }}
         />
         <button onClick={() => setFiltrosAbiertos(o => !o)}
@@ -225,7 +231,7 @@ export default function Historial() {
             </div>
           </div>
           <div>
-            <label style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Clave de rastreo / hash (avanzado)</label>
+            <label style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Hash exacto (avanzado)</label>
             <input value={hashBusqueda} onChange={e => setHashBusqueda(e.target.value)} placeholder="Búsqueda exacta"
               style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #E2E8F0", fontSize: 13 }} />
           </div>
