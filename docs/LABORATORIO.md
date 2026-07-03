@@ -1,5 +1,7 @@
 # LABORATORIO.md — Investigaciones y hallazgos experimentales
 
+**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+
 Registro de experimentos, investigaciones técnicas, benchmarks e ideas descartadas de VerificaPago. **No es un registro de decisiones** — es el espacio para todo lo que se investigó, se probó o se descartó, tenga o no tenga una decisión oficial asociada todavía.
 
 ## Por qué existe este documento, separado de DECISION_LOG.md
@@ -36,3 +38,26 @@ Durante las sesiones de trabajo, estas investigaciones se marcan con `🧪 #LAB-
 ---
 
 *Nuevas investigaciones se agregan arriba de esta línea a medida que ocurren, con fecha, qué se investigó, método, resultado y — si aplica — la decisión oficial derivada y dónde vive.*
+
+---
+
+## Investigaciones registradas
+
+### 2026-07 — Falso positivo: BBVA muestra montos con signo negativo en egresos
+
+**Qué se investigó:** por qué un comprobante legítimo de BBVA fue marcado con la validación "Monto negativo" (severidad alta, categoría estructural), a pesar de que la transferencia fue confirmada como liquidada por Banxico (estado SPEI correcto, sin discrepancias en el XML).
+
+**Método:** revisión del comprobante real (imagen adjunta por el usuario) y del `system_prompt` que gobierna el análisis de Claude Vision en `main.py`.
+
+**Resultado:** BBVA despliega el monto con signo negativo (ej. `-$40.00`) como convención visual para indicar que el dinero fue descontado de la cuenta (egreso) — no es una señal de alteración del documento. El `system_prompt` no distinguía este caso: la regla "Monto en cero o negativo" instruía a Claude a marcar como riesgo cualquier signo negativo, sin excepción.
+
+**Consecuencia (decisión oficial derivada, confirmada en producción 2026-07):** se corrigió el `system_prompt` en `build_system_prompt()` (`main.py`) en tres puntos: (1) se agregó a las reglas de formatos válidos que algunos bancos muestran el monto con signo negativo para egresos y que esto no debe marcarse como riesgo; (2) se acotó la regla de "marcar como riesgo" para excluir el signo negativo consistente con esa convención; (3) se reforzó la instrucción de extracción del campo `monto` para que siempre se extraiga como valor absoluto (positivo). No se tocó lógica de backend — el problema vivía enteramente en el prompt, no en `normalize_monto_float()` ni en ninguna validación estructural de Python. Desplegado en Render y verificado contra el mismo comprobante de BBVA que originó el hallazgo: ya no marca "Monto negativo".
+
+**Nota para crecimiento futuro:** este es el primer caso registrado de una convención de despliegue específica de un banco que generó un falso positivo. Si aparecen más casos de este tipo (otro banco con otra convención visual particular), vale la pena evaluar si conviene mantenerlos como reglas dentro del `system_prompt` (como aquí) o migrarlos a un catálogo de datos por banco — similar al patrón ya usado en `catalogo_bancos.json` para el flujo del CEP — en vez de seguir acumulando excepciones sueltas dentro del texto del prompt.
+
+---
+
+## Documentos relacionados
+
+- `XML_CEP.md` — destino del detalle técnico de investigaciones ya cerradas sobre el CEP
+- `DECISION_LOG.md` — destino de las decisiones oficiales derivadas de una investigación

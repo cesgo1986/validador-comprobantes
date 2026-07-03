@@ -6,6 +6,19 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.12.1] — 2026-07 — Código: flujo de decisión desplegado; fix de falso positivo BBVA (monto negativo)
+
+### Desplegado en producción
+- `app/resultado/page.tsx` y `app/resultado/mensajesContextuales.ts` (nuevo): implementación del flujo de decisión de 6 pasos (Impacto y Recomendación inmediata) sobre el catálogo de 1.2. Confirmado desplegado y funcionando en Vercel.
+
+### Corregido (confirmado en producción)
+- `main.py`, `build_system_prompt()`: falso positivo — BBVA muestra el monto con signo negativo en egresos (ej. `-$40.00`) como convención visual, no como alteración. El `system_prompt` no distinguía este caso y lo marcaba como "Monto negativo" (severidad alta). Se corrigió en tres puntos del prompt: regla de formatos válidos, regla de riesgo, e instrucción de extracción del campo `monto` (siempre en valor absoluto). Desplegado en Render y verificado contra el comprobante que originó el hallazgo. Ver `LABORATORIO.md`.
+
+### Observado (para Sprint A-Final, sin resolver todavía)
+- La pantalla `/resultado` en producción resultó saturada: integridad documental, reutilización del documento y el flujo de decisión compiten por atención con el mismo peso visual. Pendiente de rediseño de jerarquía (divulgación progresiva) — ver conversación en curso, aún sin decisión final registrada.
+
+---
+
 ## [0.12.0] — 2026-07 — ADR: se formaliza la capa de Recomendación; catálogo final de los 9 mensajes contextuales
 
 ### Cambiado (arquitectura del modelo — MINOR por ser cambio de modelo, no patch)
