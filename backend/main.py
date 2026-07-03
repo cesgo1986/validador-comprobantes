@@ -1031,6 +1031,9 @@ async def analizar(
             monto_detectado=monto_detectado_general if monto_detectado_general > 0 else None,
             banco_detectado=campos_planos.get("banco_origen") or banco_hint or None,
             clabe_detectada=clabe_detectada_general,
+            estado_operacion=result.get("estado_operacion"),
+            fuente_estado=result.get("fuente_estado"),
+            nivel_evidencia=result.get("nivel_evidencia"),
         )
         if audit_id:
             result["audit_id"] = audit_id
@@ -1071,10 +1074,16 @@ def dashboard_listar_analisis(
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0),
     riesgo: str | None = Query(default=None),
+    estado_operacion: str | None = Query(default=None),
     hash_sha256: str | None = Query(default=None),
+    banco: str | None = Query(default=None),
+    fecha_desde: str | None = Query(default=None),
+    fecha_hasta: str | None = Query(default=None),
 ):
     return dashboard_service.listar_analisis(
-        empresa_id=empresa_id, limit=limit, offset=offset, riesgo=riesgo, hash_sha256=hash_sha256
+        empresa_id=empresa_id, limit=limit, offset=offset, riesgo=riesgo,
+        estado_operacion=estado_operacion, hash_sha256=hash_sha256,
+        banco=banco, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
     )
 
 

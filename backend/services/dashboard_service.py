@@ -81,9 +81,22 @@ def listar_analisis(
     limit: int = 50,
     offset: int = 0,
     riesgo: str | None = None,
+    estado_operacion: str | None = None,
     hash_sha256: str | None = None,
+    banco: str | None = None,
+    fecha_desde: str | None = None,
+    fecha_hasta: str | None = None,
 ) -> dict:
-    """Listado paginado de analisis, mas reciente primero."""
+    """
+    Listado paginado de analisis, mas reciente primero.
+
+    Item 2.1 (ROADMAP.md, Etapa 2): incluye estado_operacion/fuente_estado/
+    nivel_evidencia (Motor 1, desnormalizados en 2026-07 -- ver
+    DECISION_LOG.md) y veces_visto (via outer join con hashes_documentos),
+    para que el Historial pueda mostrar el mismo protagonismo del estado
+    SPEI que ya tiene /resultado, en vez de colorear por `riesgo` (Motor 2).
+    Tambien agrega filtros de banco (busqueda parcial) y rango de fechas.
+    """
     with get_db_session() as db:
         if db is None:
             return {"items": [], "total": 0}
@@ -91,18 +104,31 @@ def listar_analisis(
         filtros = [Analisis.empresa_id == empresa_id, Analisis.deleted_at.is_(None)]
         if riesgo:
             filtros.append(Analisis.riesgo == riesgo)
+        if estado_operacion:
+            filtros.append(Analisis.estado_operacion == estado_operacion)
         if hash_sha256:
             filtros.append(Analisis.hash_sha256 == hash_sha256)
+        if banco:
+            filtros.append(Analisis.banco_detectado.ilike(f"%{banco}%"))
+        if fecha_desde:
+            filtros.append(Analisis.fecha >= fecha_desde)
+        if fecha_hasta:
+            filtros.append(Analisis.fecha <= fecha_hasta)
 
         total = db.execute(select(func.count(Analisis.id)).where(*filtros)).scalar() or 0
 
         rows = db.execute(
-            select(Analisis)
+            select(Analisis, HashDocumento.veces_visto)
+            .outerjoin(
+                HashDocumento,
+                (HashDocumento.hash_sha256 == Analisis.hash_sha256)
+                & (HashDocumento.empresa_id == Analisis.empresa_id),
+            )
             .where(*filtros)
             .order_by(desc(Analisis.fecha))
             .limit(limit)
             .offset(offset)
-        ).scalars().all()
+        ).all()
 
         items = [
             {
@@ -113,11 +139,15 @@ def listar_analisis(
                 "score_iat": float(r.score_iat) if r.score_iat is not None else None,
                 "score_final": float(r.score_final) if r.score_final is not None else None,
                 "riesgo": r.riesgo,
+                "estado_operacion": r.estado_operacion,
+                "fuente_estado": r.fuente_estado,
+                "nivel_evidencia": r.nivel_evidencia,
                 "archivo_nombre": r.archivo_nombre,
                 "banco_detectado": r.banco_detectado,
                 "monto_detectado": float(r.monto_detectado) if r.monto_detectado is not None else None,
+                "veces_visto": veces_visto if veces_visto else 1,
             }
-            for r in rows
+            for r, veces_visto in rows
         ]
         return {"items": items, "total": total}
 
@@ -162,6 +192,9 @@ def obtener_analisis_detalle(analisis_id: str, empresa_id: str = DEFAULT_EMPRESA
             "score_iat": float(registro.score_iat) if registro.score_iat is not None else None,
             "score_final": float(registro.score_final) if registro.score_final is not None else None,
             "riesgo": registro.riesgo,
+            "estado_operacion": registro.estado_operacion,
+            "fuente_estado": registro.fuente_estado,
+            "nivel_evidencia": registro.nivel_evidencia,
             "archivo_nombre": registro.archivo_nombre,
             "archivo_tipo": registro.archivo_tipo,
             "monto_detectado": float(registro.monto_detectado) if registro.monto_detectado is not None else None,
