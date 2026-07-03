@@ -6,6 +6,27 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.12.5] — 2026-07 — 1.5 cerrado: cache, métricas y reintentos desplegados
+
+### Desplegado en producción
+- `services/cache_service.py` y `services/metrics_service.py` (nuevos, genéricos, reutilizables por cualquier componente futuro).
+- `services/cep_xml_auto_service.py`: reintentos con backoff (200ms/500ms, máx. 3 intentos) en los 3 pasos del flujo CEP; consume `cache_service` (TTL 30 min, por hash SHA-256) y `metrics_service` (namespace `"xml"`) en vez de mantener estado propio.
+- `main.py`: nuevo endpoint `GET /api/v1/dashboard/metricas/xml`.
+
+### Cerrado
+- `ROADMAP.md`: ítem **1.5** de la Etapa 1 pasa a ✅ completado y desplegado. Con esto, todos los ítems de la Etapa 1 están cerrados salvo **1.6 (Observabilidad)** — el último pendiente para cerrar el MVP Beta.
+
+---
+
+## [0.12.4] — 2026-07 — ADR: externalización de Cache y Metrics como servicios transversales
+
+### Documentado (código pendiente de aplicar y desplegar)
+- `DECISION_LOG.md`: 🏛️ ADR — caché y métricas se extraen de `cep_xml_auto_service.py` a `services/cache_service.py` y `services/metrics_service.py`, genéricos y reutilizables por cualquier componente futuro (Historial, Dashboard, OCR, QR, Motor de Presentación). Motivo, impacto y documentos afectados registrados en la entrada completa.
+- `ARQUITECTURA.md`: estructura de `services/` actualizada con los dos servicios nuevos.
+- `ROADMAP.md`, ítem 1.5: alcance ajustado — reintentos con backoff (200ms/500ms, máx. 3 intentos), TTL de caché en 30 minutos (no 5), endpoint de métricas bajo `/api/v1/dashboard/metricas/xml` (namespace preparado para `/metricas/ocr`, `/metricas/claude`, etc. a futuro).
+
+---
+
 ## [0.12.3] — 2026-07 — 1.3 cerrado: desglose campo a campo de la comparación XML
 
 ### Desplegado en producción

@@ -64,7 +64,7 @@ Este es el hallazgo clave de la revisión de 2026-07: lo que falta en la Etapa 1
    ↓
 1.3 ✅ Comparación XML campo a campo (cerrado)
    ↓
-1.5  Robustecer la arquitectura XML backend
+1.5 ✅ Arquitectura XML backend: cache, métricas, reintentos (cerrado)
    ↓
 1.6  Observabilidad
    ↓
@@ -163,10 +163,15 @@ Se implementa embebido dentro de `/resultado` (extendiendo el bloque que ya exis
 
 **Estado del diseño (2026-07): completado, en producción.** El texto de los 9 estados está redactado y desplegado (ver catálogo en 1.2). La implementación en `resultado/page.tsx` incluyó además un rediseño de jerarquía no previsto originalmente en el diseño del flujo: el patrón de 6 pasos se organizó en **divulgación progresiva** — ① Resultado y ②③④ (Interpretación/Impacto/Recomendación) quedan siempre visibles como Nivel 1 (respuesta en ~5 segundos a "¿puedo entregar o no?"); ⑤ Evidencias, integridad documental, reutilización del documento, las 4 dimensiones y el diagnóstico técnico quedan detrás de un único botón "Ver detalles del análisis" (Nivel 2+), para no competir visualmente con la decisión principal. También se corrigió que el mensaje de integridad documental contextualice primero el estado SPEI favorable antes de mostrar una observación, para no inducir una lectura contraria a la conclusión real (ver `DECISION_LOG.md`, regla "nunca inducir a una acción cuando la evidencia no lo permite").
 
-### 1.5 — Arquitectura XML backend (pendiente)
-- Reintentos con backoff exponencial cuando `valida.do` falla por timeout
-- Caché de resultado de consulta (evitar re-consultar Banxico si el mismo comprobante se analiza dos veces en minutos, usando el hash SHA-256)
-- Métricas de descarga: porcentaje de éxito/fallo, tiempo promedio de respuesta
+### 1.5 — Arquitectura XML backend ✅ (completado y desplegado)
+Ver `DECISION_LOG.md`, ADR "Externalización de servicios transversales (Cache y Metrics)".
+
+- **Reintentos con backoff:** progresión explícita (200ms, 500ms, 1000ms), máximo 3 intentos. Solo reintenta timeouts — errores 4xx/5xx no se reintentan. Vive en `cep_xml_auto_service.py`, es lógica específica de ese flujo HTTP.
+- **Caché de resultado de consulta:** extraído a `services/cache_service.py` (genérico, `get`/`set`/`delete` con TTL), no vive dentro del XML Service. TTL de **30 minutos** — un comprobante ya analizado prácticamente nunca cambia, así que prioriza ahorrar llamadas a Banxico sobre "frescura" del dato. Consumido por hash SHA-256 del comprobante.
+- **Métricas de descarga:** extraídas a `services/metrics_service.py` (genérico, namespaced por servicio), no vive dentro del XML Service. Registra consultas totales, éxitos/fallos, cache hits/miss, reintentos, timeouts, duración (promedio/mín/máx), y eventos de dominio (`xml_descargado`, `xml_no_encontrado`, `xml_con_error`).
+- **Endpoint de métricas:** `GET /api/v1/dashboard/metricas/xml` — ruta anidada bajo `/metricas/` a propósito, para que `/metricas/ocr`, `/metricas/claude`, `/metricas/usuarios`, etc. sigan la misma estructura cuando existan.
+
+**Por qué se separó en dos servicios en vez de implementarlo dentro de `cep_xml_auto_service.py`:** Historial, Dashboard Empresa, validación por QR/XML manual y el futuro Motor de Presentación (Etapa 5) también van a necesitar cachear y medir. Hacerlo genérico desde ahora evita terminar con `_METRICAS_OCR`, `_METRICAS_XML`, `_METRICAS_HISTORIAL` dispersas sin una interfaz común.
 
 ### 1.6 — Observabilidad (pendiente)
 - Porcentaje de XML descargados automáticamente vs. fallidos
