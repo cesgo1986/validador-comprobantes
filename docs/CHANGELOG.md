@@ -6,6 +6,32 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.14.0] — 2026-07 — ✅ Etapa 2 (Historial real) completa
+
+### Desplegado en producción
+- `main.py`, `services/dashboard_service.py`: endpoint de exportación CSV verificado funcionando end-to-end.
+- `app/historial/page.tsx`: botón "⬇ Exportar a CSV" verificado.
+
+### Cerrado
+- `ROADMAP.md`: ítem **2.4** pasa a ✅. Con esto, **la Etapa 2 completa queda cerrada** — los 5 ítems (2.1 a 2.5) están en producción y verificados.
+
+Sube a versión MINOR (no PATCH) porque marca el cierre de una etapa completa del roadmap, mismo criterio aplicado al cerrar la Etapa 1 (`0.13.0`).
+
+---
+
+## [0.13.9] — 2026-07 — Etapa 2, 2.4: exportación de historial a CSV — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `services/dashboard_service.py`: refactor — filtros de `listar_analisis()` extraídos a `_construir_filtros_analisis()`, compartida con la nueva `exportar_analisis()` (sin paginación, hasta 5000 filas) para garantizar que la exportación coincide exactamente con los filtros activos en pantalla.
+- `main.py`: nuevo endpoint `GET /api/v1/dashboard/analisis/exportar`, genera CSV con `Content-Disposition: attachment`, etiquetas de estado SPEI traducidas vía `SEMAFORO_SPEI`.
+- `app/historial/page.tsx`: botón "⬇ Exportar a CSV" dentro del panel de filtros avanzados (Nivel 2).
+
+### Documentado
+- `API.md`: nuevo endpoint documentado.
+- `ROADMAP.md`: ítem 2.4 detallado.
+
+---
+
 ## [0.13.8] — 2026-07 — 2.2 cerrado: búsqueda unificada desplegada y verificada
 
 ### Desplegado en producción

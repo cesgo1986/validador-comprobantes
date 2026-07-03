@@ -195,7 +195,7 @@ Con esto cerrado, esta parte del producto se congela — no se vuelve a tocar `/
 
 ---
 
-## Etapa 2 — Historial real ⭐⭐⭐
+## ✅ Etapa 2 — Historial real: COMPLETA (2026-07)
 
 **Objetivo:** conectar el historial con datos reales y hacerlo buscable — el siguiente gran salto de utilidad, porque cambia el producto de "analizo un comprobante" a "analizo tendencias".
 
@@ -211,6 +211,8 @@ Funcionalidades:
 **2.1 — Lista con filtros ✅ (completado y desplegado, 2026-07):** diseño con divulgación progresiva (ver `DECISION_LOG.md`) — Nivel 1: búsqueda simple + lista cronológica agrupada por día, coloreada/etiquetada por `estado_operacion` (Motor 1, no `riesgo`). Nivel 2+: filtros avanzados (riesgo, fecha, hash) y "Resumen de actividad", colapsados por defecto. Incluyó migración de `estado_operacion`/`fuente_estado`/`nivel_evidencia` en la tabla `analisis` (ver ADR en `DECISION_LOG.md`). Nota: los análisis anteriores a la migración muestran `estado_operacion: null` — la columna se agregó vacía, sin backfill retroactivo del JSONB histórico. Pendiente evaluar si vale la pena un script de backfill más adelante; no bloquea el uso normal.
 
 **2.2 — Búsqueda unificada ✅ (completado y desplegado, 2026-07):** la caja de búsqueda simple (Nivel 1) del Historial busca simultáneamente en banco, clave de rastreo, referencia, CLABE y (si el texto es numérico) monto — el usuario escribe una sola cosa, sin elegir en qué campo buscar (parámetro `q` en `GET /api/v1/dashboard/analisis`, ver `API.md`). Incluyó migración desnormalizando `clave_rastreo` y `referencia` (indexadas) y sembrando `tipo_transferencia` (sin uso activo, siempre `"SPEI"` hoy) — ver ADR de columnas desnormalizadas en `DECISION_LOG.md`. Misma limitación que 2.1: análisis anteriores a la migración no tienen `clave_rastreo`/`referencia` poblados, solo se pueden encontrar por banco o monto.
+
+**2.4 — Exportación de historial ✅ (completado y desplegado, 2026-07):** `GET /api/v1/dashboard/analisis/exportar` — mismos filtros que `/analisis` (incluida la búsqueda unificada `q`), sin paginación, hasta 5000 filas. Reutiliza `_construir_filtros_analisis()` compartida con `listar_analisis()` (ver `dashboard_service.py`) para garantizar que la exportación coincide exactamente con lo que el usuario ve filtrado en pantalla — no una implementación de filtros separada que pudiera divergir. Etiquetas de estado SPEI traducidas a texto legible vía `SEMAFORO_SPEI` en el CSV. Botón "⬇ Exportar a CSV" agregado dentro del panel de filtros avanzados de `app/historial/page.tsx` (Nivel 2, no compite con la lista). Verificado funcionando end-to-end.
 
 **2.3 — Vista de detalle de un análisis histórico ✅ (completado y desplegado, 2026-07):** `app/historial/[id]/page.tsx`, consume `GET /api/v1/dashboard/analisis/{id}`. Reutiliza `AnalisisContext` (ver ADR en `DECISION_LOG.md`) — hidrata el contexto con el resultado histórico para que "Ver validaciones completas" navegue a `/resultado/detalle` sin ninguna modificación en ese archivo. Incluye: badge "Análisis archivado" (cambia la expectativa del usuario — no espera que los datos cambien), ficha de auditoría (fecha, archivo, banco, monto, hash, nivel de evidencia, fuente del estado) antes del semáforo, espacio reservado "Actividad relacionada" (visión de Historial Inteligente, sin implementar), y nota de privacidad reencuadrada ("no se guarda la imagen" como decisión de diseño, no como limitación). Deliberadamente **sin** botón "Ver comprobante" — el sistema no persiste la imagen original del comprobante, solo el JSON del análisis.
 
