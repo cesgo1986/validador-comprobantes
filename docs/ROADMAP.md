@@ -173,20 +173,23 @@ Ver `DECISION_LOG.md`, ADR "Externalización de servicios transversales (Cache y
 
 **Por qué se separó en dos servicios en vez de implementarlo dentro de `cep_xml_auto_service.py`:** Historial, Dashboard Empresa, validación por QR/XML manual y el futuro Motor de Presentación (Etapa 5) también van a necesitar cachear y medir. Hacerlo genérico desde ahora evita terminar con `_METRICAS_OCR`, `_METRICAS_XML`, `_METRICAS_HISTORIAL` dispersas sin una interfaz común.
 
-### 1.6 — Observabilidad (pendiente)
-- Porcentaje de XML descargados automáticamente vs. fallidos
-- Tiempo promedio de análisis completo
-- Causas más frecuentes de fallo en la descarga del XML
-- OCR promedio y distribución de scores por banco
-- Errores de scraping del CEP HTML
+### 1.6 — Observabilidad ✅ (completado y desplegado)
+- Porcentaje de XML descargados automáticamente vs. fallidos → `GET /api/v1/dashboard/metricas/xml` (1.5)
+- Tiempo promedio de análisis completo → `GET /api/v1/dashboard/metricas/analizar`
+- Causas más frecuentes de fallo en la descarga del XML → campo `eventos` de `/metricas/xml` (`xml_no_encontrado`, `xml_con_error`)
+- OCR promedio y distribución de scores por banco → `GET /api/v1/dashboard/metricas/scores-por-banco` (consulta a base de datos, histórico completo; usa `score_claude` como señal de riesgo documental, no como confianza de OCR — ver nota en `dashboard_service.py`)
+- Errores de scraping del CEP HTML → `GET /api/v1/dashboard/metricas/cep` (`cep_no_existe`, `cep_timeout`, `cep_error`, etc.)
+
+## ✅ Etapa 1 — Cierre funcional del MVP Beta: COMPLETA (2026-07)
 
 ### Entregables de cierre de Etapa 1 (Sprint A-Final)
-- Mensajes contextuales para los 9 estados SPEI, cada uno respondiendo "¿entrego o no?"
-- Comparación XML campo a campo visible en la UI
-- "¿Cómo se llegó a este resultado?" implementado como patrón visual embebido en `/resultado`
-- Fuentes de validación refinadas
-- Casos de intermitencia de Banxico claramente explicados en la UI
-- Estados "No encontrada", "En proceso", "Devuelta", "Rechazada" y "Cancelada" completamente diseñados
+- ✅ Mensajes contextuales para los 9 estados SPEI, cada uno respondiendo "¿entrego o no?"
+- ✅ Comparación XML campo a campo visible en la UI
+- ✅ "¿Cómo se llegó a este resultado?" implementado como patrón visual embebido en `/resultado`, con jerarquía de divulgación progresiva
+- ✅ Fuentes de validación refinadas
+- ✅ Observabilidad básica (XML, CEP, análisis completo, scores por banco)
+- ✅ Estados "Acreditada", "Liquidada", "En proceso", "Devuelta", "En devolución", "Rechazada", "Cancelada", "No liquidada" y "Desconocida" completamente diseñados (catálogo completo, ver ítem 1.2)
+- 🟡 Casos de intermitencia del portal de Banxico (mantenimiento, caída temporal): cubiertos de forma general por el mensaje del estado `desconocida`, pero no se diseñó un tratamiento visual específico distinto para "Banxico no disponible ahora mismo" vs. "no se pudo determinar el estado" por otras razones. Ajuste menor, no bloqueante — candidato para revisar durante la Beta si se observa confusión real de usuarios.
 
 Con esto cerrado, esta parte del producto se congela — no se vuelve a tocar `/resultado` salvo bugs — y el foco se mueve por completo a valor empresarial (Etapas 2-4).
 

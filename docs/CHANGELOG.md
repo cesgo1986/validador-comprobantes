@@ -6,6 +6,20 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.13.0] — 2026-07 — ✅ Etapa 1 (MVP Beta, experiencia de resultados) completa
+
+### Desplegado en producción
+- `main.py`: `verify_cep()` y el endpoint `/analizar` instrumentados con `metrics_service` (namespaces `"cep"` y `"analizar"`).
+- `services/dashboard_service.py`: nueva función `distribucion_scores_por_banco()`.
+- Tres endpoints nuevos: `GET /api/v1/dashboard/metricas/cep`, `GET /api/v1/dashboard/metricas/analizar`, `GET /api/v1/dashboard/metricas/scores-por-banco`.
+
+### Cerrado
+- `ROADMAP.md`: ítem **1.6** (Observabilidad) pasa a ✅. Con esto, **la Etapa 1 completa queda cerrada** — los 6 ítems (1.1 a 1.6) están en producción.
+
+Sube a versión MINOR (no PATCH) porque marca el cierre de una etapa completa del roadmap, no un ajuste incremental. A partir de esta versión, `/resultado` se congela salvo bugs, y el desarrollo se mueve a la Etapa 2 (Historial real).
+
+---
+
 ## [0.12.5] — 2026-07 — 1.5 cerrado: cache, métricas y reintentos desplegados
 
 ### Desplegado en producción
