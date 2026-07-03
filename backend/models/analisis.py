@@ -12,7 +12,13 @@ campos_planos, sin logica de extraccion nueva.
 estado_operacion, fuente_estado y nivel_evidencia (Motor 1, Estado SPEI)
 se desnormalizaron en 2026-07 -- ver DECISION_LOG.md, ADR "se
 desnormaliza estado_operacion, fuente_estado y nivel_evidencia en la
-tabla analisis". Historial es el primer consumidor fuera de /resultado.
+tabla analisis".
+
+clave_rastreo, referencia y tipo_transferencia se agregaron en 2026-07
+(item 2.2, Etapa 2) -- ver DECISION_LOG.md, ADR "los campos utilizados
+para busqueda, correlacion o analitica deben existir como columnas
+desnormalizadas". tipo_transferencia esta sembrada sin uso activo
+todavia (siempre 'SPEI' hoy).
 """
 import datetime
 import uuid
@@ -39,11 +45,16 @@ class Analisis(Base):
 
     # Motor 1 -- Estado SPEI (fuente: Banxico), desnormalizado 2026-07.
     # Nunca se escriben desde el Motor 2 (analisis documental) -- ver
-    # MOTOR_DECISIONES.md. Se persisten con los mismos valores que ya
-    # calcula scoring_v3.py durante el analisis, sin logica nueva aqui.
+    # MOTOR_DECISIONES.md.
     estado_operacion: Mapped[str] = mapped_column(String(32), nullable=True, index=True)
     fuente_estado: Mapped[str] = mapped_column(String(32), nullable=True)
     nivel_evidencia: Mapped[str] = mapped_column(String(32), nullable=True)
+
+    # Identificadores de la operacion -- desnormalizados 2026-07 (item 2.2)
+    # para busqueda unificada del Historial sin depender del JSONB.
+    clave_rastreo: Mapped[str] = mapped_column(String(64), nullable=True, index=True)
+    referencia: Mapped[str] = mapped_column(String(64), nullable=True, index=True)
+    tipo_transferencia: Mapped[str] = mapped_column(String(20), nullable=True)  # sembrada -- hoy siempre 'SPEI'
 
     # Columnas desnormalizadas para filtros rapidos sin abrir el JSONB.
     archivo_nombre: Mapped[str] = mapped_column(String(255), nullable=True)

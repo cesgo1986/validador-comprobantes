@@ -1034,6 +1034,8 @@ async def analizar(
             estado_operacion=result.get("estado_operacion"),
             fuente_estado=result.get("fuente_estado"),
             nivel_evidencia=result.get("nivel_evidencia"),
+            clave_rastreo=campos_planos.get("clave_rastreo") or None,
+            referencia=campos_planos.get("referencia") or None,
         )
         if audit_id:
             result["audit_id"] = audit_id
@@ -1079,11 +1081,12 @@ def dashboard_listar_analisis(
     banco: str | None = Query(default=None),
     fecha_desde: str | None = Query(default=None),
     fecha_hasta: str | None = Query(default=None),
+    q: str | None = Query(default=None, description="Búsqueda unificada: banco, clave de rastreo, referencia, CLABE o monto"),
 ):
     return dashboard_service.listar_analisis(
         empresa_id=empresa_id, limit=limit, offset=offset, riesgo=riesgo,
         estado_operacion=estado_operacion, hash_sha256=hash_sha256,
-        banco=banco, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
+        banco=banco, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta, q=q,
     )
 
 

@@ -6,9 +6,14 @@ desnormalizadas (archivo_nombre, monto_detectado, banco_detectado, etc.)
 que permiten filtros rapidos en el dashboard sin abrir el JSONB.
 
 estado_operacion, fuente_estado y nivel_evidencia se agregaron en
-2026-07 (ver DECISION_LOG.md, ADR de desnormalizacion de Estado SPEI) --
-mismos valores que main.py ya calcula via scoring_v3.py, sin logica de
-extraccion nueva.
+2026-07 (ver DECISION_LOG.md, ADR de desnormalizacion de Estado SPEI).
+
+clave_rastreo, referencia y tipo_transferencia se agregaron en 2026-07
+(item 2.2, Etapa 2) -- ver DECISION_LOG.md, ADR de columnas
+desnormalizadas para busqueda/correlacion/analitica. tipo_transferencia
+tiene default 'SPEI' porque hoy es el unico valor real posible -- no es
+un dato inventado, es simplemente el tipo de transferencia que
+VerificaPago analiza actualmente.
 
 Degrada con gracia si DATABASE_URL no esta configurada.
 """
@@ -34,6 +39,9 @@ def guardar_analisis(
     estado_operacion: str | None = None,
     fuente_estado: str | None = None,
     nivel_evidencia: str | None = None,
+    clave_rastreo: str | None = None,
+    referencia: str | None = None,
+    tipo_transferencia: str = "SPEI",
 ) -> str | None:
     """
     Inserta un registro de auditoria. Devuelve el id (UUID como string)
@@ -55,6 +63,9 @@ def guardar_analisis(
             estado_operacion=estado_operacion,
             fuente_estado=fuente_estado,
             nivel_evidencia=nivel_evidencia,
+            clave_rastreo=clave_rastreo,
+            referencia=referencia,
+            tipo_transferencia=tipo_transferencia,
             archivo_nombre=archivo_nombre,
             archivo_tipo=archivo_tipo,
             monto_detectado=monto_detectado,
