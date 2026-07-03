@@ -6,6 +6,45 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.13.4] — 2026-07 — 2.1 cerrado: Historial desplegado con divulgación progresiva
+
+### Desplegado en producción
+- Migración de Alembic aplicada en Render (`estado_operacion`, `fuente_estado`, `nivel_evidencia` en `analisis`).
+- `app/lib/estadoSpei.ts` y `app/historial/page.tsx` desplegados en Vercel — Historial funcional, verificado con análisis reales mostrando el semáforo SPEI como protagonista.
+
+### Cerrado
+- `ROADMAP.md`: ítem **2.1** (Etapa 2) pasa a ✅. Nota registrada: análisis previos a la migración muestran `estado_operacion: null` (sin backfill retroactivo) — no bloqueante.
+
+---
+
+## [0.13.3] — 2026-07 — Etapa 2, 2.1: desnormalización de Estado SPEI + Historial con divulgación progresiva — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar — incluye migración de base de datos)
+- Nueva migración de Alembic: `estado_operacion`, `fuente_estado`, `nivel_evidencia` como columnas desnormalizadas en `analisis` (índice en `estado_operacion`).
+- `models/analisis.py`, `services/auditoria_service.py`, `main.py`: actualizados para persistir los 3 campos nuevos (ya se calculaban en `/analizar`, sin lógica de extracción nueva).
+- `services/dashboard_service.py`: `listar_analisis()` y `obtener_analisis_detalle()` devuelven `estado_operacion`/`fuente_estado`/`nivel_evidencia`; `listar_analisis()` agrega filtro `estado_operacion` y `veces_visto` (vía join con `hashes_documentos`).
+- `main.py`: endpoint `/api/v1/dashboard/analisis` con el filtro `estado_operacion` nuevo.
+- `app/lib/estadoSpei.ts` (nuevo): espejo en frontend de `SEMAFORO_SPEI` (backend), única fuente de verdad para pintar el estado SPEI fuera de `/resultado`.
+- `app/historial/page.tsx`: reescrito con divulgación progresiva (ver ADR) — Nivel 1: búsqueda simple + lista cronológica agrupada por día, coloreada/etiquetada por `estado_operacion` (Motor 1); Nivel 2+: filtros avanzados (riesgo documental, fecha, hash) y "Resumen de actividad", colapsados por defecto.
+
+### Documentado
+- `ARQUITECTURA.md`, `API.md`: esquema de `analisis` y forma de `/api/v1/dashboard/analisis` actualizados con los campos nuevos.
+
+---
+
+## [0.13.2] — 2026-07 — Etapa 2 en marcha: 2.1 (Historial, lista con filtros) — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `app/historial/page.tsx`: implementación completa de la lista de análisis — estadísticas resumidas (total, hoy, reutilizados), filtros por riesgo/banco/rango de fechas, paginación ("cargar más"), estados vacío/error.
+- `services/dashboard_service.py`: `listar_analisis()` extendida con filtros `banco` (búsqueda parcial) y `fecha_desde`/`fecha_hasta` — antes solo soportaba `riesgo` y `hash_sha256`.
+- `main.py`: endpoint `GET /api/v1/dashboard/analisis` extendido con los mismos filtros nuevos.
+
+### Corregido
+- `API.md`: el campo de fecha en `/api/v1/dashboard/analisis` se documentaba como `created_at`; el código real (`dashboard_service.py`) siempre devolvió `fecha`. Se corrige la documentación para que coincida con el código, no al revés.
+- `API.md`: se agregan los 4 endpoints de métricas de la Etapa 1 (`/metricas/xml`, `/metricas/cep`, `/metricas/analizar`, `/metricas/scores-por-banco`) que quedaron implementados en producción pero nunca documentados aquí.
+
+---
+
 ## [0.13.1] — 2026-07 — Fix: recomendación legacy contradecía el estado SPEI confirmado
 
 ### Corregido (pendiente de deploy)

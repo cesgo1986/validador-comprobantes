@@ -208,6 +208,10 @@ Funcionalidades:
 - Exportación de historial
 - Métricas agregadas visibles para el usuario, ej.: total de análisis, % exitosos, % rechazados, posibles alteraciones detectadas, documentos reutilizados, no encontrados
 
+**2.1 — Lista con filtros ✅ (completado y desplegado, 2026-07):** diseño con divulgación progresiva (ver `DECISION_LOG.md`) — Nivel 1: búsqueda simple + lista cronológica agrupada por día, coloreada/etiquetada por `estado_operacion` (Motor 1, no `riesgo`). Nivel 2+: filtros avanzados (riesgo, fecha, hash) y "Resumen de actividad", colapsados por defecto. Incluyó migración de `estado_operacion`/`fuente_estado`/`nivel_evidencia` en la tabla `analisis` (ver ADR en `DECISION_LOG.md`). Nota: los análisis anteriores a la migración muestran `estado_operacion: null` — la columna se agregó vacía, sin backfill retroactivo del JSONB histórico. Pendiente evaluar si vale la pena un script de backfill más adelante; no bloquea el uso normal.
+
+**Evolución futura — Historial Inteligente (visión, sin sprint asignado):** el Historial evolucionará hacia un Historial Inteligente capaz de identificar patrones por emisor, beneficiario, cuenta, CLABE, banco, dispositivo y comportamiento histórico — es decir, no buscar comprobantes, sino buscar comportamiento. Esta evolución se considerará cuando exista suficiente información estadística proveniente de la Beta. No es un compromiso de roadmap ni tiene fecha — queda anotada aquí para no perderse cuando llegue el momento de evaluarla.
+
 ---
 
 ## Etapa 3 — Alertas inteligentes
