@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { getSemaforoSpei } from "../lib/estadoSpei";
 
 const TEAL = "#00BFA5";
@@ -81,6 +82,8 @@ function formatearMonto(monto: number | null): string {
 }
 
 export default function Historial() {
+  const router = useRouter();
+
   const [items, setItems] = useState<AnalisisItem[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -281,7 +284,8 @@ export default function Historial() {
             {itemsDelDia.map(item => {
               const spei = getSemaforoSpei(item.estado_operacion);
               return (
-                <div key={item.id} style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                <div key={item.id} onClick={() => router.push(`/historial/${item.id}`)}
+                  style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
                   <span style={{ fontSize: 18, flexShrink: 0 }}>{spei.icono}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: spei.color }}>
