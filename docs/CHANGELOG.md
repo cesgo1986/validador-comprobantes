@@ -6,6 +6,20 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.12.2] — 2026-07 — 1.2 y 1.4 cerrados: flujo de decisión + jerarquía de divulgación progresiva en producción
+
+### Desplegado en producción
+- `app/resultado/page.tsx`: rediseño de jerarquía de información. Nivel 1 (fijo, ~5 seg): ① Resultado + ②③④ "¿Qué significa esto?" (Interpretación/Impacto/Recomendación inmediata) — responde únicamente "¿puedo entregar o no?". Nivel 2+ (expandible bajo demanda, un solo botón "Ver detalles del análisis"): integridad documental, reutilización del documento, evidencias, las 4 dimensiones, diagnóstico técnico.
+- Corrección de redacción: el mensaje de integridad documental ahora contextualiza primero el estado SPEI favorable ("La operación sí fue validada por Banxico...") antes de mostrar una observación, para no inducir una lectura contraria a la conclusión real cuando SPEI e integridad documental discrepan.
+
+### Cerrado
+- `ROADMAP.md`: ítems **1.2** (catálogo de 9 mensajes contextuales) y **1.4** (flujo de decisión explicable) de la Etapa 1 pasan a ✅ completados y desplegados.
+
+### Documentado (sin cambios adicionales de código)
+- `ROADMAP.md`: la secuencia del Sprint A-Final se actualiza — quedan pendientes únicamente 1.3 (evidencia XML campo a campo), 1.5 (arquitectura XML backend) y 1.6 (observabilidad) para cerrar el MVP Beta.
+
+---
+
 ## [0.12.1] — 2026-07 — Código: flujo de decisión desplegado; fix de falso positivo BBVA (monto negativo)
 
 ### Desplegado en producción
