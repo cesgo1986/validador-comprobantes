@@ -221,6 +221,16 @@ Lista paginada de análisis realizados.
 
 ---
 
+## GET /api/v1/dashboard/analisis/exportar
+
+Exporta a CSV todos los análisis que coinciden con los filtros activos — Etapa 2, ítem 2.4. Mismos parámetros que `/api/v1/dashboard/analisis` **sin** `limit`/`offset`: devuelve todo lo que coincide (hasta un límite de seguridad interno de 5000 filas), no solo una página.
+
+**Query params:** `empresa_id`, `riesgo`, `estado_operacion`, `hash_sha256`, `banco`, `fecha_desde`, `fecha_hasta`, `q` (búsqueda unificada, igual que en `/analisis`)
+
+**Respuesta:** `text/csv`, con `Content-Disposition: attachment; filename=historial_verificapago_<fecha>.csv`. Columnas: Fecha, Banco, Monto, Estado SPEI (etiqueta legible vía `SEMAFORO_SPEI`, no el valor crudo del enum), Riesgo documental, Clave de rastreo, Referencia, Hash, Veces analizado.
+
+---
+
 ## GET /api/v1/dashboard/analisis/{analisis_id}
 
 Detalle completo de un análisis, incluyendo el resultado JSON original y el historial del hash.
