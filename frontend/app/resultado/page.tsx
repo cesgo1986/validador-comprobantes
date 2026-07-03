@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAnalisis, EstadoOperacion } from "../context/AnalisisContext";
+import { getMensajeContextual } from "./mensajesContextuales";
 
 const TEAL = "#00BFA5";
 const GREEN = "#43A047";
@@ -18,10 +19,15 @@ function dimensionColor(score: number): string {
 // Deliberadamente NO es un promedio ni una fórmula numérica de las 3
 // dimensiones -- promediar "confianza documental" + "verificabilidad" +
 // "contexto temporal" reintroduce exactamente el problema que separamos
-// al construir el scoring v3 (un documento consistente sin rastro externo
-// terminaría viéndose "mal" en un número único, cuando el problema real
-// es solo ausencia de evidencia, no fraude). En su lugar, son reglas
-// explícitas sobre los valores ya calculados por el backend.
+// al construir el scoring v3. En su lugar, son reglas explícitas sobre
+// los valores ya calculados por el backend.
+//
+// ── Flujo de decisión (MODELO_DECISION_EXPLICABLE.md, 5 capas) ──────────
+// ① Resultado (el semáforo de abajo) → ② Interpretación → ③ Impacto →
+// ④ Recomendación inmediata (opcional) → ⑤ Evidencias (fuentes de
+// validación) → ⑥ Detalle (botón "Ver detalles", ruta /resultado/detalle).
+// Impacto y Recomendación son capas distintas — Recomendación solo
+// aparece cuando agrega una acción concreta más allá del Impacto.
 export default function Resultado() {
   const router = useRouter();
   const { result, file } = useAnalisis();
@@ -32,6 +38,8 @@ export default function Resultado() {
   }, [result, router]);
 
   if (!result) return null;
+
+  const mensaje = getMensajeContextual(result.estado_operacion);
 
   const descargarReporte = () => {
     const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
@@ -58,7 +66,7 @@ export default function Resultado() {
           </div>
         </div>
 
-        {/* ── Motor 1: Estado SPEI — único semáforo, protagonista ────────────── */}
+        {/* ── ① Resultado — Motor 1: Estado SPEI, único semáforo, protagonista ── */}
         {(() => {
           const spei = result.semaforo_spei;
           const colorSpei = spei?.color === "verde" ? GREEN
@@ -72,11 +80,8 @@ export default function Resultado() {
             ? "Banxico — CEP"
             : "No verificado con Banxico";
 
-          // Integridad documental: lógica de color revisada.
-          // Rojo solo cuando hay evidencia acumulada fuerte (confianza < 30 O
-          // discrepancia en XML). Ámbar para el caso intermedio habitual.
-          // Esto evita que un usuario vea "🟢 Liquidada + 🔴 Posible alteración"
-          // y concluya que la transferencia no ocurrió.
+          // Integridad documental: rojo solo con evidencia acumulada fuerte
+          // (confianza < 30 O discrepancia en XML). Ver DECISION_LOG.md.
           const integ = result.integridad_config;
           const tieneXmlDiscrepante = (result as {cep_xml?: {comparacion_campos?: {discrepancias?: number}}}).cep_xml?.comparacion_campos?.discrepancias ?? 0 > 0;
           const esCasoExtremo = result.confianza_documental < 30 || tieneXmlDiscrepante;
@@ -87,7 +92,6 @@ export default function Resultado() {
             : integ?.color === "rojo" || integ?.color === "naranja" ? "#EAB308"
             : "#9CA3AF";
 
-          // Subtexto explicativo según el estado de integridad
           const integSubtexto = result.integridad_comprobante === "sin_observaciones"
             ? "El comprobante es visualmente consistente."
             : result.integridad_comprobante === "con_observaciones"
@@ -96,25 +100,12 @@ export default function Resultado() {
             ? "Se detectaron diferencias relevantes respecto al comprobante presentado."
             : "Se detectaron diferencias respecto al comprobante presentado.";
 
-          // Fuentes de validación disponibles
-          const fuentes: string[] = [];
-          if (result.nivel_evidencia === "xml_oficial" || result.nivel_evidencia === "cep_html") {
-            fuentes.push("Estado SPEI");
-          }
-          if (result.nivel_evidencia === "xml_oficial") {
-            fuentes.push("XML oficial CEP");
-            fuentes.push("Comparación de campos");
-          }
-
           return (
             <div style={{ padding: "24px 22px 0" }}>
-
-              {/* Label */}
               <div style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>
                 Estado de la transferencia (SPEI)
               </div>
 
-              {/* Semáforo SPEI — centrado, protagonista */}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 20 }}>
                 <div style={{ position: "relative", width: 80, height: 80, marginBottom: 12 }}>
                   <svg width="80" height="80" viewBox="0 0 80 80">
@@ -131,10 +122,8 @@ export default function Resultado() {
                 <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500 }}>{fuenteLabel}</div>
               </div>
 
-              {/* Separador */}
               <div style={{ height: 1, background: "#F0F4F8", marginBottom: 16 }} />
 
-              {/* Motor 2: Integridad documental — en 2 líneas, sin semáforo */}
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
                   Integridad del comprobante
@@ -146,39 +135,67 @@ export default function Resultado() {
                 <div style={{ fontSize: 11, color: "#94A3B8", lineHeight: 1.5 }}>{integSubtexto}</div>
               </div>
 
-              {/* Fuentes de validación */}
-              {fuentes.length > 0 && (
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 10, color: "#CBD5E1", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-                    Fuentes de validación
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    {fuentes.map(f => (
-                      <div key={f} style={{ fontSize: 11, color: "#64748B", display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ color: GREEN, fontWeight: 700, fontSize: 12 }}>✓</span> {f}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Aviso de reutilización — después de fuentes, antes del diagnóstico */}
               {result.documento_reutilizado && (
                 <div style={{ padding: "10px 14px", background: `${ORANGE}12`, border: `1px solid ${ORANGE}40`, borderRadius: 10, fontSize: 12, color: "#7C4A0A", lineHeight: 1.5, marginBottom: 16 }}>
                   ⚠️ Este comprobante exacto ya fue analizado antes (visto {result.veces_visto} veces).
                 </div>
               )}
 
-              {/* Separador antes del diagnóstico */}
               <div style={{ height: 1, background: "#F0F4F8" }} />
             </div>
           );
         })()}
 
-        {/* Diagnóstico detallado — colapsable */}
+        {/* ── ②③④ Interpretación / Impacto / Recomendación inmediata ────────── */}
+        <div style={{ padding: "20px 22px 4px" }}>
+          <div style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
+            ¿Qué significa esto?
+          </div>
+          <p style={{ fontSize: 14, color: "#334155", lineHeight: 1.6, marginBottom: 12 }}>
+            {mensaje.interpretacion}
+          </p>
+          <p style={{ fontSize: 14, color: "#1E293B", fontWeight: 600, lineHeight: 1.6, marginBottom: mensaje.recomendacion ? 12 : 0 }}>
+            {mensaje.impacto}
+          </p>
+          {mensaje.recomendacion && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: `${TEAL}10`, border: `1px solid ${TEAL}30`, borderRadius: 10 }}>
+              <span style={{ fontSize: 13 }}>👉</span>
+              <span style={{ fontSize: 13, color: "#0F766E", fontWeight: 600 }}>{mensaje.recomendacion}</span>
+            </div>
+          )}
+        </div>
+
+        {/* ── ⑤ Evidencias — "¿Cómo se llegó a este resultado?" ─────────────── */}
+        {(() => {
+          const fuentes: string[] = [];
+          if (result.nivel_evidencia === "xml_oficial" || result.nivel_evidencia === "cep_html") {
+            fuentes.push("Estado SPEI");
+          }
+          if (result.nivel_evidencia === "xml_oficial") {
+            fuentes.push("XML oficial CEP");
+            fuentes.push("Comparación de campos");
+          }
+          if (fuentes.length === 0) return null;
+          return (
+            <div style={{ padding: "16px 22px 4px" }}>
+              <div style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
+                ¿Cómo se llegó a este resultado?
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {fuentes.map(f => (
+                  <div key={f} style={{ fontSize: 12, color: "#64748B", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ color: GREEN, fontWeight: 700, fontSize: 13 }}>✓</span> {f}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Diagnóstico técnico adicional — colapsable, para quien quiere el detalle crudo del backend */}
         <button onClick={() => setDiagnosticoAbierto(o => !o)}
-          style={{ width: "100%", padding: "14px 22px", display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
-          <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#334155" }}>Diagnóstico detallado</span>
+          style={{ width: "100%", padding: "14px 22px", display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", textAlign: "left", marginTop: 8 }}>
+          <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#334155" }}>Diagnóstico técnico</span>
           <span style={{ color: "#CBD5E1", fontSize: 14 }}>{diagnosticoAbierto ? "▲" : "▼"}</span>
         </button>
         {diagnosticoAbierto && (
@@ -207,7 +224,7 @@ export default function Resultado() {
           </div>
         )}
 
-        {/* Botones */}
+        {/* ── ⑥ Detalle ────────────────────────────────────────────────────── */}
         <div style={{ padding: "8px 22px 22px", display: "flex", flexDirection: "column", gap: 10 }}>
           <button onClick={() => router.push("/resultado/detalle")}
             style={{ width: "100%", padding: 14, fontSize: 14, fontWeight: 700, borderRadius: 12, cursor: "pointer", background: "#F1F5F9", color: "#334155", border: "none" }}>
