@@ -100,14 +100,6 @@ export default function Detalle() {
         })}
       </div>
 
-      {result.recomendacion && (
-        <div style={{ marginTop: 14, background: "#fff", borderRadius: 16, padding: "16px 18px" }}>
-          <div style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Recomendación</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: ORANGE, marginBottom: 4 }}>Revisar manualmente</div>
-          <div style={{ fontSize: 13, color: "#64748B", lineHeight: 1.6 }}>{result.recomendacion}</div>
-        </div>
-      )}
-
       <button onClick={() => router.push("/resultado/comprobante")}
         style={{ marginTop: 14, width: "100%", padding: 15, fontSize: 15, fontWeight: 700, borderRadius: 14, cursor: "pointer", background: TEAL, color: "#fff", border: "none" }}>
         Siguiente →
