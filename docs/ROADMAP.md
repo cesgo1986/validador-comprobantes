@@ -62,7 +62,7 @@ Este es el hallazgo clave de la revisión de 2026-07: lo que falta en la Etapa 1
    ↓
 1.2 ✅ Mensajes contextuales escritos usando ese flujo (cerrado — desplegados junto con 1.4)
    ↓
-1.3  Completar la evidencia XML (desglose campo a campo)
+1.3 ✅ Comparación XML campo a campo (cerrado)
    ↓
 1.5  Robustecer la arquitectura XML backend
    ↓
@@ -138,15 +138,8 @@ Cada uno de los 9 estados se redacta siguiendo el flujo de decisión completo (R
 
 Este es probablemente el estado que más aparecerá durante la Beta — es el que recibe más cuidado de redacción porque es donde más fácil es que alguien tome una mala decisión: ni afirma que la transferencia es falsa, ni que es válida, solo orienta.
 
-### 1.3 — Comparación XML en la UI (parcialmente construido — incluido en Sprint A-Final)
-`app/resultado/detalle/page.tsx` ya existe y agrupa `result.validaciones` por categoría (`cep`, `estructural`, `visual`, `temporal`, `contextual`, `semantica`, `reputacion`, `historial`) en acordeones colapsables con estado ok/warn/fail. Esto cubre "fuentes de validación refinadas" en términos generales, pero **no** es todavía el desglose campo a campo que pide este ítem — hoy la categoría `cep` se renderiza como los ítems que el backend meta en `validaciones` (según `API.md`, un único ítem "CEP Banxico - Verificación SPEI"), no como una lista campo por campo de `cep_xml.comparacion_campos`. Falta:
-- ✓ Monto coincide
-- ✓ Banco receptor coincide
-- ✓ Cuenta destino coincide
-- ✓ Clave de rastreo coincide
-- ⚠ Discrepancias explícitas cuando existan (ej. "Banco destino diferente")
-
-El backend ya calcula todo esto (`cep_xml.comparacion_campos.comparaciones`, ver `API.md`) — es trabajo puramente de frontend: mapear esos campos a entradas individuales dentro del grupo `cep`, o a una sección propia. Se prioriza en este sprint porque genera confianza inmediata y el costo de cerrarlo es bajo (el dato ya existe). Corresponde al paso ⑤ Detalle del flujo de decisión de 1.4.
+### 1.3 — Comparación XML en la UI ✅ (completado y desplegado)
+`main.py` ahora genera una entrada de `validaciones` (categoría `cep_xml`) por cada campo comparado — `monto`, `fecha`, `clave_rastreo`, `banco_destino`, `cuenta_destino_ultimos_digitos` — en vez del mensaje agregado único que había antes. `app/resultado/detalle/page.tsx` mapea `cep_xml` a "Comparación XML oficial (Banxico)" como grupo propio, justo después de `cep` en el orden de prioridad. El backend ya calculaba esto (`cep_xml.comparacion_campos.comparaciones`, ver `API.md`) — el cambio fue exclusivamente de presentación: desglosar en vez de agregar. El campo `fecha` se reporta como `status: "info"` (no ok/fail) porque su comparación es intencionalmente no concluyente por formato variable entre bancos (ver `cep_xml_service.py`).
 
 ### 1.4 — El flujo de decisión explicable (antes "Centro de Estado" / "Evidencia de la decisión" / "¿Cómo se llegó a este resultado?") ✅ (completado y desplegado)
 Ver `DECISION_LOG.md`, entradas "'Evidencia de la decisión' se renombra a '¿Cómo se llegó a este resultado?'...", "Refinamiento: de las 4 preguntas al flujo de decisión de 5 pasos" y "🏛️ ADR: se formaliza la capa de Recomendación, distinta de Impacto" (2026-07). Es un **patrón visual reutilizable**, no una pantalla nueva, gobernado por una regla de producto: toda conclusión de VerificaPago debe poder justificarse con al menos una evidencia verificable, y nunca debe inducir a una acción cuando la evidencia todavía no lo permite.

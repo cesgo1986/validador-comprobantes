@@ -6,6 +6,17 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.12.3] — 2026-07 — 1.3 cerrado: desglose campo a campo de la comparación XML
+
+### Desplegado en producción
+- `main.py`: la comparación XML vs. comprobante ahora genera una entrada de `validaciones` individual por campo (`monto`, `fecha`, `clave_rastreo`, `banco_destino`, `cuenta_destino_ultimos_digitos`), categoría `cep_xml`, en vez de un mensaje agregado único.
+- `app/resultado/detalle/page.tsx`: nueva categoría `cep_xml` mapeada a "Comparación XML oficial (Banxico)", ordenada justo después de `cep`.
+
+### Cerrado
+- `ROADMAP.md`: ítem **1.3** de la Etapa 1 pasa a ✅ completado y desplegado. Con esto, 1.1, 1.2, 1.3 y 1.4 de la Etapa 1 quedan cerrados — solo faltan 1.5 (arquitectura XML backend) y 1.6 (observabilidad) para cerrar el MVP Beta.
+
+---
+
 ## [0.12.2] — 2026-07 — 1.2 y 1.4 cerrados: flujo de decisión + jerarquía de divulgación progresiva en producción
 
 ### Desplegado en producción
