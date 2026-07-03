@@ -1,4 +1,7 @@
 import json
+import csv
+import io
+from fastapi.responses import StreamingResponse
 import base64
 import datetime
 import re
@@ -1100,6 +1103,68 @@ def dashboard_detalle_analisis(
         raise HTTPException(status_code=404, detail="Analisis no encontrado")
     return detalle
 
+@dashboard_router.get("/analisis/exportar")
+def dashboard_exportar_analisis(
+    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    riesgo: str | None = Query(default=None),
+    estado_operacion: str | None = Query(default=None),
+    hash_sha256: str | None = Query(default=None),
+    banco: str | None = Query(default=None),
+    fecha_desde: str | None = Query(default=None),
+    fecha_hasta: str | None = Query(default=None),
+    q: str | None = Query(default=None),
+):
+    """
+    Item 2.4 (ROADMAP.md, Etapa 2): exporta a CSV todos los análisis que
+    coinciden con los filtros activos -- mismos parámetros que
+    /api/v1/dashboard/analisis, pero sin paginación (hasta el límite de
+    seguridad interno de exportar_analisis()). Devuelve exactamente lo
+    que el usuario ve filtrado en el Historial, no solo la página cargada.
+ 
+    Las etiquetas de estado_operacion se traducen a texto legible
+    (Liquidada, En proceso, etc.) usando SEMAFORO_SPEI -- mismo mapeo que
+    usa el resto del producto, para que el CSV hable el mismo idioma que
+    la app.
+    """
+    items = dashboard_service.exportar_analisis(
+        empresa_id=empresa_id, riesgo=riesgo, estado_operacion=estado_operacion,
+        hash_sha256=hash_sha256, banco=banco, fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta, q=q,
+    )
+ 
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow([
+        "Fecha", "Banco", "Monto", "Estado SPEI", "Riesgo documental",
+        "Clave de rastreo", "Referencia", "Hash", "Veces analizado",
+    ])
+    for item in items:
+        estado_enum = None
+        try:
+            estado_enum = EstadoOperacion(item["estado_operacion"]) if item["estado_operacion"] else None
+        except ValueError:
+            estado_enum = None
+        etiqueta_estado = SEMAFORO_SPEI.get(estado_enum, {}).get("etiqueta", item["estado_operacion"] or "—") if estado_enum else "—"
+ 
+        writer.writerow([
+            item["fecha"],
+            item["banco_detectado"],
+            item["monto_detectado"] if item["monto_detectado"] is not None else "",
+            etiqueta_estado,
+            item["riesgo"],
+            item["clave_rastreo"],
+            item["referencia"],
+            item["hash_sha256"],
+            item["veces_visto"],
+        ])
+ 
+    buffer.seek(0)
+    fecha_archivo = datetime.date.today().isoformat()
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=historial_verificapago_{fecha_archivo}.csv"},
+    )
 
 @dashboard_router.get("/hashes")
 def dashboard_top_hashes(

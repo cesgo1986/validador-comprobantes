@@ -89,6 +89,53 @@ def _parsear_monto_busqueda(texto: str) -> float | None:
         return None
 
 
+def _construir_filtros_analisis(
+    empresa_id: str,
+    riesgo: str | None = None,
+    estado_operacion: str | None = None,
+    hash_sha256: str | None = None,
+    banco: str | None = None,
+    fecha_desde: str | None = None,
+    fecha_hasta: str | None = None,
+    q: str | None = None,
+) -> list:
+    """
+    Construye la lista de condiciones WHERE compartida entre listar_analisis()
+    y exportar_analisis() (item 2.4) -- evita mantener la misma lógica de
+    filtros duplicada en dos funciones que deben comportarse idéntico
+    (si no, la exportación podría no coincidir con lo que el usuario ve
+    filtrado en pantalla, que sería un bug de confianza grave).
+    """
+    filtros = [Analisis.empresa_id == empresa_id, Analisis.deleted_at.is_(None)]
+    if riesgo:
+        filtros.append(Analisis.riesgo == riesgo)
+    if estado_operacion:
+        filtros.append(Analisis.estado_operacion == estado_operacion)
+    if hash_sha256:
+        filtros.append(Analisis.hash_sha256 == hash_sha256)
+    if banco:
+        filtros.append(Analisis.banco_detectado.ilike(f"%{banco}%"))
+    if fecha_desde:
+        filtros.append(Analisis.fecha >= fecha_desde)
+    if fecha_hasta:
+        filtros.append(Analisis.fecha <= fecha_hasta)
+
+    if q and q.strip():
+        texto = q.strip()
+        condiciones_q = [
+            Analisis.banco_detectado.ilike(f"%{texto}%"),
+            Analisis.clave_rastreo.ilike(f"%{texto}%"),
+            Analisis.referencia.ilike(f"%{texto}%"),
+            Analisis.clabe_detectada.ilike(f"%{texto}%"),
+        ]
+        monto_interpretado = _parsear_monto_busqueda(texto)
+        if monto_interpretado is not None:
+            condiciones_q.append(Analisis.monto_detectado == monto_interpretado)
+        filtros.append(or_(*condiciones_q))
+
+    return filtros
+
+
 def listar_analisis(
     empresa_id: str = DEFAULT_EMPRESA_ID,
     limit: int = 50,
@@ -104,47 +151,16 @@ def listar_analisis(
     """
     Listado paginado de analisis, mas reciente primero.
 
-    Item 2.2 (ROADMAP.md, Etapa 2): `q` es la búsqueda unificada -- el
-    usuario escribe una sola cosa (banco, clave de rastreo, referencia,
-    CLABE, o un monto) y el backend decide dónde buscarlo, en vez de que
-    el usuario tenga que elegir el campo. Se combina con OR entre
-    banco_detectado, clave_rastreo, referencia y clabe_detectada
-    (coincidencia parcial), y adicionalmente compara contra
-    monto_detectado si el texto es interpretable como número.
-
-    `banco` se mantiene por separado como filtro exacto/avanzado --
-    no se elimina para no romper consumidores que ya lo usan.
+    Item 2.2: `q` es la búsqueda unificada (banco, clave de rastreo,
+    referencia, CLABE, o monto). Ver _construir_filtros_analisis().
     """
     with get_db_session() as db:
         if db is None:
             return {"items": [], "total": 0}
 
-        filtros = [Analisis.empresa_id == empresa_id, Analisis.deleted_at.is_(None)]
-        if riesgo:
-            filtros.append(Analisis.riesgo == riesgo)
-        if estado_operacion:
-            filtros.append(Analisis.estado_operacion == estado_operacion)
-        if hash_sha256:
-            filtros.append(Analisis.hash_sha256 == hash_sha256)
-        if banco:
-            filtros.append(Analisis.banco_detectado.ilike(f"%{banco}%"))
-        if fecha_desde:
-            filtros.append(Analisis.fecha >= fecha_desde)
-        if fecha_hasta:
-            filtros.append(Analisis.fecha <= fecha_hasta)
-
-        if q and q.strip():
-            texto = q.strip()
-            condiciones_q = [
-                Analisis.banco_detectado.ilike(f"%{texto}%"),
-                Analisis.clave_rastreo.ilike(f"%{texto}%"),
-                Analisis.referencia.ilike(f"%{texto}%"),
-                Analisis.clabe_detectada.ilike(f"%{texto}%"),
-            ]
-            monto_interpretado = _parsear_monto_busqueda(texto)
-            if monto_interpretado is not None:
-                condiciones_q.append(Analisis.monto_detectado == monto_interpretado)
-            filtros.append(or_(*condiciones_q))
+        filtros = _construir_filtros_analisis(
+            empresa_id, riesgo, estado_operacion, hash_sha256, banco, fecha_desde, fecha_hasta, q
+        )
 
         total = db.execute(select(func.count(Analisis.id)).where(*filtros)).scalar() or 0
 
@@ -184,6 +200,64 @@ def listar_analisis(
             for r, veces_visto in rows
         ]
         return {"items": items, "total": total}
+
+
+def exportar_analisis(
+    empresa_id: str = DEFAULT_EMPRESA_ID,
+    riesgo: str | None = None,
+    estado_operacion: str | None = None,
+    hash_sha256: str | None = None,
+    banco: str | None = None,
+    fecha_desde: str | None = None,
+    fecha_hasta: str | None = None,
+    q: str | None = None,
+    limite_maximo: int = 5000,
+) -> list[dict]:
+    """
+    Item 2.4 (ROADMAP.md, Etapa 2): devuelve TODOS los análisis que
+    coinciden con los filtros (no paginado, hasta `limite_maximo`), para
+    exportar exactamente lo que el usuario ve filtrado en el Historial --
+    no solo la página de 20 que tiene cargada en pantalla.
+
+    limite_maximo existe como salvaguarda de recursos (evitar que una
+    exportación sin filtros en una cuenta con cientos de miles de
+    análisis tumbe el proceso), no como límite de producto -- 5000 filas
+    ya es más de lo que cualquier persona revisa útilmente en un CSV.
+    """
+    with get_db_session() as db:
+        if db is None:
+            return []
+
+        filtros = _construir_filtros_analisis(
+            empresa_id, riesgo, estado_operacion, hash_sha256, banco, fecha_desde, fecha_hasta, q
+        )
+
+        rows = db.execute(
+            select(Analisis, HashDocumento.veces_visto)
+            .outerjoin(
+                HashDocumento,
+                (HashDocumento.hash_sha256 == Analisis.hash_sha256)
+                & (HashDocumento.empresa_id == Analisis.empresa_id),
+            )
+            .where(*filtros)
+            .order_by(desc(Analisis.fecha))
+            .limit(limite_maximo)
+        ).all()
+
+        return [
+            {
+                "fecha": r.fecha.isoformat() if r.fecha else "",
+                "banco_detectado": r.banco_detectado or "",
+                "monto_detectado": float(r.monto_detectado) if r.monto_detectado is not None else None,
+                "estado_operacion": r.estado_operacion or "",
+                "riesgo": r.riesgo or "",
+                "clave_rastreo": r.clave_rastreo or "",
+                "referencia": r.referencia or "",
+                "hash_sha256": r.hash_sha256 or "",
+                "veces_visto": veces_visto if veces_visto else 1,
+            }
+            for r, veces_visto in rows
+        ]
 
 
 def obtener_analisis_detalle(analisis_id: str, empresa_id: str = DEFAULT_EMPRESA_ID) -> dict | None:
