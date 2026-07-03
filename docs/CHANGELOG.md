@@ -6,6 +6,17 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.13.8] — 2026-07 — 2.2 cerrado: búsqueda unificada desplegada y verificada
+
+### Desplegado en producción
+- Migración de Alembic aplicada en Render (`clave_rastreo`, `referencia`, `tipo_transferencia` en `analisis`).
+- `app/historial/page.tsx`: búsqueda unificada verificada funcionando, tanto desde la app como directo contra `GET /api/v1/dashboard/analisis?q=...`.
+
+### Cerrado
+- `ROADMAP.md`: ítem **2.2** de la Etapa 2 pasa a ✅. Misma nota que 2.1: análisis previos a la migración no tienen `clave_rastreo`/`referencia` poblados — solo se encuentran por banco o monto.
+
+---
+
 ## [0.13.7] — 2026-07 — Etapa 2, 2.2: búsqueda unificada + ADR de columnas desnormalizadas — código listo, pendiente de deploy
 
 ### Agregado (código pendiente de aplicar y desplegar — incluye migración de base de datos)
