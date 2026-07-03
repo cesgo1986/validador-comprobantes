@@ -20,6 +20,7 @@ function agruparPorCategoria(validaciones: Validacion[]) {
 
 const NOMBRES_GRUPO: Record<string, string> = {
   cep: "Verificación Banxico / CEP",
+  cep_xml: "Comparación XML oficial (Banxico)",
   estructural: "Validaciones estructurales",
   visual: "Consistencia visual y OCR",
   temporal: "Validaciones temporales",
@@ -50,7 +51,7 @@ export default function Detalle() {
 
   const grupos = agruparPorCategoria(result.validaciones || []);
   const ordenGrupos = Object.keys(grupos).sort((a, b) => {
-    const prioridad = ["cep", "estructural", "visual", "temporal", "contextual", "semantica", "reputacion", "historial"];
+    const prioridad = ["cep", "cep_xml", "estructural", "visual", "temporal", "contextual", "semantica", "reputacion", "historial"];
     return prioridad.indexOf(a) - prioridad.indexOf(b);
   });
 
