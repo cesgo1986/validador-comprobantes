@@ -1,5 +1,7 @@
 # MOTOR_DECISIONES.md — Arquitectura del motor de evaluación
 
+**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+
 ## Los 2 motores independientes
 
 VerificaPago evalúa un comprobante con dos motores que corren en paralelo y nunca se influyen mutuamente.
@@ -108,3 +110,22 @@ Para dar al usuario una señal rápida, se calcula un semáforo que combina ambo
 | `consistente` | Las 3 dimensiones numéricas ≥ 75, o estado SPEI liquidado/devuelto |
 | `revisar` | Al menos una dimensión entre 45-74, sin contradicciones fuertes |
 | `riesgo_alto` | confianza_documental < 45, o estado SPEI contradictorio (rechazada/cancelada/no_liquidada) |
+
+---
+
+## Motor de Comportamiento (sembrado, Etapa 3 — sin implementar)
+
+Junto al Motor 1 (SPEI) y el Motor 2 (Integridad documental), se nombra un **tercer motor conceptual**: el Motor de Comportamiento, fuente de las Alertas Inteligentes (ver `DECISION_LOG.md`, ADR "las alertas son eventos persistentes generados por un motor de reglas independiente"). A diferencia de los otros dos, no analiza un comprobante individual — analiza patrones **entre** análisis: mismo hash reutilizado, misma CLABE receptora repetida, misma clave de rastreo repetida.
+
+Hoy no existe código para este motor — es una idea nombrada, no implementada. Su alcance inicial (Etapa 3) es deliberadamente acotado a reglas simples de repetición. A futuro podría evaluar horarios, frecuencia, dispositivos, redes entre empresas y patrones de fraude organizado, sin romper el esquema de datos — el diseño de la tabla `alertas` ya contempla esto vía un campo `metadata` (JSONB) abierto por tipo de alerta.
+
+Sigue el mismo principio de independencia que los otros dos motores: nunca modifica el Motor 1 ni el Motor 2, solo produce eventos adicionales que se muestran junto a ellos.
+
+---
+
+## Documentos relacionados
+
+- `SCORING.md` — el cálculo detallado de las 4 dimensiones
+- `ARQUITECTURA.md` — dónde vive este motor en el sistema
+- `MODELO_DECISION_EXPLICABLE.md` — cómo estos motores alimentan la capa de Interpretación
+- `DECISION_LOG.md` (ver "Separar Estado SPEI de Integridad Documental" y "las alertas son eventos persistentes generados por un motor de reglas independiente")

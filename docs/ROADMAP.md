@@ -224,15 +224,35 @@ Funcionalidades:
 
 ## Etapa 3 — Alertas inteligentes
 
-**Objetivo:** pasar de guardar información a detectarla activamente. Esto ya no es validación puntual, es inteligencia sobre el histórico.
+**Objetivo:** pasar de guardar información a detectarla activamente. Esto ya no es validación puntual, es inteligencia sobre el histórico. Depende de Etapa 2 (Historial real), ya cerrada, para tener la base de datos sobre la cual detectar patrones.
 
-Ejemplos de alertas:
-- Este mismo comprobante (hash) apareció nuevamente
-- El mismo hash apareció hace N días
-- Un cliente/cuenta acumula varios intentos fallidos en un periodo corto
-- Varias cuentas distintas usando la misma imagen de comprobante
+Ver `DECISION_LOG.md`, ADR "las alertas son eventos persistentes generados por un motor de reglas independiente" — decisión de fondo que ordena toda esta etapa: las alertas se implementan como un **Alert Engine** desacoplado que evalúa reglas después de guardar cada análisis, no como lógica dispersa dentro de los endpoints, y la tabla `alertas` registra **hechos** (`tipo_alerta`, `entidad_tipo`, `entidad_id`, `severidad`, `estado` + `metadata` JSONB), no interpretaciones ya resueltas.
 
-Depende de Etapa 2 (historial real) para tener la base de datos sobre la cual detectar patrones.
+**3.1 — Diseño del Alert Engine (arquitectura) ✅:** ver el ADR completo en `DECISION_LOG.md`. Flujo: `analizar()` → guardar análisis → `AlertEngine.evaluar()` → crear eventos. Estructura planeada:
+```
+alert_engine/
+├── engine.py            -- orquesta: junta resultados de todas las reglas
+├── regla_hash.py         -- reutilización del mismo hash
+├── regla_clabe.py         -- CLABE receptora frecuente
+├── regla_clave_rastreo.py
+├── regla_dispositivo.py   -- futuro, sin dato disponible todavía
+└── regla_banco.py         -- futuro
+```
+Cada regla es una función que recibe el análisis recién guardado y devuelve `[]` o una lista de alertas — agregar una regla nueva es agregar un archivo, no modificar el motor. Se siembra un tercer motor conceptual, el **Motor de Comportamiento** (ver `MOTOR_DECISIONES.md`), junto al Motor SPEI y el Motor Documental.
+
+**3.2 — Tabla `alertas` (persistencia de eventos, pendiente):** migración de Alembic con el esquema definido en el ADR. Análoga a las migraciones de `estado_operacion` y `clave_rastreo` ya aplicadas — mismo criterio de columnas desnormalizadas para lo que se filtra/agrupa (`tipo_alerta`, `entidad_tipo`, `severidad`, `estado`), y `metadata` JSONB para el detalle específico de cada tipo.
+
+**3.3 — Primeras reglas (pendiente):**
+- Hash reutilizado (ya hay una señal parcial en `hashes_documentos.veces_visto`, pero sin ser una alerta persistente todavía)
+- Cuenta receptora (CLABE) frecuente
+- Clave de rastreo repetida
+- (Ejemplo original del roadmap: varias cuentas distintas usando la misma imagen de comprobante — cubierto por la regla de hash)
+
+**3.4 — Pantalla `/alertas` (pendiente):** hoy es un placeholder (ver `ARQUITECTURA.md`). Debe seguir el mismo principio de divulgación progresiva ya adoptado como transversal (ver ADR en `DECISION_LOG.md`) — no todas las alertas pesan igual, así que la pantalla no debería mostrarlas todas con el mismo peso visual.
+
+**3.5 — Notificaciones y badge inteligente (pendiente):** separación explícita entre **Evento** (algo ocurrió, se registra siempre) y **Notificación** (el usuario debe enterarse, no todo evento la amerita) mediante un **Motor de Prioridad** entre ambos. Reemplaza el badge hoy hardcodeado en `3` dentro de `BottomNav.tsx`.
+
+**Nota de proceso:** las discusiones sobre umbrales de detección (¿cuántas veces es "frecuente"? ¿en cuántos días?) se registran como `#LAB-VP` en `LABORATORIO.md` conforme ocurran durante la Beta — son investigaciones que van a evolucionar con datos reales, no decisiones definitivas de hoy.
 
 ---
 

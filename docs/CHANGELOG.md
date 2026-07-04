@@ -6,6 +6,18 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.15.0] — 2026-07 — Cierre del núcleo funcional; Etapa 3 (Alertas Inteligentes) en marcha: diseño del Alert Engine
+
+### Documentado (sin código todavía)
+- `DECISION_LOG.md`: 🏛️ ADR — se declara concluido el núcleo funcional de VerificaPago (Motor SPEI, Motor Documental, Modelo de Decisión Explicable, Historial). Las funcionalidades nuevas reutilizan estos motores en vez de crear lógica paralela.
+- `DECISION_LOG.md`: 🏛️ ADR — las alertas se implementan como eventos persistentes (tabla `alertas`, hechos no interpretaciones) generados por un Alert Engine desacoplado (reglas independientes, cada una un archivo). Se separan explícitamente Evento y Notificación mediante un Motor de Prioridad. Se siembra un tercer motor conceptual: el Motor de Comportamiento.
+- `MOTOR_DECISIONES.md`: nueva sección sobre el Motor de Comportamiento, sembrado sin implementar.
+- `ROADMAP.md`: Etapa 3 reestructurada en 3.1 (diseño del Alert Engine, completado en este ADR) → 3.2 (tabla `alertas`) → 3.3 (primeras reglas) → 3.4 (pantalla `/alertas`) → 3.5 (notificaciones y badge inteligente).
+
+Sube a versión MINOR porque introduce un ADR de arquitectura fundacional para toda la capa inteligente del producto (Alertas, y a futuro Dashboard Empresa y Motor Antifraude), no un ajuste incremental.
+
+---
+
 ## [0.14.0] — 2026-07 — ✅ Etapa 2 (Historial real) completa
 
 ### Desplegado en producción

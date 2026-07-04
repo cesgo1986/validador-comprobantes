@@ -151,6 +151,65 @@ Una fuente de nivel superior puede actualizar el estado SPEI. Una fuente de nive
 
 ---
 
+## 2026-07 — 🏛️ ADR: las alertas son eventos persistentes generados por un motor de reglas independiente
+
+**Decisión:** la Etapa 3 (Alertas Inteligentes) no se implementa como lógica dispersa dentro de los endpoints (`if hash_repetido: insertar_alerta(...)`), ni como una tabla que registra interpretaciones ya resueltas (`tipo`, `mensaje`, `severidad`). Se implementa como un **Alert Engine** independiente que evalúa reglas después de guardar cada análisis, y una tabla `alertas` que registra **hechos**, no interpretaciones.
+
+**Flujo:** `analizar()` → guardar análisis → `AlertEngine.evaluar()` → crear eventos. El endpoint `/analizar` nunca contiene lógica de detección de patrones directamente — solo dispara la evaluación.
+
+**Esquema de la tabla `alertas` (diseño, aún no implementado):**
+```
+id
+tipo_alerta        -- REUTILIZACION_HASH, CLAVE_RASTREO_REPETIDA,
+                      CUENTA_RECEPTORA_FRECUENTE, BANCO_RIESGO,
+                      DISPOSITIVO_REPETIDO, ... (abierto a crecer)
+severidad
+entidad_tipo        -- HASH, CUENTA, CLABE, BANCO, DISPOSITIVO
+entidad_id
+analisis_origen
+estado               -- NUEVA, REVISADA, DESCARTADA
+metadata (JSONB)     -- detalle libre por tipo de alerta, sin tocar el esquema
+created_at
+updated_at
+```
+
+**Por qué `metadata` como JSONB en vez de columnas por tipo de alerta:** con `estado_operacion`/`clave_rastreo`/`referencia` ya se estableció que todo campo usado para buscar/filtrar/correlacionar debe desnormalizarse (ver ADR anterior) — pero eso aplica a identificadores estables de la operación, no a los detalles variables de cada tipo de alerta. Forzar una columna por cada dato que una alerta pudiera necesitar (cantidad de veces, lista de análisis relacionados, umbral usado) llevaría a una tabla con decenas de columnas casi siempre vacías conforme crezcan los tipos de alerta. El balance correcto: `tipo_alerta`, `entidad_tipo`, `entidad_id`, `severidad` y `estado` se desnormalizan porque se van a filtrar/agrupar constantemente; el detalle específico de cada tipo vive en `metadata`.
+
+**Estructura del Alert Engine (diseño, aún no implementado):**
+```
+alert_engine/
+├── engine.py          -- orquesta: junta los resultados de todas las reglas
+├── regla_hash.py       -- reutilización del mismo hash
+├── regla_clabe.py       -- CLABE receptora frecuente
+├── regla_clave_rastreo.py
+├── regla_dispositivo.py -- futuro, sin dato disponible todavía
+└── regla_banco.py       -- futuro
+```
+Cada regla es una función que recibe el análisis recién guardado y devuelve `[]` o una lista de alertas. El motor solo agrega resultados — agregar una regla nueva es agregar un archivo, no modificar el motor.
+
+**Separación Evento / Notificación:** no todo evento merece notificar al usuario. Un hash reutilizado por segunda vez es un evento; un hash reutilizado en 4 empresas distintas amerita notificación. Se introduce un **Motor de Prioridad** entre la generación de eventos y las notificaciones/badge, para que el badge de la app (hoy hardcodeado en `3`, ver `BottomNav.tsx`) no se convierta en ruido constante.
+
+**Se siembra un tercer motor — Motor de Comportamiento:** junto al Motor SPEI (Banxico) y el Motor Documental (VerificaPago), se nombra un tercer motor conceptual que hoy solo cubre reglas simples (hash repetido, cuenta repetida, CLABE repetida) pero que a futuro podría evaluar horarios, frecuencia, dispositivos, redes entre empresas y patrones de fraude organizado — sin romper el esquema, porque vive en `metadata`.
+
+**Consecuencia:**
+- `ROADMAP.md`, Etapa 3, se reestructura en 3.1 (diseño del Alert Engine — este ADR) → 3.2 (tabla `alertas`) → 3.3 (primeras reglas: hash, cuenta, CLABE, clave de rastreo) → 3.4 (pantalla `/alertas`) → 3.5 (notificaciones y badge inteligente).
+- `MOTOR_DECISIONES.md` se actualiza para nombrar el Motor de Comportamiento como tercer motor conceptual, sembrado sin implementación todavía.
+- Las discusiones sobre umbrales de detección (¿cuántas veces es "frecuente"?) se registran como `#LAB-VP` en `LABORATORIO.md` conforme ocurran durante la Beta — son investigaciones que van a evolucionar con datos reales, no decisiones definitivas de hoy.
+
+---
+
+## 2026-07 — 🏛️ ADR: cierre del núcleo funcional de VerificaPago
+
+**Decisión:** se declara concluido el núcleo funcional de VerificaPago. A partir de este punto, las nuevas funcionalidades deben construirse **reutilizando** los motores existentes — Motor SPEI, Motor Documental, Modelo de Decisión Explicable, Historial y el futuro Motor de Presentación — en vez de crear lógica paralela.
+
+**Motivo:** con la Etapa 1 (experiencia de resultados) y la Etapa 2 (Historial real) cerradas y verificadas en producción, el proyecto ya tiene los bloques fundamentales que el resto del roadmap va a consumir: dos motores independientes con jerarquía de evidencia clara, un modelo de 5 capas para explicar cualquier decisión, un `AnalisisContext` reutilizable entre pantallas, y datos históricos desnormalizados y buscables. Esto marca un cambio de enfoque genuino: de **construir funcionalidades aisladas** a **expandir capacidades sobre una arquitectura consolidada**.
+
+**Consecuencia:**
+- Antes de escribir código para cualquier ítem de Etapa 3 en adelante, la pregunta de diseño por defecto es: *¿esto ya existe en alguno de los motores actuales, o reutiliza `AnalisisContext`/`MODELO_DECISION_EXPLICABLE.md`, antes de construir algo nuevo desde cero?*
+- Este ADR es simbólico tanto como técnico — funciona como el punto de referencia al que se puede volver cuando, dentro de meses, alguien pregunte "¿por qué el proyecto ya no se siente como un MVP?".
+
+---
+
 ## 2026-07 — 🏛️ ADR: se elimina la visualización del campo `recomendacion` legacy por contradecir el estado SPEI confirmado
 
 **Decisión:** se elimina de `app/resultado/detalle/page.tsx` el bloque que mostraba `result.recomendacion` (etiquetado siempre como "Recomendación: Revisar manualmente"). El campo sigue existiendo en la respuesta del backend por compatibilidad, pero ya no se muestra en ninguna pantalla.
