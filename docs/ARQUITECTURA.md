@@ -70,7 +70,8 @@ backend/
 │   ├── empresa.py               ← Tabla empresas
 │   ├── usuario.py               ← Tabla usuarios
 │   ├── analisis.py              ← Tabla analisis (JSONB + columnas desnormalizadas)
-│   └── hash_documento.py        ← Tabla hashes_documentos (UNIQUE empresa_id + hash_sha256)
+│   ├── hash_documento.py        ← Tabla hashes_documentos (UNIQUE empresa_id + hash_sha256)
+│   └── alerta.py                ← Tabla alertas (eventos del Alert Engine, ítem 3.2 — Etapa 3)
 ├── services/
 │   ├── hash_service.py          ← SHA-256 del comprobante, detección de reutilización
 │   ├── auditoria_service.py     ← Persistencia del análisis completo
@@ -78,7 +79,9 @@ backend/
 │   ├── cep_xml_service.py       ← Parseo y comparación del XML del CEP
 │   ├── cep_xml_auto_service.py  ← Descarga automática del XML desde Banxico
 │   ├── cache_service.py         ← Cache genérico en memoria (get/set/delete + TTL), reutilizable por cualquier servicio
-│   └── metrics_service.py       ← Métricas genéricas en memoria por namespace de servicio, reutilizable por cualquier servicio
+│   ├── metrics_service.py       ← Métricas genéricas en memoria por namespace de servicio, reutilizable por cualquier servicio
+│   └── alerta_service.py        ← Persistencia de alertas (crear/listar/cambiar estado) — sin las reglas de detección, ver alert_engine/
+├── alert_engine/                ← (planeado, ítem 3.3 — Etapa 3, aún no creado) reglas de detección, cada una un archivo independiente
 └── alembic/
     └── versions/
         └── ade15461db9e_*.py    ← Migración inicial multiempresa

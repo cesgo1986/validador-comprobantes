@@ -6,6 +6,30 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.15.2] — 2026-07 — 3.2 cerrado: tabla alertas desplegada
+
+### Desplegado en producción
+- Migración de Alembic aplicada en Render: tabla `alertas` creada con sus 6 índices.
+- `models/alerta.py`, `services/alerta_service.py` disponibles, sin consumidores todavía (esperado — 3.3 es lo que los va a usar).
+
+### Cerrado
+- `ROADMAP.md`: ítem **3.2** de la Etapa 3 pasa a ✅.
+
+---
+
+## [0.15.1] — 2026-07 — Etapa 3, 3.2: tabla alertas (persistencia) — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar — incluye migración de base de datos)
+- Nueva migración de Alembic: tabla `alertas` completa (`tipo_alerta`, `severidad`, `entidad_tipo`, `entidad_id`, `analisis_origen`, `estado`, `metadata` JSONB), con índices en los campos que se van a filtrar/agrupar.
+- `models/alerta.py` (nuevo): modelo `Alerta`. Sin `back_populates` deliberadamente, para no requerir tocar `models/empresa.py` ni `models/analisis.py`.
+- `services/alerta_service.py` (nuevo): `crear_alerta()`, `listar_alertas()`, `cambiar_estado_alerta()` — solo persistencia, sin lógica de detección (eso es 3.3, en `alert_engine/`, todavía sin crear).
+
+### Documentado
+- `ARQUITECTURA.md`: `models/alerta.py`, `services/alerta_service.py` y el futuro `alert_engine/` (planeado) agregados a la estructura del backend.
+- `ROADMAP.md`: ítem 3.2 detallado.
+
+---
+
 ## [0.15.0] — 2026-07 — Cierre del núcleo funcional; Etapa 3 (Alertas Inteligentes) en marcha: diseño del Alert Engine
 
 ### Documentado (sin código todavía)

@@ -240,7 +240,7 @@ alert_engine/
 ```
 Cada regla es una función que recibe el análisis recién guardado y devuelve `[]` o una lista de alertas — agregar una regla nueva es agregar un archivo, no modificar el motor. Se siembra un tercer motor conceptual, el **Motor de Comportamiento** (ver `MOTOR_DECISIONES.md`), junto al Motor SPEI y el Motor Documental.
 
-**3.2 — Tabla `alertas` (persistencia de eventos, pendiente):** migración de Alembic con el esquema definido en el ADR. Análoga a las migraciones de `estado_operacion` y `clave_rastreo` ya aplicadas — mismo criterio de columnas desnormalizadas para lo que se filtra/agrupa (`tipo_alerta`, `entidad_tipo`, `severidad`, `estado`), y `metadata` JSONB para el detalle específico de cada tipo.
+**3.2 — Tabla `alertas` ✅ (completado y desplegado, 2026-07):** migración de Alembic + `models/alerta.py` + `services/alerta_service.py` (capa de persistencia: crear, listar, cambiar estado). Deliberadamente **sin** las reglas de detección todavía — eso es 3.3, vive aparte en `alert_engine/` (aún no creado), para no mezclar "cómo se guarda una alerta" con "qué la dispara". `tipo_alerta`/`severidad`/`entidad_tipo`/`estado` son `String`, no `ENUM` de Postgres — la restricción de valores permitidos vive en el código, no en la base de datos, para que agregar un tipo de alerta nuevo sea agregar un archivo, no una migración.
 
 **3.3 — Primeras reglas (pendiente):**
 - Hash reutilizado (ya hay una señal parcial en `hashes_documentos.veces_visto`, pero sin ser una alerta persistente todavía)
