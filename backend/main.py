@@ -1312,6 +1312,14 @@ def dashboard_cambiar_estado_alerta(
         raise HTTPException(status_code=404, detail="Alerta no encontrada")
     return {"ok": True, "id": alerta_id, "estado": nuevo_estado}
 
+@dashboard_router.get("/alertas/conteo")
+def dashboard_conteo_alertas(empresa_id: str = Query(default=DEFAULT_EMPRESA_ID)):
+    """
+    Item 3.5: conteo de alertas para el badge inteligente de BottomNav.
+    Separa el total de alertas NUEVA del subconjunto "notificable" (Motor
+    de Prioridad, ver DECISION_LOG.md) -- el badge usa `notificables`.
+    """
+    return alerta_service.contar_alertas(empresa_id=empresa_id)
 
 app.include_router(dashboard_router)
 

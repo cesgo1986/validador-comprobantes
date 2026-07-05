@@ -129,3 +129,26 @@ def cambiar_estado_alerta(alerta_id: str, nuevo_estado: str, empresa_id: str = D
         registro.updated_at = datetime.datetime.utcnow()
         db.flush()
         return True
+    
+SEVERIDADES_NOTIFICABLES = {"MEDIA", "ALTA", "CRITICA"}
+
+
+def contar_alertas(empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
+    """
+    Cuenta las alertas NUEVA totales y las que además son "notificables"
+    (Motor de Prioridad). El badge de BottomNav usa `notificables`, no
+    `total_nuevas` -- para que una alerta BAJA (ej. segunda reutilización
+    de un hash, que puede ser un reenvío legítimo) no infle el contador
+    de la misma forma que una alerta ALTA.
+    """
+    with get_db_session() as db:
+        if db is None:
+            return {"total_nuevas": 0, "notificables": 0}
+
+        base = [Alerta.empresa_id == empresa_id, Alerta.deleted_at.is_(None), Alerta.estado == "NUEVA"]
+        total_nuevas = db.execute(select(func.count(Alerta.id)).where(*base)).scalar() or 0
+        notificables = db.execute(
+            select(func.count(Alerta.id)).where(*base, Alerta.severidad.in_(SEVERIDADES_NOTIFICABLES))
+        ).scalar() or 0
+
+        return {"total_nuevas": total_nuevas, "notificables": notificables}
