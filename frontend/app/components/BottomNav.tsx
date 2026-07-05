@@ -1,8 +1,10 @@
 "use client";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const TEAL = "#00BFA5";
 const DARK = "#1A2340";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 const ICONS = {
   home: (active: boolean) => (
@@ -36,13 +38,42 @@ export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
 
+  // Item 3.5: badge inteligente -- ya no hardcodeado. Usa "notificables"
+  // (Motor de Prioridad: severidad MEDIA o superior, ver
+  // services/alerta_service.py), no el total de alertas NUEVA -- una
+  // alerta BAJA no debe inflar el contador igual que una ALTA.
+  const [alertasBadge, setAlertasBadge] = useState(0);
+
+  useEffect(() => {
+    let activo = true;
+
+    async function cargarConteo() {
+      try {
+        const resp = await fetch(`${API_URL}/api/v1/dashboard/alertas/conteo`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (activo) setAlertasBadge(data.notificables ?? 0);
+      } catch {
+        // El badge es un extra -- si falla, la navegación sigue funcionando
+        // con el badge en 0 en vez de romper la barra inferior.
+      }
+    }
+
+    cargarConteo();
+    // Refresca cada 60s mientras la app esté abierta -- suficiente para
+    // sentirse "vivo" sin necesitar WebSockets todavía (ver ROADMAP.md,
+    // posible evolución futura si se necesita tiempo real de verdad).
+    const intervalo = setInterval(cargarConteo, 60000);
+    return () => { activo = false; clearInterval(intervalo); };
+  }, []);
+
   // El botón central "+" siempre regresa al flujo de nuevo análisis,
   // sin importar en qué pantalla del flujo este el usuario.
   const items = [
     { key: "inicio", label: "Inicio", href: "/", icon: ICONS.home, badge: 0 },
     { key: "historial", label: "Historial", href: "/historial", icon: ICONS.historial, badge: 0 },
     { key: "plus", label: "", href: "/", icon: ICONS.plus, badge: 0, isPlus: true },
-    { key: "alertas", label: "Alertas", href: "/alertas", icon: ICONS.alertas, badge: 3 },
+    { key: "alertas", label: "Alertas", href: "/alertas", icon: ICONS.alertas, badge: alertasBadge },
     { key: "perfil", label: "Perfil", href: "/perfil", icon: ICONS.perfil, badge: 0 },
   ];
 
