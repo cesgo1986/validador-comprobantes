@@ -43,7 +43,7 @@ app/
 │   └── [id]/page.tsx            ← Detalle de análisis histórico (Etapa 2, ítem 2.3 ✅) — hidrata AnalisisContext, reutiliza /resultado/detalle
 ├── lib/
 │   └── estadoSpei.ts            ← Espejo de SEMAFORO_SPEI (backend), única fuente de verdad de color/etiqueta/icono fuera de /resultado
-├── alertas/page.tsx             ← Placeholder (Etapa 3)
+├── alertas/page.tsx             ← Lista con divulgación progresiva (Etapa 3, ítem 3.4)
 ├── perfil/page.tsx              ← Placeholder (Sprint E)
 ├── context/AnalisisContext.tsx  ← Estado compartido entre pantallas
 ├── components/BottomNav.tsx     ← Navegación inferior fija

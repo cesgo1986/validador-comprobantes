@@ -326,6 +326,43 @@ Nota de nomenclatura: `score_claude` es el score de riesgo visual/documental de 
 
 ---
 
+## GET /api/v1/dashboard/alertas
+
+Lista paginada de alertas generadas por el Alert Engine (Etapa 3, ítem 3.4). Mismo patrón que `/analisis`: filtros opcionales, paginación con `limit`/`offset`.
+
+**Query params:** `empresa_id`, `limit` (máx. 200, default 50), `offset`, `estado` (`NUEVA` | `REVISADA` | `DESCARTADA`), `severidad` (`BAJA` | `MEDIA` | `ALTA` | `CRITICA`), `tipo_alerta` (`REUTILIZACION_HASH` | `CLABE_FRECUENTE` | `CLAVE_RASTREO_REPETIDA`, abierto a crecer)
+
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "tipo_alerta": "REUTILIZACION_HASH",
+      "severidad": "BAJA",
+      "entidad_tipo": "HASH",
+      "entidad_id": "ad85f0c4...",
+      "analisis_origen": "uuid",
+      "estado": "NUEVA",
+      "metadata": { "veces_visto": 2 },
+      "created_at": "2026-07-04T10:00:00Z"
+    }
+  ],
+  "total": 5
+}
+```
+
+---
+
+## PATCH /api/v1/dashboard/alertas/{alerta_id}/estado
+
+Cambia el estado de una alerta (Etapa 3, ítem 3.4) — típicamente `NUEVA` → `REVISADA` o `NUEVA` → `DESCARTADA`, aunque el endpoint no restringe la transición.
+
+**Query params:** `nuevo_estado` (requerido), `empresa_id`
+
+**Respuesta:** `{ "ok": true, "id": "uuid", "estado": "REVISADA" }`, o `404` si la alerta no existe.
+
+---
+
 ## Códigos de error
 
 | Status | Descripción |

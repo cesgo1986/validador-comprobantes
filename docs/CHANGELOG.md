@@ -6,6 +6,29 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.15.6] — 2026-07 — 3.4 cerrado: pantalla /alertas desplegada
+
+### Desplegado en producción
+- `main.py`: endpoints de alertas desplegados sin errores (corregido el import faltante de `alerta_service` detectado por Pylance antes del deploy).
+- `app/alertas/page.tsx`: desplegado, reemplaza el placeholder.
+
+### Cerrado
+- `ROADMAP.md`: ítem **3.4** de la Etapa 3 pasa a ✅.
+
+---
+
+## [0.15.5] — 2026-07 — Etapa 3, 3.4: pantalla /alertas — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `main.py`: `GET /api/v1/dashboard/alertas` (listado paginado con filtros) y `PATCH /api/v1/dashboard/alertas/{id}/estado` (marcar revisada/descartada).
+- `app/alertas/page.tsx`: reemplaza el placeholder. Divulgación progresiva — Nivel 1 muestra solo alertas `NUEVA` por defecto, con acciones rápidas por tarjeta; Nivel 2 (filtros) permite ver revisadas/descartadas y filtrar por severidad/tipo. Etiquetas legibles por tipo de alerta y entidad.
+
+### Documentado
+- `API.md`: los 2 endpoints nuevos documentados.
+- `ARQUITECTURA.md`, `ROADMAP.md`: actualizados.
+
+---
+
 ## [0.15.4] — 2026-07 — 3.3 cerrado: primeras reglas del Alert Engine desplegadas
 
 ### Desplegado en producción
