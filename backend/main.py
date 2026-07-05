@@ -17,6 +17,7 @@ from services.hash_service import registrar_y_consultar_hash
 from services.auditoria_service import guardar_analisis
 from services import dashboard_service
 from services import metrics_service
+from alert_engine import engine as alert_engine
 from database import init_db, DEFAULT_EMPRESA_ID
 from services.cep_xml_service import parsear_xml_cep, comparar_xml_contra_comprobante, construir_resultado_xml, XMLCepInvalido
 from services.cep_xml_auto_service import datos_suficientes_para_consulta, descargar_xml_cep_automatico
@@ -1044,6 +1045,43 @@ async def analizar(
             result["audit_id"] = audit_id
     except Exception as e:
         print("Aviso: no fue posible guardar auditoria:", e)
+
+    # ── Alert Engine: evaluar reglas de deteccion (item 3.3, Etapa 3) ────────
+    # Ver DECISION_LOG.md, ADR "las alertas son eventos persistentes...".
+    # Corre DESPUES de guardar el analisis -- nunca antes, y nunca modifica
+    # el resultado que se le devuelve al usuario. Si el motor de alertas
+    # falla, el analisis principal ya se completo y se devuelve igual.
+    try:
+        contexto_alertas = {
+            "empresa_id": DEFAULT_EMPRESA_ID,
+            "analisis_id": result.get("audit_id"),
+            "hash_sha256": hash_info.get("hash_documento"),
+            "veces_visto": hash_info.get("veces_visto"),
+            "clabe_detectada": clabe_detectada_general,
+            "clave_rastreo": campos_planos.get("clave_rastreo") or None,
+            "banco_detectado": campos_planos.get("banco_origen") or banco_hint or None,
+            "monto_detectado": monto_detectado_general if monto_detectado_general > 0 else None,
+        }
+        alert_engine.evaluar(contexto_alertas)
+    except Exception as e:
+        print("Aviso: el Alert Engine fallo sin afectar el analisis:", e)
+
+    metrics_service.registrar_exito("analizar", duracion_ms=(time.time() - t_inicio_analizar) * 1000)
+    return result
+    try:
+        contexto_alertas = {
+            "empresa_id": DEFAULT_EMPRESA_ID,
+            "analisis_id": result.get("audit_id"),
+            "hash_sha256": hash_info.get("hash_documento"),
+            "veces_visto": hash_info.get("veces_visto"),
+            "clabe_detectada": clabe_detectada_general,
+            "clave_rastreo": campos_planos.get("clave_rastreo") or None,
+            "banco_detectado": campos_planos.get("banco_origen") or banco_hint or None,
+            "monto_detectado": monto_detectado_general if monto_detectado_general > 0 else None,
+        }
+        alert_engine.evaluar(contexto_alertas)
+    except Exception as e:
+        print("Aviso: el Alert Engine fallo sin afectar el analisis:", e)
 
     metrics_service.registrar_exito("analizar", duracion_ms=(time.time() - t_inicio_analizar) * 1000)
     return result
