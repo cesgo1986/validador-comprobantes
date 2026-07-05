@@ -1,6 +1,17 @@
 """
 services/dashboard_service.py — Queries que alimentan los endpoints /api/v1/dashboard/*.
 
+A partir de item 4.1 (Etapa 4, ver DECISION_LOG.md), este servicio ya
+NO construye queries de agregación por su cuenta -- las delega a
+AggregationService (aggregation_service.py). Este archivo se queda con
+dos responsabilidades genuinamente distintas de "agregar":
+  1. Listado/detalle/exportación de análisis individuales
+     (listar_analisis, obtener_analisis_detalle, exportar_analisis).
+  2. Wrappers delgados hacia AggregationService, para no romper los
+     endpoints ya en producción que llaman a estas funciones por nombre
+     (mismo nombre, misma firma, mismo comportamiento -- solo cambió
+     dónde vive el SQL).
+
 Todos los queries filtran por empresa_id. En este MVP siempre es
 DEFAULT_EMPRESA_ID, pero la firma de cada funcion ya recibe empresa_id
 como parametro para no requerir cambios cuando se active multiempresa
@@ -11,70 +22,82 @@ from sqlalchemy import select, func, desc, or_
 from models.analisis import Analisis
 from models.hash_documento import HashDocumento
 from database import get_db_session, DEFAULT_EMPRESA_ID
+from services import aggregation_service
+from services import alerta_service
 
+
+# ─────────────────────────────────────────────────────────────────
+# Wrappers hacia AggregationService -- mismo nombre/firma que antes,
+# el SQL real vive en aggregation_service.py.
+# ─────────────────────────────────────────────────────────────────
 
 def obtener_stats(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_desde: str | None = None, fecha_hasta: str | None = None) -> dict:
+    return aggregation_service.calcular_stats_generales(empresa_id, fecha_desde, fecha_hasta)
+
+
+def tendencia_diaria(empresa_id: str = DEFAULT_EMPRESA_ID, dias: int = 30) -> list:
+    return aggregation_service.calcular_tendencia_diaria(empresa_id, dias)
+
+
+def distribucion_scores_por_banco(empresa_id: str = DEFAULT_EMPRESA_ID, dias: int = 30, min_analisis: int = 1) -> list:
+    return aggregation_service.calcular_distribucion_scores_por_banco(empresa_id, dias, min_analisis)
+
+
+def top_hashes_reutilizados(empresa_id: str = DEFAULT_EMPRESA_ID, min_veces: int = 2, limit: int = 20) -> list:
+    return aggregation_service.calcular_top_hashes_reutilizados(empresa_id, min_veces, limit)
+
+
+# ─────────────────────────────────────────────────────────────────
+# Nuevos wrappers hacia AggregationService -- item 4.1, Etapa 4.
+# ─────────────────────────────────────────────────────────────────
+
+def obtener_monto_total_procesado(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_desde: str | None = None, fecha_hasta: str | None = None) -> dict:
+    return aggregation_service.calcular_monto_total_procesado(empresa_id, fecha_desde, fecha_hasta)
+
+
+def obtener_banco_mas_frecuente(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_desde: str | None = None, fecha_hasta: str | None = None, limit: int = 5) -> list:
+    return aggregation_service.calcular_banco_mas_frecuente(empresa_id, fecha_desde, fecha_hasta, limit)
+
+
+def obtener_riesgo_por_periodo(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_desde: str | None = None, fecha_hasta: str | None = None) -> dict:
+    return aggregation_service.calcular_riesgo_por_periodo(empresa_id, fecha_desde, fecha_hasta)
+
+
+def obtener_alertas_agregadas(empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
+    return aggregation_service.calcular_alertas_agregadas(empresa_id)
+
+
+def obtener_resumen_ejecutivo(empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
     """
-    Metricas generales: total de analisis, analisis de hoy, score
-    promedio, y distribucion por nivel de riesgo.
+    Item 4.2 (Mobile Executive Summary): bundle de datos para la
+    tarjeta resumen dentro de Perfil/Empresa -- una sola llamada en vez
+    de que el frontend orqueste 3-4 peticiones para armar una tarjeta
+    simple. Compone datos de AggregationService y alerta_service, no
+    calcula nada nuevo por su cuenta.
     """
-    with get_db_session() as db:
-        if db is None:
-            return {
-                "total_analisis": 0, "analisis_hoy": 0, "score_promedio": None,
-                "distribucion_riesgo": [], "documentos_unicos": 0, "documentos_reutilizados": 0,
-            }
+    hoy = datetime.date.today().isoformat()
+    stats = aggregation_service.calcular_stats_generales(empresa_id, fecha_desde=hoy, fecha_hasta=hoy)
+    riesgo = aggregation_service.calcular_riesgo_por_periodo(empresa_id, fecha_desde=hoy, fecha_hasta=hoy)
+    conteo_alertas = alerta_service.contar_alertas(empresa_id)
 
-        base_filtro = [Analisis.empresa_id == empresa_id, Analisis.deleted_at.is_(None)]
-        if fecha_desde:
-            base_filtro.append(Analisis.fecha >= fecha_desde)
-        if fecha_hasta:
-            base_filtro.append(Analisis.fecha <= fecha_hasta)
+    riesgo_alto = sum(r["total"] for r in riesgo["por_riesgo"] if r["riesgo"] in ("ALTO", "CRITICO"))
+    total_estado = sum(e["total"] for e in riesgo["por_estado_operacion"])
+    confirmadas = sum(e["total"] for e in riesgo["por_estado_operacion"] if e["estado_operacion"] in ("liquidada", "acreditada"))
+    pct_confirmadas = round((confirmadas / total_estado) * 100, 1) if total_estado > 0 else None
 
-        total = db.execute(select(func.count(Analisis.id)).where(*base_filtro)).scalar() or 0
+    return {
+        "analisis_hoy": stats["analisis_hoy"],
+        "alertas_nuevas": conteo_alertas["total_nuevas"],
+        "alertas_notificables": conteo_alertas["notificables"],
+        "riesgo_alto": riesgo_alto,
+        "pct_confirmadas": pct_confirmadas,
+    }
 
-        hoy = datetime.date.today()
-        analisis_hoy = db.execute(
-            select(func.count(Analisis.id)).where(
-                Analisis.empresa_id == empresa_id,
-                Analisis.deleted_at.is_(None),
-                func.date(Analisis.fecha) == hoy,
-            )
-        ).scalar() or 0
 
-        score_promedio = db.execute(select(func.avg(Analisis.score_final)).where(*base_filtro)).scalar()
-
-        distribucion_rows = db.execute(
-            select(Analisis.riesgo, func.count(Analisis.id))
-            .where(*base_filtro)
-            .group_by(Analisis.riesgo)
-        ).all()
-        distribucion_riesgo = [{"riesgo": r or "INDETERMINADO", "total": c} for r, c in distribucion_rows]
-
-        documentos_unicos = db.execute(
-            select(func.count(HashDocumento.id)).where(
-                HashDocumento.empresa_id == empresa_id,
-                HashDocumento.deleted_at.is_(None),
-            )
-        ).scalar() or 0
-
-        documentos_reutilizados = db.execute(
-            select(func.count(HashDocumento.id)).where(
-                HashDocumento.empresa_id == empresa_id,
-                HashDocumento.deleted_at.is_(None),
-                HashDocumento.veces_visto > 1,
-            )
-        ).scalar() or 0
-
-        return {
-            "total_analisis": total,
-            "analisis_hoy": analisis_hoy,
-            "score_promedio": round(float(score_promedio), 2) if score_promedio is not None else None,
-            "distribucion_riesgo": distribucion_riesgo,
-            "documentos_unicos": documentos_unicos,
-            "documentos_reutilizados": documentos_reutilizados,
-        }
-
+# ─────────────────────────────────────────────────────────────────
+# Listado / detalle / exportación de análisis individuales -- sin
+# cambios, no son agregaciones, se quedan aquí.
+# ─────────────────────────────────────────────────────────────────
 
 def _parsear_monto_busqueda(texto: str) -> float | None:
     """
@@ -314,116 +337,3 @@ def obtener_analisis_detalle(analisis_id: str, empresa_id: str = DEFAULT_EMPRESA
             "resultado": registro.resultado,
             "historial_hash": historial_hash,
         }
-
-
-def top_hashes_reutilizados(empresa_id: str = DEFAULT_EMPRESA_ID, min_veces: int = 2, limit: int = 20) -> list:
-    """Hashes con mayor veces_visto -- el primer detector de fraude recurrente."""
-    with get_db_session() as db:
-        if db is None:
-            return []
-
-        rows = db.execute(
-            select(HashDocumento)
-            .where(
-                HashDocumento.empresa_id == empresa_id,
-                HashDocumento.deleted_at.is_(None),
-                HashDocumento.veces_visto >= min_veces,
-            )
-            .order_by(desc(HashDocumento.veces_visto))
-            .limit(limit)
-        ).scalars().all()
-
-        resultado = []
-        for h in rows:
-            riesgo_max_row = db.execute(
-                select(Analisis.riesgo)
-                .where(Analisis.empresa_id == empresa_id, Analisis.hash_sha256 == h.hash_sha256)
-                .order_by(desc(Analisis.score_final))
-                .limit(1)
-            ).scalar_one_or_none()
-
-            resultado.append({
-                "hash_sha256": h.hash_sha256,
-                "veces_visto": h.veces_visto,
-                "primer_analisis": h.primer_analisis.isoformat(),
-                "ultimo_analisis": h.ultimo_analisis.isoformat(),
-                "riesgo_max": riesgo_max_row,
-            })
-        return resultado
-
-
-def tendencia_diaria(empresa_id: str = DEFAULT_EMPRESA_ID, dias: int = 30) -> list:
-    """Serie diaria de totales y score promedio, para graficar tendencias."""
-    with get_db_session() as db:
-        if db is None:
-            return []
-
-        desde = datetime.date.today() - datetime.timedelta(days=dias)
-
-        rows = db.execute(
-            select(
-                func.date(Analisis.fecha).label("dia"),
-                func.count(Analisis.id),
-                func.avg(Analisis.score_final),
-            )
-            .where(
-                Analisis.empresa_id == empresa_id,
-                Analisis.deleted_at.is_(None),
-                Analisis.fecha >= desde,
-            )
-            .group_by(func.date(Analisis.fecha))
-            .order_by(func.date(Analisis.fecha))
-        ).all()
-
-        return [
-            {
-                "fecha": dia.isoformat() if hasattr(dia, "isoformat") else str(dia),
-                "total": total,
-                "score_promedio": round(float(score_avg), 2) if score_avg is not None else None,
-            }
-            for dia, total, score_avg in rows
-        ]
-
-
-def distribucion_scores_por_banco(empresa_id: str = DEFAULT_EMPRESA_ID, dias: int = 30, min_analisis: int = 1) -> list:
-    """
-    Item 1.6 (Observabilidad): distribucion de scores por banco detectado,
-    de los ultimos `dias`.
-
-    Nota de nomenclatura importante: "score_claude" es el score de riesgo
-    visual/documental que devuelve Claude Vision (0=bajo riesgo,
-    100=critico) -- no es una metrica de confianza de OCR en si misma.
-    """
-    with get_db_session() as db:
-        if db is None:
-            return []
-
-        desde = datetime.date.today() - datetime.timedelta(days=dias)
-
-        rows = db.execute(
-            select(
-                Analisis.banco_detectado,
-                func.count(Analisis.id),
-                func.avg(Analisis.score_claude),
-                func.avg(Analisis.score_final),
-            )
-            .where(
-                Analisis.empresa_id == empresa_id,
-                Analisis.deleted_at.is_(None),
-                Analisis.fecha >= desde,
-                Analisis.banco_detectado.is_not(None),
-            )
-            .group_by(Analisis.banco_detectado)
-            .having(func.count(Analisis.id) >= min_analisis)
-            .order_by(desc(func.count(Analisis.id)))
-        ).all()
-
-        return [
-            {
-                "banco": banco,
-                "total_analisis": total,
-                "score_claude_promedio": round(float(score_claude_avg), 2) if score_claude_avg is not None else None,
-                "score_final_promedio": round(float(score_final_avg), 2) if score_final_avg is not None else None,
-            }
-            for banco, total, score_claude_avg, score_final_avg in rows
-        ]

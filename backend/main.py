@@ -1321,6 +1321,58 @@ def dashboard_conteo_alertas(empresa_id: str = Query(default=DEFAULT_EMPRESA_ID)
     """
     return alerta_service.contar_alertas(empresa_id=empresa_id)
 
+@dashboard_router.get("/monto-total")
+def dashboard_monto_total(
+    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    fecha_desde: str | None = Query(default=None),
+    fecha_hasta: str | None = Query(default=None),
+):
+    """Item 4.1: monto total procesado en el periodo (KPI de volumen)."""
+    return dashboard_service.obtener_monto_total_procesado(
+        empresa_id=empresa_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta
+    )
+ 
+ 
+@dashboard_router.get("/bancos-frecuentes")
+def dashboard_bancos_frecuentes(
+    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    fecha_desde: str | None = Query(default=None),
+    fecha_hasta: str | None = Query(default=None),
+    limit: int = Query(default=5, le=20),
+):
+    """Item 4.1: top bancos por volumen de análisis (distinto de /metricas/scores-por-banco, que es por score)."""
+    return dashboard_service.obtener_banco_mas_frecuente(
+        empresa_id=empresa_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta, limit=limit
+    )
+ 
+ 
+@dashboard_router.get("/riesgo-por-periodo")
+def dashboard_riesgo_por_periodo(
+    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    fecha_desde: str | None = Query(default=None),
+    fecha_hasta: str | None = Query(default=None),
+):
+    """Item 4.1: distribución por riesgo documental (Motor 2) y por estado_operacion (Motor 1) en el periodo."""
+    return dashboard_service.obtener_riesgo_por_periodo(
+        empresa_id=empresa_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta
+    )
+ 
+ 
+@dashboard_router.get("/alertas-agregadas")
+def dashboard_alertas_agregadas(empresa_id: str = Query(default=DEFAULT_EMPRESA_ID)):
+    """Item 4.1: conteo de alertas NUEVA por severidad y tipo."""
+    return dashboard_service.obtener_alertas_agregadas(empresa_id=empresa_id)
+ 
+ 
+@dashboard_router.get("/resumen-ejecutivo")
+def dashboard_resumen_ejecutivo(empresa_id: str = Query(default=DEFAULT_EMPRESA_ID)):
+    """
+    Item 4.2 (Mobile Executive Summary): bundle de datos para la
+    tarjeta resumen dentro de Perfil/Empresa -- una sola llamada.
+    """
+    return dashboard_service.obtener_resumen_ejecutivo(empresa_id=empresa_id)
+
+
 app.include_router(dashboard_router)
 
 
