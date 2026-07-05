@@ -242,11 +242,7 @@ Cada regla es una función que recibe el análisis recién guardado y devuelve `
 
 **3.2 — Tabla `alertas` ✅ (completado y desplegado, 2026-07):** migración de Alembic + `models/alerta.py` + `services/alerta_service.py` (capa de persistencia: crear, listar, cambiar estado). Deliberadamente **sin** las reglas de detección todavía — eso es 3.3, vive aparte en `alert_engine/` (aún no creado), para no mezclar "cómo se guarda una alerta" con "qué la dispara". `tipo_alerta`/`severidad`/`entidad_tipo`/`estado` son `String`, no `ENUM` de Postgres — la restricción de valores permitidos vive en el código, no en la base de datos, para que agregar un tipo de alerta nuevo sea agregar un archivo, no una migración.
 
-**3.3 — Primeras reglas (pendiente):**
-- Hash reutilizado (ya hay una señal parcial en `hashes_documentos.veces_visto`, pero sin ser una alerta persistente todavía)
-- Cuenta receptora (CLABE) frecuente
-- Clave de rastreo repetida
-- (Ejemplo original del roadmap: varias cuentas distintas usando la misma imagen de comprobante — cubierto por la regla de hash)
+**3.3 — Primeras reglas de detección ✅ (completado y desplegado, 2026-07):** `alert_engine/` completo — `engine.py` (orquestador), `regla_hash.py`, `regla_clabe.py`, `regla_clave_rastreo.py` (esta última revisada durante el diseño: solo compara banco, no monto — ver `LABORATORIO.md`). Se dispara desde `main.py` justo después de `guardar_analisis()`, nunca antes, y nunca modifica el resultado devuelto al usuario — si el motor de alertas falla, el análisis principal ya se completó. Umbrales de las 3 reglas documentados como hipótesis iniciales en `LABORATORIO.md` (`#LAB-VP`), sujetos a ajuste con datos reales de la Beta. Verificado en producción: análisis normales sin afectación, alertas creándose correctamente en la tabla.
 
 **3.4 — Pantalla `/alertas` (pendiente):** hoy es un placeholder (ver `ARQUITECTURA.md`). Debe seguir el mismo principio de divulgación progresiva ya adoptado como transversal (ver ADR en `DECISION_LOG.md`) — no todas las alertas pesan igual, así que la pantalla no debería mostrarlas todas con el mismo peso visual.
 

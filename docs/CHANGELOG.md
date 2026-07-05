@@ -6,6 +6,31 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.15.4] — 2026-07 — 3.3 cerrado: primeras reglas del Alert Engine desplegadas
+
+### Desplegado en producción
+- `alert_engine/` completo, verificado: análisis normales sin afectación, alertas creándose correctamente en la tabla `alertas`.
+
+### Cerrado
+- `ROADMAP.md`: ítem **3.3** de la Etapa 3 pasa a ✅.
+
+---
+
+## [0.15.3] — 2026-07 — Etapa 3, 3.3: primeras reglas del Alert Engine — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `alert_engine/engine.py` (nuevo): orquestador — ejecuta reglas activas, persiste alertas, degrada con gracia si una regla falla.
+- `alert_engine/regla_hash.py` (nuevo): reutilización de hash, severidad escalada por `veces_visto` (2=BAJA, 3-4=MEDIA, 5+=ALTA).
+- `alert_engine/regla_clabe.py` (nuevo): CLABE receptora frecuente (≥10 apariciones en 30 días, severidad MEDIA).
+- `alert_engine/regla_clave_rastreo.py` (nuevo): clave de rastreo repetida con banco o monto distinto (severidad ALTA fija).
+- `main.py`: dispara `alert_engine.evaluar()` después de `guardar_analisis()`, envuelto en try/except para no afectar el análisis principal si falla.
+
+### Documentado
+- `LABORATORIO.md`: los 3 umbrales registrados como `#LAB-VP` — hipótesis iniciales sin datos históricos, sujetas a ajuste durante la Beta.
+- `ROADMAP.md`: ítem 3.3 detallado.
+
+---
+
 ## [0.15.2] — 2026-07 — 3.2 cerrado: tabla alertas desplegada
 
 ### Desplegado en producción
