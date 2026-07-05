@@ -17,6 +17,7 @@ from services.hash_service import registrar_y_consultar_hash
 from services.auditoria_service import guardar_analisis
 from services import dashboard_service
 from services import metrics_service
+from services import alerta_service
 from alert_engine import engine as alert_engine
 from database import init_db, DEFAULT_EMPRESA_ID
 from services.cep_xml_service import parsear_xml_cep, comparar_xml_contra_comprobante, construir_resultado_xml, XMLCepInvalido
@@ -1271,6 +1272,45 @@ def dashboard_scores_por_banco(
     return dashboard_service.distribucion_scores_por_banco(
         empresa_id=empresa_id, dias=dias, min_analisis=min_analisis
     )
+
+
+@dashboard_router.get("/alertas")
+def dashboard_listar_alertas(
+    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0),
+    estado: str | None = Query(default=None),
+    severidad: str | None = Query(default=None),
+    tipo_alerta: str | None = Query(default=None),
+):
+    """
+    Item 3.4 (ROADMAP.md, Etapa 3): lista paginada de alertas generadas
+    por el Alert Engine (item 3.3). Mismo patrón que /analisis: filtros
+    opcionales, paginación con limit/offset.
+    """
+    return alerta_service.listar_alertas(
+        empresa_id=empresa_id, limit=limit, offset=offset,
+        estado=estado, severidad=severidad, tipo_alerta=tipo_alerta,
+    )
+
+
+@dashboard_router.patch("/alertas/{alerta_id}/estado")
+def dashboard_cambiar_estado_alerta(
+    alerta_id: str,
+    nuevo_estado: str = Query(...),
+    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+):
+    """
+    Item 3.4: marca una alerta como REVISADA o DESCARTADA (o cualquier
+    otro valor de estado -- no se restringe el flujo aquí, ver
+    alerta_service.cambiar_estado_alerta()).
+    """
+    actualizado = alerta_service.cambiar_estado_alerta(
+        alerta_id=alerta_id, nuevo_estado=nuevo_estado, empresa_id=empresa_id
+    )
+    if not actualizado:
+        raise HTTPException(status_code=404, detail="Alerta no encontrada")
+    return {"ok": True, "id": alerta_id, "estado": nuevo_estado}
 
 
 app.include_router(dashboard_router)
