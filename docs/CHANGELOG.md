@@ -1,8 +1,35 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+**Versión del documento:** 0.16.2 · **Última actualización:** 05/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.16.2] — 2026-07 — Refactor de componentes compartidos desplegado y verificado
+
+### Desplegado en producción
+- `app/lib/colores.ts`, `app/components/resultado/*.tsx`, `app/resultado/page.tsx`, `app/historial/[id]/page.tsx`: desplegados sin regresión visual. `/resultado` e `/historial/[id]` se ven idénticos a la versión pre-refactor. Alertas e Historial siguen generándose correctamente.
+
+---
+
+## [0.16.1] — 2026-07 — Refactor: componentes compartidos entre /resultado y /historial/[id], previo a Etapa 4
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `app/lib/colores.ts` (nuevo): paleta compartida (`TEAL`, `GREEN`, `ORANGE`, `RED`, `GRAY`), antes duplicada como constantes locales en cada archivo.
+- `app/components/resultado/SemaforoSpei.tsx` (nuevo): Nivel 1 — semáforo SPEI.
+- `app/components/resultado/QueSignificaEsto.tsx` (nuevo): Nivel 1 — Interpretación + Impacto + Recomendación.
+- `app/components/resultado/DetalleExpandible.tsx` (nuevo): Nivel 2+ — integridad, evidencias, dimensiones, diagnóstico técnico. Recibe `avisoReutilizacion` y `extra` como props para las diferencias entre consumidores.
+
+### Cambiado
+- `app/resultado/page.tsx`: reescrito para consumir los componentes compartidos — ya no duplica el bloque central.
+- `app/historial/[id]/page.tsx`: reescrito para consumir los componentes compartidos.
+
+### Documentado
+- `DECISION_LOG.md`: la deuda técnica reconocida al construir 2.3 se marca como **resuelta**, antes del tercer consumidor (Dashboard Empresa, Etapa 4), cumpliendo el compromiso registrado en su momento.
+- `ROADMAP.md`, `ARQUITECTURA.md`: actualizados con la estructura nueva.
+
+Este refactor fue producto de una auto-revisión de arquitectura antes de abrir Etapa 4 (6 puntos de coherencia: independencia de motores, integración al Modelo de Decisión Explicable, duplicación de lógica, preparación de BD para multiempresa, sincronía de documentación, y nivel de congelamiento del MVP). También se corrigió en esa revisión un desfase real: los 12 documentos de `/docs` tenían el encabezado "Versión del documento" desactualizado (`0.11.0` fijo desde su creación, sin actualizarse en cada versión) — se sincronizaron todos a `0.16.0`.
 
 ---
 
