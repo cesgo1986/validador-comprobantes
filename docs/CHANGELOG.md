@@ -1,8 +1,19 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.16.2 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.17.0 · **Última actualización:** 05/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.17.0] — 2026-07 — 🏛️ ADR: núcleo funcional del MVP congelado
+
+### Documentado
+- `DECISION_LOG.md`: se declara congelado el núcleo funcional (`/resultado`, `/historial`, `/alertas` — Motor SPEI, Motor Documental, Alert Engine, Modelo de Decisión Explicable, `AnalisisContext`). Ningún módulo nuevo (Dashboard Empresa, APIs futuras, cualquier cliente) puede implementar lógica propia de decisión — debe consumir estos motores.
+- Registrada la revisión de coherencia arquitectónica de 6 puntos que motivó este ADR, con hallazgos reales (duplicación de JSX ya resuelta, desfase de versión en documentos ya corregido) y pendientes explícitos (integración de Alertas al Modelo de Decisión Explicable, aún sin resolver — no se fuerza).
+- Se establece como práctica: cada cambio a `docs/` actualiza el encabezado "Versión del documento" del archivo tocado, no solo `CHANGELOG.md`.
+
+Sube a versión MINOR porque marca el cierre formal de una fase de madurez del proyecto (núcleo congelado), no un ajuste incremental — mismo criterio que el cierre de la Fase de Fundación y del núcleo funcional previos.
 
 ---
 

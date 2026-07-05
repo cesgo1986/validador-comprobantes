@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+**Versión del documento:** 0.17.0 · **Última actualización:** 05/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -102,7 +102,7 @@ Una fuente de nivel superior puede actualizar el estado SPEI. Una fuente de nive
 
 **Consecuencia:**
 - Fuente única de verdad de "cómo se presenta un análisis": `AnalisisContext` + `mensajesContextuales.ts` + `MODELO_DECISION_EXPLICABLE.md`.
-- **Deuda técnica reconocida, no bloqueante:** `app/historial/[id]/page.tsx` duplica una porción significativa del JSX de `app/resultado/page.tsx` (semáforo, bloque "¿Qué significa esto?", panel de detalles expandible). No se extrajo a un componente compartido en 2.3 para no modificar un archivo estable en producción bajo presión de tiempo. Queda registrado en `ROADMAP.md` como refactor pendiente — candidatos de extracción: `ResultadoHeader`, `ResultadoExplicacion`, `ResultadoEvidencias`. Se debe resolver **antes** de que exista un tercer consumidor (Dashboard Empresa, Etapa 4), para no triplicar la duplicación.
+- **Deuda técnica reconocida — resuelta 2026-07, antes de Etapa 4:** `app/historial/[id]/page.tsx` duplicaba una porción significativa del JSX de `app/resultado/page.tsx` (semáforo, bloque "¿Qué significa esto?", panel de detalles expandible). Se extrajo a tres componentes compartidos en `app/components/resultado/`: `SemaforoSpei.tsx`, `QueSignificaEsto.tsx`, `DetalleExpandible.tsx` (más `app/lib/colores.ts` para las constantes de color, también duplicadas). Se resolvió justo antes de que existiera el tercer consumidor (Dashboard Empresa, Etapa 4), cumpliendo el compromiso registrado en esta misma entrada.
 
 ---
 
@@ -195,6 +195,28 @@ Cada regla es una función que recibe el análisis recién guardado y devuelve `
 - `ROADMAP.md`, Etapa 3, se reestructura en 3.1 (diseño del Alert Engine — este ADR) → 3.2 (tabla `alertas`) → 3.3 (primeras reglas: hash, cuenta, CLABE, clave de rastreo) → 3.4 (pantalla `/alertas`) → 3.5 (notificaciones y badge inteligente).
 - `MOTOR_DECISIONES.md` se actualiza para nombrar el Motor de Comportamiento como tercer motor conceptual, sembrado sin implementación todavía.
 - Las discusiones sobre umbrales de detección (¿cuántas veces es "frecuente"?) se registran como `#LAB-VP` en `LABORATORIO.md` conforme ocurran durante la Beta — son investigaciones que van a evolucionar con datos reales, no decisiones definitivas de hoy.
+
+---
+
+## 2026-07 — 🏛️ ADR: núcleo funcional del MVP congelado — todo módulo nuevo consume los motores existentes
+
+**Decisión:** se declara congelado el núcleo funcional del MVP — `/resultado`, `/historial` y `/alertas` (Motor SPEI, Motor Documental, Alert Engine, Modelo de Decisión Explicable, `AnalisisContext`). A partir de esta decisión, **ningún módulo nuevo puede implementar lógica propia de decisión** — Dashboard Empresa (Etapa 4), las APIs futuras y cualquier cliente (web, móvil, escritorio) deben consumir exactamente estos motores, no reimplementarlos.
+
+"Congelado" significa: no se vuelve a tocar por gusto o mejora incremental. Sí se toca por bugs, performance o accesibilidad — igual que ya se hizo con el fix de BBVA (Etapa 1) o el fix del `onClick` faltante en Historial (Etapa 2).
+
+**Motivo — revisión de coherencia arquitectónica antes de abrir Etapa 4 (2026-07), 6 puntos verificados contra el código real, no de memoria:**
+
+1. **Independencia de los 3 motores — ✔ confirmado.** El Alert Engine solo *lee* datos ya producidos por Motor SPEI/Documental (vía columnas desnormalizadas), nunca los reinterpreta ni los modifica.
+2. **¿Todo llega al Modelo de Decisión Explicable? — parcial, pendiente explícito.** El análisis en vivo y el histórico sí siguen el modelo completo (Hechos → Interpretación → Impacto → Recomendación → Evidencias). Alertas, en cambio, hoy es un sistema paralelo — no se integra todavía como "Evidencia" dentro de la vista de un análisis específico. Queda anotado como pendiente, no resuelto en este ADR.
+3. **Duplicación de lógica — se encontró y se corrigió.** `historial/[id]/page.tsx` duplicaba JSX de `resultado/page.tsx`, exactamente la deuda técnica que quedó registrada al construir 2.3 con el compromiso de resolverla "antes del tercer consumidor". Se resolvió en esta misma sesión (ver entrada anterior de este log) — extracción a `app/components/resultado/`.
+4. **Base de datos preparada para Empresa — parcial, y es lo esperado.** `empresa_id` ya está en `analisis`, `alertas`, `hashes_documentos`. `usuario_id` no está vinculado todavía (existe la tabla `usuarios`, sin FK en `analisis`/`alertas`) — correcto para esta etapa, porque no hay autenticación real (eso es Etapa 6). No bloquea Etapa 4 si el dashboard opera a nivel empresa, no por usuario individual.
+5. **Documentación sincronizada — se encontró y se corrigió.** Los 12 documentos de `/docs` tenían el encabezado "Versión del documento" fijo en `0.11.0` desde su creación, sin actualizarse en cada versión, mientras `CHANGELOG.md` ya iba en `0.16.0`. Corregido — y se establece como práctica: de aquí en adelante, cada cambio a `docs/` debe actualizar el encabezado de versión del archivo tocado, no solo `CHANGELOG.md`.
+6. **Congelamiento del MVP — decisión tomada en este ADR.** Ver arriba.
+
+**Consecuencia:**
+- Toda funcionalidad de Etapa 4 (Dashboard Empresa) en adelante debe justificar, antes de escribir código, en qué motor existente se apoya — no puede calcular su propia versión de "estado", "integridad" o "alerta".
+- La integración de Alertas al Modelo de Decisión Explicable (hallazgo #2) queda como decisión pendiente explícita — se revisará cuando Dashboard Empresa o Alertas evolucionen lo suficiente para necesitarla, no se fuerza ahora.
+- A partir de esta versión, actualizar el encabezado "Versión del documento" de cada archivo de `/docs` que se modifique es parte del flujo de trabajo, no un paso opcional.
 
 ---
 
