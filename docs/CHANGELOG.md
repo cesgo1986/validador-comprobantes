@@ -6,6 +6,19 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.15.7] — 2026-07 — Etapa 3, 3.5: badge inteligente — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `services/alerta_service.py`: `contar_alertas()` — Motor de Prioridad, separa alertas `NUEVA` totales de las "notificables" (severidad `MEDIA`+).
+- `main.py`: nuevo endpoint `GET /api/v1/dashboard/alertas/conteo`.
+- `app/components/BottomNav.tsx`: badge de "Alertas" ya no hardcodeado en `3` — se conecta al conteo real, con polling cada 60s.
+
+### Documentado
+- `LABORATORIO.md`: umbral de severidades "notificables" (`MEDIA`+) registrado como `#LAB-VP`.
+- `API.md`, `ARQUITECTURA.md`, `ROADMAP.md`: actualizados.
+
+---
+
 ## [0.15.6] — 2026-07 — 3.4 cerrado: pantalla /alertas desplegada
 
 ### Desplegado en producción

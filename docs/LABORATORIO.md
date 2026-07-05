@@ -25,6 +25,48 @@ Durante las sesiones de trabajo, estas investigaciones se marcan con `🧪 #LAB-
 
 ## Investigaciones registradas
 
+### 2026-07 — Umbral del Motor de Prioridad (Evento vs. Notificación)
+
+**Qué se decidió (sin experimento previo, criterio de arranque):** para el badge inteligente (ítem 3.5, Etapa 3), se definió que solo las alertas de severidad `MEDIA`, `ALTA` o `CRITICA` cuentan como "notificables" — `BAJA` se sigue registrando como evento (visible en la pantalla `/alertas` si el usuario filtra por ese estado), pero no incrementa el badge.
+
+**Motivo:** el ejemplo del ADR original sigue aplicando — un hash reutilizado por segunda vez (`BAJA`, ver `regla_hash.py`) probablemente no amerita interrumpir al usuario; un hash reutilizado 5+ veces (`ALTA`) sí. Sin este corte, el badge terminaría contando cosas que no cambian ninguna decisión real, y se volvería ruido — exactamente lo que el ADR de separación Evento/Notificación buscaba evitar.
+
+**Por qué se registra aquí y no como decisión definitiva:** el corte "MEDIA o superior" es arbitrario en el sentido de que no viene de datos — es la línea más razonable con la información disponible hoy. Si en la Beta se observa que las alertas `MEDIA` (hoy solo `CLABE_FRECUENTE`) generan demasiado ruido, o que hace falta un nivel intermedio, este es el lugar donde se documenta el ajuste.
+
+**Consecuencia (decisión oficial derivada):** el conjunto vive como constante en código (`services/alerta_service.py`: `SEVERIDADES_NOTIFICABLES = {"MEDIA", "ALTA", "CRITICA"}`), no en base de datos — mismo criterio que los umbrales de las reglas de detección.
+
+---
+
+### 2026-07 — Umbrales iniciales de las reglas del Alert Engine (hipótesis, sujetas a ajuste con datos de la Beta)
+
+**Qué se decidió (sin experimento previo, criterio de arranque):** los umbrales de las tres primeras reglas del Alert Engine (ítem 3.3, Etapa 3) se fijaron sin datos históricos reales — son un punto de partida razonable, no una conclusión validada.
+
+- **Reutilización de hash:** severidad escala con `veces_visto` — 2ª vez = BAJA, 3-4 = MEDIA, 5+ = ALTA.
+- **CLABE receptora frecuente:** 10 o más análisis con la misma CLABE en 30 días → alerta de severidad MEDIA. Umbral deliberadamente alto porque un negocio legítimo recibe pagos constantemente — se busca un salto de actividad, no el uso normal.
+- **Clave de rastreo repetida:** severidad ALTA fija cuando la misma clave de rastreo aparece con **banco distinto**. La versión inicial también comparaba `monto_detectado`, pero se retiró esa comparación (ver revisión abajo) — quedó solo banco.
+
+**Revisión (2026-07, mismo día):** se retiró la comparación por `monto_detectado` en la regla de clave de rastreo. Motivo: un monto distinto con la misma clave de rastreo es más probable que sea un error de OCR (Claude Vision leyendo mal un dígito) que evidencia real de fraude — mientras que un banco distinto con la misma clave es una contradicción estructural (la clave de rastreo codifica el banco emisor en su formato) mucho más difícil de explicar por error de lectura. Comparar solo banco reduce falsos positivos sin perder la señal que de verdad importa. Esta revisión ocurrió antes de desplegar la regla — no hubo datos reales de producción todavía que la motivaran, fue una corrección de diseño detectada en revisión.
+
+**Por qué se registra aquí y no directamente como decisión definitiva:** estos números (10 apariciones, 30 días, los cortes de 2/3/5 para hash, y ahora "solo banco" para clave de rastreo) son exactamente el tipo de parámetro que se espera seguir ajustando en cuanto haya datos reales de la Beta. Cuando eso ocurra, la corrección se documenta como continuación de esta misma entrada, no como una investigación nueva.
+
+**Consecuencia (decisión oficial derivada):** los umbrales viven como constantes en cada archivo de regla (`alert_engine/regla_clabe.py`: `UMBRAL_APARICIONES = 10`, `VENTANA_DIAS = 30`) — no en base de datos ni configuración externa todavía. Si durante la Beta se ajustan con frecuencia, vale la pena evaluar moverlos a `catalogo_bancos.json` o una tabla de configuración, siguiendo el mismo patrón ya usado para los parámetros del flujo CEP.
+
+---
+
+### 2026-07 — Falso positivo: BBVA muestra montos con signo negativo en egresos
+
+**Qué se investigó:** por qué un comprobante legítimo de BBVA fue marcado con la validación "Monto negativo" (severidad alta, categoría estructural), a pesar de que la transferencia fue confirmada como liquidada por Banxico (estado SPEI correcto, sin discrepancias en el XML).
+
+**Método:** revisión del comprobante real (imagen adjunta por el usuario) y del `system_prompt` que gobierna el análisis de Claude Vision en `main.py`.
+
+**Resultado:** BBVA despliega el monto con signo negativo (ej. `-$40.00`) como convención visual para indicar que el dinero fue descontado de la cuenta (egreso) — no es una señal de alteración del documento. El `system_prompt` no distinguía este caso: la regla "Monto en cero o negativo" instruía a Claude a marcar como riesgo cualquier signo negativo, sin excepción.
+
+**Consecuencia (decisión oficial derivada, confirmada en producción 2026-07):** se corrigió el `system_prompt` en `build_system_prompt()` (`main.py`) en tres puntos: (1) se agregó a las reglas de formatos válidos que algunos bancos muestran el monto con signo negativo para egresos y que esto no debe marcarse como riesgo; (2) se acotó la regla de "marcar como riesgo" para excluir el signo negativo consistente con esa convención; (3) se reforzó la instrucción de extracción del campo `monto` para que siempre se extraiga como valor absoluto (positivo). No se tocó lógica de backend — el problema vivía enteramente en el prompt, no en `normalize_monto_float()` ni en ninguna validación estructural de Python. Desplegado en Render y verificado contra el mismo comprobante de BBVA que originó el hallazgo: ya no marca "Monto negativo".
+
+**Nota para crecimiento futuro:** este es el primer caso registrado de una convención de despliegue específica de un banco que generó un falso positivo. Si aparecen más casos de este tipo (otro banco con otra convención visual particular), vale la pena evaluar si conviene mantenerlos como reglas dentro del `system_prompt` (como aquí) o migrarlos a un catálogo de datos por banco — similar al patrón ya usado en `catalogo_bancos.json` para el flujo del CEP — en vez de seguir acumulando excepciones sueltas dentro del texto del prompt.
+
+---
+
 ### 2026-06 — Validación criptográfica del sello digital del XML del CEP
 
 **Qué se investigó:** si el certificado del SAT cuyo número de serie coincide textualmente con el que referencia el XML del CEP era, en efecto, la llave que firmó ese XML.
@@ -41,23 +83,8 @@ Durante las sesiones de trabajo, estas investigaciones se marcan con `🧪 #LAB-
 
 ---
 
-## Investigaciones registradas
-
-### 2026-07 — Falso positivo: BBVA muestra montos con signo negativo en egresos
-
-**Qué se investigó:** por qué un comprobante legítimo de BBVA fue marcado con la validación "Monto negativo" (severidad alta, categoría estructural), a pesar de que la transferencia fue confirmada como liquidada por Banxico (estado SPEI correcto, sin discrepancias en el XML).
-
-**Método:** revisión del comprobante real (imagen adjunta por el usuario) y del `system_prompt` que gobierna el análisis de Claude Vision en `main.py`.
-
-**Resultado:** BBVA despliega el monto con signo negativo (ej. `-$40.00`) como convención visual para indicar que el dinero fue descontado de la cuenta (egreso) — no es una señal de alteración del documento. El `system_prompt` no distinguía este caso: la regla "Monto en cero o negativo" instruía a Claude a marcar como riesgo cualquier signo negativo, sin excepción.
-
-**Consecuencia (decisión oficial derivada, confirmada en producción 2026-07):** se corrigió el `system_prompt` en `build_system_prompt()` (`main.py`) en tres puntos: (1) se agregó a las reglas de formatos válidos que algunos bancos muestran el monto con signo negativo para egresos y que esto no debe marcarse como riesgo; (2) se acotó la regla de "marcar como riesgo" para excluir el signo negativo consistente con esa convención; (3) se reforzó la instrucción de extracción del campo `monto` para que siempre se extraiga como valor absoluto (positivo). No se tocó lógica de backend — el problema vivía enteramente en el prompt, no en `normalize_monto_float()` ni en ninguna validación estructural de Python. Desplegado en Render y verificado contra el mismo comprobante de BBVA que originó el hallazgo: ya no marca "Monto negativo".
-
-**Nota para crecimiento futuro:** este es el primer caso registrado de una convención de despliegue específica de un banco que generó un falso positivo. Si aparecen más casos de este tipo (otro banco con otra convención visual particular), vale la pena evaluar si conviene mantenerlos como reglas dentro del `system_prompt` (como aquí) o migrarlos a un catálogo de datos por banco — similar al patrón ya usado en `catalogo_bancos.json` para el flujo del CEP — en vez de seguir acumulando excepciones sueltas dentro del texto del prompt.
-
----
-
 ## Documentos relacionados
 
 - `XML_CEP.md` — destino del detalle técnico de investigaciones ya cerradas sobre el CEP
 - `DECISION_LOG.md` — destino de las decisiones oficiales derivadas de una investigación
+- `MOTOR_DECISIONES.md` — Motor de Comportamiento, fuente de las alertas cuyos umbrales se documentan aquí

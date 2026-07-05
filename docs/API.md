@@ -363,6 +363,16 @@ Cambia el estado de una alerta (Etapa 3, ítem 3.4) — típicamente `NUEVA` →
 
 ---
 
+## GET /api/v1/dashboard/alertas/conteo
+
+Conteo de alertas para el badge inteligente de `BottomNav` (Etapa 3, ítem 3.5). Separa el total de alertas `NUEVA` del subconjunto "notificable" — Motor de Prioridad, ver `DECISION_LOG.md`: solo severidad `MEDIA` o superior cuenta para el badge; `BAJA` se registra igual pero no lo incrementa.
+
+**Query params:** `empresa_id`
+
+**Respuesta:** `{ "total_nuevas": 5, "notificables": 2 }`
+
+---
+
 ## Códigos de error
 
 | Status | Descripción |

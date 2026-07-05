@@ -46,7 +46,7 @@ app/
 ├── alertas/page.tsx             ← Lista con divulgación progresiva (Etapa 3, ítem 3.4)
 ├── perfil/page.tsx              ← Placeholder (Sprint E)
 ├── context/AnalisisContext.tsx  ← Estado compartido entre pantallas
-├── components/BottomNav.tsx     ← Navegación inferior fija
+├── components/BottomNav.tsx     ← Navegación inferior fija, badge de Alertas conectado a /alertas/conteo (Etapa 3, ítem 3.5)
 └── layout.tsx                   ← AnalisisProvider + BottomNav
 ```
 
