@@ -6,6 +6,19 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ---
 
+## [0.16.0] — 2026-07 — ✅ Etapa 3 (Alertas Inteligentes) completa
+
+### Desplegado en producción
+- `services/alerta_service.py`, `main.py`: Motor de Prioridad y endpoint de conteo, verificados funcionando.
+- `app/components/BottomNav.tsx`: badge inteligente verificado — ya no hardcodeado.
+
+### Cerrado
+- `ROADMAP.md`: ítem **3.5** pasa a ✅. Con esto, **la Etapa 3 completa queda cerrada** — los 5 ítems (3.1 a 3.5) están en producción y verificados.
+
+Sube a versión MINOR (no PATCH) porque marca el cierre de una etapa completa del roadmap, mismo criterio aplicado al cerrar las Etapas 1 y 2.
+
+---
+
 ## [0.15.7] — 2026-07 — Etapa 3, 3.5: badge inteligente — código listo, pendiente de deploy
 
 ### Agregado (código pendiente de aplicar y desplegar)

@@ -222,7 +222,7 @@ Funcionalidades:
 
 ---
 
-## Etapa 3 — Alertas inteligentes
+## ✅ Etapa 3 — Alertas inteligentes: COMPLETA (2026-07)
 
 **Objetivo:** pasar de guardar información a detectarla activamente. Esto ya no es validación puntual, es inteligencia sobre el histórico. Depende de Etapa 2 (Historial real), ya cerrada, para tener la base de datos sobre la cual detectar patrones.
 
@@ -246,7 +246,7 @@ Cada regla es una función que recibe el análisis recién guardado y devuelve `
 
 **3.4 — Pantalla `/alertas` ✅ (completado y desplegado, 2026-07):** `app/alertas/page.tsx` con divulgación progresiva — Nivel 1: solo alertas `NUEVA` por defecto (lo que necesita atención ahora), con acciones rápidas "Marcar como revisada"/"Descartar" por tarjeta. Nivel 2 (filtros): estado, severidad, tipo de alerta. Dos endpoints nuevos: `GET /api/v1/dashboard/alertas` y `PATCH /api/v1/dashboard/alertas/{id}/estado` (ver `API.md`). Etiquetas legibles por tipo de alerta y entidad — el usuario nunca ve el valor crudo del enum (`REUTILIZACION_HASH` se muestra como "Comprobante reutilizado").
 
-**3.5 — Notificaciones y badge inteligente (código listo, 2026-07, pendiente de aplicar y desplegar):** Motor de Prioridad implementado como filtro simple — `services/alerta_service.py`: `contar_alertas()` separa `total_nuevas` de `notificables` (severidad `MEDIA`+, ver `LABORATORIO.md` para el umbral como hipótesis). Nuevo endpoint `GET /api/v1/dashboard/alertas/conteo`. `BottomNav.tsx` reemplaza el badge hardcodeado en `3` por el conteo real (`notificables`), refrescado cada 60s mientras la app está abierta — no es tiempo real (WebSockets), es polling simple, suficiente para esta etapa.
+**3.5 — Notificaciones y badge inteligente ✅ (completado y desplegado, 2026-07):** Motor de Prioridad implementado como filtro simple — `services/alerta_service.py`: `contar_alertas()` separa `total_nuevas` de `notificables` (severidad `MEDIA`+, ver `LABORATORIO.md` para el umbral como hipótesis). Nuevo endpoint `GET /api/v1/dashboard/alertas/conteo`. `BottomNav.tsx` reemplaza el badge hardcodeado en `3` por el conteo real (`notificables`), refrescado cada 60s mientras la app está abierta — no es tiempo real (WebSockets), es polling simple, suficiente para esta etapa. Verificado funcionando en producción.
 
 **Nota de proceso:** las discusiones sobre umbrales de detección (¿cuántas veces es "frecuente"? ¿en cuántos días?) se registran como `#LAB-VP` en `LABORATORIO.md` conforme ocurran durante la Beta — son investigaciones que van a evolucionar con datos reales, no decisiones definitivas de hoy.
 
