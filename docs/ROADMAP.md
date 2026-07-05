@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+**Versión del documento:** 0.18.0 · **Última actualización:** 05/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -216,7 +216,7 @@ Funcionalidades:
 
 **2.3 — Vista de detalle de un análisis histórico ✅ (completado y desplegado, 2026-07):** `app/historial/[id]/page.tsx`, consume `GET /api/v1/dashboard/analisis/{id}`. Reutiliza `AnalisisContext` (ver ADR en `DECISION_LOG.md`) — hidrata el contexto con el resultado histórico para que "Ver validaciones completas" navegue a `/resultado/detalle` sin ninguna modificación en ese archivo. Incluye: badge "Análisis archivado" (cambia la expectativa del usuario — no espera que los datos cambien), ficha de auditoría (fecha, archivo, banco, monto, hash, nivel de evidencia, fuente del estado) antes del semáforo, espacio reservado "Actividad relacionada" (visión de Historial Inteligente, sin implementar), y nota de privacidad reencuadrada ("no se guarda la imagen" como decisión de diseño, no como limitación). Deliberadamente **sin** botón "Ver comprobante" — el sistema no persiste la imagen original del comprobante, solo el JSON del análisis.
 
-**Refactor pendiente (deuda técnica reconocida, no bloqueante):** `app/historial/[id]/page.tsx` duplica una porción significativa del JSX de `app/resultado/page.tsx` (semáforo, "¿Qué significa esto?", panel expandible). No se extrajo a un componente compartido en 2.3 para no modificar un archivo estable en producción. Candidatos de extracción cuando se haga: `ResultadoHeader`, `ResultadoExplicacion`, `ResultadoEvidencias`. Debe resolverse antes de que exista un tercer consumidor del mismo patrón visual (Dashboard Empresa, Etapa 4) — ver ADR en `DECISION_LOG.md`.
+**Refactor ✅ resuelto (2026-07, antes de Etapa 4):** `app/historial/[id]/page.tsx` duplicaba una porción significativa del JSX de `app/resultado/page.tsx`. Extraído a componentes compartidos en `app/components/resultado/`: `SemaforoSpei.tsx`, `QueSignificaEsto.tsx`, `DetalleExpandible.tsx` (+ `app/lib/colores.ts`). Resuelto antes de abrir Etapa 4 (Dashboard Empresa) — ver ADR en `DECISION_LOG.md`.
 
 **Evolución futura — Historial Inteligente (visión, sin sprint asignado):** el Historial evolucionará hacia un Historial Inteligente capaz de identificar patrones por emisor, beneficiario, cuenta, CLABE, banco, dispositivo y comportamiento histórico — es decir, no buscar comprobantes, sino buscar comportamiento. Esta evolución se considerará cuando exista suficiente información estadística proveniente de la Beta. No es un compromiso de roadmap ni tiene fecha — queda anotada aquí para no perderse cuando llegue el momento de evaluarla. El espacio "Actividad relacionada" en `/historial/[id]` ya quedó reservado visualmente para cuando esto se implemente.
 
@@ -252,16 +252,23 @@ Cada regla es una función que recibe el análisis recién guardado y devuelve `
 
 ---
 
-## Etapa 4 — Dashboard Empresa
+## Etapa 4 — Backend Empresarial + Executive Summary móvil
 
-**Objetivo:** cambiar de público — de "analizo una transferencia" a "analizo miles". Este es el salto a Enterprise.
+**Objetivo:** cambiar de público — de "analizo una transferencia" a "analizo miles". Este es el salto a Enterprise. Ver `DECISION_LOG.md`, ADR "ningún dashboard consulta la base de datos o los motores directamente" — decisión de fondo que ordena toda esta etapa: se introduce `AggregationService` como cuarto consumidor del núcleo (junto a Motor SPEI, Motor Documental y Alert Engine), y **no** se construye un dashboard completo en móvil — ver ADR "una sola experiencia, múltiples presentaciones".
 
-Ejemplo de contenido del dashboard:
-- Transferencias del día por estado (liquidadas, en proceso, devueltas)
+**4.1 — Backend empresarial completo (`AggregationService`):** responsabilidad única — responder preguntas agregadas sobre el estado del sistema:
+- Transferencias por estado (liquidadas, en proceso, devueltas) en un periodo
 - Monto total procesado
-- Clientes con más incidencias
-- Top bancos por volumen
-- Tiempo promedio de validación
+- Distribución por bancos, banco más frecuente
+- Riesgo por periodo, % con alta confianza documental
+- Alertas agregadas (críticas activas, por tipo)
+- Actividad por empresa, tiempo promedio de análisis
+
+La API queda prácticamente definitiva en este ítem — Desktop (Etapa 5) consume exactamente estos mismos endpoints, sin necesitar otros nuevos. `dashboard_service.py` pasa a ser un consumidor de `AggregationService`, no el lugar donde viven las queries agregadas nuevas.
+
+**4.2 — Mobile Executive Summary:** no un dashboard completo — un resumen ejecutivo compacto (análisis de hoy, alertas nuevas, riesgo alto, % confirmadas), sin gráficas, sin tablas, sin filtros avanzados. Responde una sola pregunta: *"¿cómo está mi operación?"*. Vive dentro de `app/perfil/page.tsx`, que temporalmente se convierte en "Perfil / Empresa" (ver ADR en `DECISION_LOG.md`) — sin agregar un sexto ícono a `BottomNav`, y sin construir algo que se descarte cuando llegue la autenticación real (Etapa 6).
+
+**4.3 — Desktop completo:** diferido a Etapa 5, donde ya existía como ítem propio. Consume `AggregationService` a través de los mismos endpoints de 4.1 — gráficas, tablas, filtros, exportación, drill-down viven ahí, no aquí.
 
 ---
 
@@ -269,18 +276,19 @@ Ejemplo de contenido del dashboard:
 
 **Objetivo:** nueva experiencia para clientes empresariales que procesan volúmenes altos. Se ubica después de Historial, Alertas y Dashboard porque para este punto ya está claro exactamente qué información debe consumir.
 
-**No es adaptar la UI móvil.** Es diseñar desde cero para pantallas grandes:
+**Corrección (2026-07):** esta sección decía *"No es adaptar la UI móvil. Es diseñar desde cero para pantallas grandes"* — eso contradice el ADR "una sola experiencia, múltiples presentaciones" (`DECISION_LOG.md`), registrado antes de abrir Etapa 4. Es exactamente lo contrario: Desktop **sí es** la misma app móvil, aprovechando el espacio disponible para dejar de esconder detrás de divulgación progresiva lo que en móvil vive detrás de un botón expandible. No se rediseña desde cero — se despliega lo que ya existe.
+
+Contenido de Etapa 5, reformulado bajo ese principio:
 - Análisis de múltiples comprobantes simultáneos
-- Vista de resultados en tabla con filtros
-- Integración con el historial y dashboard
-- Exportación de reportes
+- La misma vista de Resultado/Historial, pero con Evidencias visibles simultáneamente en vez de detrás de "Ver detalles del análisis" (más espacio, misma información)
+- El Executive Summary de 4.2 se expande a Dashboard Empresa completo (gráficas, tablas, filtros, exportación, drill-down) — mismos endpoints de `AggregationService`, sin backend nuevo
 - Workflow de aprobación/rechazo por operador
 
-Desktop cambia el mercado: pasa de "analizo un comprobante" a "analizo 500 comprobantes diarios".
+Desktop cambia el mercado: pasa de "analizo un comprobante" a "analizo 500 comprobantes diarios" — pero el producto que lo hace es el mismo.
 
 ### 5.1 — Motor de Presentación (backend)
 
-Desktop es el segundo consumidor real del backend (después de Mobile). Por la regla de arquitectura fijada en `DECISION_LOG.md` ("Regla arquitectónica: la lógica de presentación migra al backend solo con múltiples consumidores"), este es el momento de mover la lógica de colores/iconos/niveles de severidad — hoy vive solo en `app/resultado/page.tsx` — a un objeto `presentation` calculado por el backend:
+Desktop es el segundo consumidor real del backend (después de Mobile). Por la regla de arquitectura fijada en `DECISION_LOG.md` ("Regla arquitectónica: la lógica de presentación migra al backend solo con múltiples consumidores"), este es el momento de mover la lógica de colores/iconos/niveles de severidad — hoy vive solo en `app/resultado/page.tsx` y en los componentes compartidos de `app/components/resultado/` — a un objeto `presentation` calculado por el backend:
 
 ```json
 {

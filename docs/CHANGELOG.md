@@ -1,8 +1,21 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.17.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.18.0 · **Última actualización:** 05/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.18.0] — 2026-07 — Etapa 4 redefinida: AggregationService + Executive Summary móvil; principio "una sola experiencia, múltiples presentaciones"
+
+### Documentado (sin código todavía)
+- `DECISION_LOG.md`: 🏛️ ADR — "una sola experiencia, múltiples presentaciones": móvil define el producto, Desktop solo expande, nada exclusivo de Desktop.
+- `DECISION_LOG.md`: 🏛️ ADR — ningún dashboard consulta la base de datos o los motores directamente; se introduce `AggregationService` (cuarto consumidor del núcleo) como única pieza autorizada a construir queries agregadas.
+- `DECISION_LOG.md`: 🏛️ ADR — `Perfil` evoluciona temporalmente a "Perfil / Empresa" para el Executive Summary, sin agregar un sexto ícono a `BottomNav`.
+- `PRODUCT_VISION.md`: nuevo principio #6, "Una sola experiencia, múltiples presentaciones".
+- `ROADMAP.md`: Etapa 4 reescrita — 4.1 (`AggregationService` + backend empresarial completo), 4.2 (Mobile Executive Summary vía Perfil), 4.3 (Desktop completo, diferido a Etapa 5). Etapa 5 corregida: se retira la frase "no es adaptar la UI móvil, es diseñar desde cero" — contradecía el ADR de una sola experiencia.
+
+Sube a versión MINOR porque redefine la estructura de una etapa completa del roadmap y establece un principio de producto permanente, no un ajuste incremental.
 
 ---
 

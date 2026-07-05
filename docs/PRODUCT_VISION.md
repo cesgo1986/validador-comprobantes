@@ -1,5 +1,7 @@
 # PRODUCT_VISION.md — Visión estratégica de VerificaPago
 
+**Versión del documento:** 0.18.0 · **Última actualización:** 05/07/2026
+
 *Documento de producto, no técnico. Define qué es VerificaPago, hacia dónde va y qué no será nunca.*
 
 ---
@@ -54,6 +56,9 @@ VerificaPago nunca dice "créeme" — siempre dice "aquí está por qué llegué
 
 **5. Arquitectura que respeta la fuente**
 Banxico responde por la operación. VerificaPago responde por el documento. Esa línea nunca se cruza en el código ni en la interfaz.
+
+**6. Una sola experiencia, múltiples presentaciones**
+VerificaPago es un producto, no dos aplicaciones. Móvil define el producto — cualquier funcionalidad nueva se diseña primero ahí. Desktop nunca redefine la experiencia, solo aprovecha el espacio disponible para mostrar simultáneamente lo que en móvil vive detrás de divulgación progresiva. Ninguna funcionalidad nace exclusivamente para Desktop: si aporta valor, existe también en móvil, aunque sea detrás de un panel expandible. Ver `DECISION_LOG.md` ("una sola experiencia, múltiples presentaciones").
 
 ---
 
@@ -179,3 +184,12 @@ Esa separación, que parece sutil, cambia completamente el tipo de decisiones qu
 - "La transferencia está liquidada y el comprobante coincide con el XML" → máxima certeza disponible hoy
 
 Eso es lo que hace a VerificaPago defendible frente a copias: la filosofía está en la arquitectura, no solo en la interfaz.
+
+---
+
+## Documentos relacionados
+
+- `PRODUCT.md` — definición técnica/producto complementaria
+- `MODELO_DECISION_EXPLICABLE.md` — el principio de Explicabilidad se desarrolla ahí a fondo
+- `DECISION_LOG.md` — decisiones que materializan esta visión
+- `ROADMAP.md` — el plan concreto para llegar a esta visión

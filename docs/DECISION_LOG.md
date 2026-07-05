@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.17.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.18.0 · **Última actualización:** 05/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -195,6 +195,57 @@ Cada regla es una función que recibe el análisis recién guardado y devuelve `
 - `ROADMAP.md`, Etapa 3, se reestructura en 3.1 (diseño del Alert Engine — este ADR) → 3.2 (tabla `alertas`) → 3.3 (primeras reglas: hash, cuenta, CLABE, clave de rastreo) → 3.4 (pantalla `/alertas`) → 3.5 (notificaciones y badge inteligente).
 - `MOTOR_DECISIONES.md` se actualiza para nombrar el Motor de Comportamiento como tercer motor conceptual, sembrado sin implementación todavía.
 - Las discusiones sobre umbrales de detección (¿cuántas veces es "frecuente"?) se registran como `#LAB-VP` en `LABORATORIO.md` conforme ocurran durante la Beta — son investigaciones que van a evolucionar con datos reales, no decisiones definitivas de hoy.
+
+---
+
+## 2026-07 — 🏛️ ADR: una sola experiencia, múltiples presentaciones
+
+**Decisión:** VerificaPago es un solo producto con dos presentaciones (móvil y Desktop), no dos aplicaciones distintas. Reglas:
+
+1. Existe un único flujo funcional.
+2. Móvil define el producto — cualquier funcionalidad nueva se diseña primero para móvil.
+3. Desktop nunca redefine la experiencia — solo aprovecha el espacio disponible para mostrar simultáneamente lo que en móvil está detrás de divulgación progresiva (ej. Resultado + Evidencias lado a lado, en vez de un botón "Ver detalles del análisis").
+4. Ninguna funcionalidad nace exclusivamente para Desktop. Si aporta valor al producto, debe existir también en móvil, aunque sea detrás de un panel expandible o del botón `+` (ver ADR siguiente).
+
+**Motivo:** sin esta regla, Etapa 5 (Desktop) corre el riesgo de convertirse en un producto paralelo con su propia lógica, su propia UX y — con el tiempo — su propio conjunto de bugs y decisiones que ya no coinciden con móvil. La pregunta al construir algo nuevo deja de ser *"¿cómo lo hacemos para Desktop?"* y pasa a ser *"¿cómo funciona el producto? ¿cómo se muestra en móvil? ¿cómo se expande en Desktop?"*.
+
+**Consecuencia:**
+- `ROADMAP.md`, Etapa 5: se corrige la descripción — decía *"No es adaptar la UI móvil, es diseñar desde cero para pantallas grandes"*, que contradice este ADR. Ahora dice lo contrario: Desktop parte de la app móvil ya construida y deja de esconder información, no rediseña.
+- El botón `+` de `BottomNav` (hoy sin uso más allá de regresar al flujo de análisis) es el lugar donde progresivamente aparecerán funciones nuevas que en Desktop se conviertan en barra lateral — ver ADR de Etapa 4 para el primer caso concreto (resumen empresarial).
+- Se agrega como principio en `PRODUCT_VISION.md`.
+
+---
+
+## 2026-07 — 🏛️ ADR: ningún dashboard consulta la base de datos o los motores directamente — todos pasan por `AggregationService`
+
+**Decisión:** se introduce un cuarto consumidor del núcleo (junto a Motor SPEI, Motor Documental y Alert Engine): **Dashboard Empresa**. Se establece que ningún dashboard —el de Etapa 4, el de Desktop en Etapa 5, o cualquier futuro— calcula nada por su cuenta ni consulta la base de datos directamente. El flujo obligatorio es:
+
+```
+Dashboard → DashboardService → AggregationService → Motores
+```
+
+Nunca `Dashboard → SELECT ... → Base de datos` directo.
+
+**Motivo:** sin esta capa, cada dashboard nuevo reimplementaría sus propias agregaciones (¿cuántos análisis hoy? ¿qué banco es más frecuente? ¿qué % terminó liquidado?), y el día que cambie una regla del Alert Engine o del Motor Documental, habría que actualizar cada dashboard por separado — exactamente el problema que ya se resolvió para Historial con `_construir_filtros_analisis()` compartida, pero a una escala mayor.
+
+**`AggregationService` (nuevo, ítem 4.1 — Etapa 4), responsabilidad única:** responder preguntas agregadas sobre el estado del sistema — cuántos análisis hubo en un periodo, banco más frecuente, alertas críticas activas, tendencia semanal, % liquidado, % con alta confianza documental, etc. Es la única pieza autorizada a construir queries de agregación nuevas; `dashboard_service.py` pasa a ser un consumidor de `AggregationService`, no el lugar donde viven las queries agregadas nuevas.
+
+**Estructura de Etapa 4 (reemplaza el desglose genérico anterior):**
+- **4.1 — Backend empresarial completo (`AggregationService` + endpoints):** KPIs agregados, tendencias, distribución por bancos, riesgo por periodo, alertas agregadas, actividad por empresa. La API queda prácticamente definitiva — Desktop (Etapa 5) consume exactamente estos mismos endpoints, sin necesitar otros nuevos.
+- **4.2 — Mobile Executive Summary:** no un dashboard completo en móvil — un resumen ejecutivo compacto (análisis de hoy, alertas nuevas, riesgo alto, % confirmadas), sin gráficas ni tablas ni filtros. Vive dentro de `Perfil`, que temporalmente se convierte en "Perfil / Empresa" (ver ADR siguiente).
+- **4.3 — Desktop completo:** diferido a Etapa 5, donde ya existía. Consume `AggregationService` a través de los mismos endpoints de 4.1 — gráficas, tablas, filtros, exportación, drill-down viven ahí, no en Etapa 4.
+
+**Consecuencia:**
+- `ROADMAP.md`, Etapa 4, se reescribe con este desglose.
+- `ARQUITECTURA.md` agrega `services/aggregation_service.py` (planeado) a la estructura del backend.
+
+---
+
+## 2026-07 — 🏛️ ADR: `Perfil` evoluciona temporalmente a "Perfil / Empresa"
+
+**Decisión:** en vez de agregar un sexto ícono al `BottomNav` para el Executive Summary de Dashboard Empresa (ítem 4.2), se usa el espacio ya reservado en `Perfil` — hoy un placeholder sin implementar, destinado a convertirse en el panel de usuario cuando exista autenticación real (Etapa 6). Durante la Etapa 4, `Perfil` muestra datos de la empresa, el resumen ejecutivo y configuración básica; cuando llegue la autenticación multiempresa, ese mismo espacio evoluciona naturalmente al panel de usuario, sin romper la navegación ni haber construido algo que después haya que eliminar.
+
+**Consecuencia:** `BottomNav.tsx` no se modifica en su estructura de 5 elementos. `app/perfil/page.tsx` deja de ser un placeholder vacío en la Etapa 4.
 
 ---
 
