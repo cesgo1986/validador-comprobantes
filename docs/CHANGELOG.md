@@ -1,8 +1,30 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.19.1 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.20.0 · **Última actualización:** 05/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.20.0] — 2026-07 — ✅ Etapa 4 (Backend Empresarial + Executive Summary móvil) completa
+
+### Desplegado en producción
+- `app/perfil/page.tsx`: Executive Summary verificado funcionando.
+
+### Cerrado
+- `ROADMAP.md`: ítems **4.1** y **4.2** pasan a ✅. **4.3** (Desktop completo) queda formalmente diferido a Etapa 5, tal como se decidió en el ADR "una sola experiencia, múltiples presentaciones". Con esto, **la Etapa 4 completa queda cerrada**.
+
+Sube a versión MINOR porque marca el cierre de una etapa completa del roadmap, mismo criterio que las Etapas 1, 2 y 3.
+
+---
+
+## [0.19.2] — 2026-07 — Etapa 4, 4.2: Mobile Executive Summary — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `app/perfil/page.tsx`: reemplaza el placeholder — tarjeta "Resumen de hoy" consumiendo `/resumen-ejecutivo`. Sin gráficas, sin tablas, sin filtros — ver ADR "una sola experiencia, múltiples presentaciones". Deliberadamente sin datos de la empresa (no existe endpoint todavía).
+
+### Documentado
+- `ARQUITECTURA.md`, `ROADMAP.md`: actualizados.
 
 ---
 

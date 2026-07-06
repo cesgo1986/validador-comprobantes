@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.18.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.20.0 · **Última actualización:** 05/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -252,23 +252,17 @@ Cada regla es una función que recibe el análisis recién guardado y devuelve `
 
 ---
 
-## Etapa 4 — Backend Empresarial + Executive Summary móvil
+## ✅ Etapa 4 — Backend Empresarial + Executive Summary móvil: COMPLETA (2026-07)
 
 **Objetivo:** cambiar de público — de "analizo una transferencia" a "analizo miles". Este es el salto a Enterprise. Ver `DECISION_LOG.md`, ADR "ningún dashboard consulta la base de datos o los motores directamente" — decisión de fondo que ordena toda esta etapa: se introduce `AggregationService` como cuarto consumidor del núcleo (junto a Motor SPEI, Motor Documental y Alert Engine), y **no** se construye un dashboard completo en móvil — ver ADR "una sola experiencia, múltiples presentaciones".
 
-**4.1 — Backend empresarial completo (`AggregationService`):** responsabilidad única — responder preguntas agregadas sobre el estado del sistema:
-- Transferencias por estado (liquidadas, en proceso, devueltas) en un periodo
-- Monto total procesado
-- Distribución por bancos, banco más frecuente
-- Riesgo por periodo, % con alta confianza documental
-- Alertas agregadas (críticas activas, por tipo)
-- Actividad por empresa, tiempo promedio de análisis
+**4.1 — Backend empresarial completo ✅ (completado y desplegado, 2026-07):** `services/aggregation_service.py` (nuevo). Se movieron ahí, sin cambiar su lógica, las 4 agregaciones que ya existían en `dashboard_service.py` (`obtener_stats`, `tendencia_diaria`, `distribucion_scores_por_banco`, `top_hashes_reutilizados`) — `dashboard_service.py` ahora las expone como wrappers delgados, mismo nombre/firma, cero riesgo para los endpoints ya en producción. Se agregan 4 agregaciones nuevas: monto total procesado, banco más frecuente por volumen, riesgo por periodo (Motor 1 + Motor 2 por separado), y alertas agregadas. 5 endpoints nuevos: `/monto-total`, `/bancos-frecuentes`, `/riesgo-por-periodo`, `/alertas-agregadas`, `/resumen-ejecutivo` (este último para 4.2). Incluyó un fix real encontrado en el proceso: comparación de fechas contra `Analisis.fecha` (ver `CHANGELOG.md` v0.19.1) — afectaba también los filtros de fecha de Historial desde el ítem 2.1, sin haberse detectado hasta ahora.
 
-La API queda prácticamente definitiva en este ítem — Desktop (Etapa 5) consume exactamente estos mismos endpoints, sin necesitar otros nuevos. `dashboard_service.py` pasa a ser un consumidor de `AggregationService`, no el lugar donde viven las queries agregadas nuevas.
+**Gaps identificados y deliberadamente no resueltos en este corte:** "tiempo promedio de validación" requeriría una columna nueva (`duracion_ms`) en `analisis` — hoy solo existe como promedio en memoria del proceso (`metrics_service`), no histórico ni por periodo; no se implementa para no exponer un número que parezca histórico sin serlo. "Actividad por empresa" (comparar varias empresas) no tiene sentido real hasta que exista autenticación multiempresa (Etapa 6).
 
-**4.2 — Mobile Executive Summary:** no un dashboard completo — un resumen ejecutivo compacto (análisis de hoy, alertas nuevas, riesgo alto, % confirmadas), sin gráficas, sin tablas, sin filtros avanzados. Responde una sola pregunta: *"¿cómo está mi operación?"*. Vive dentro de `app/perfil/page.tsx`, que temporalmente se convierte en "Perfil / Empresa" (ver ADR en `DECISION_LOG.md`) — sin agregar un sexto ícono a `BottomNav`, y sin construir algo que se descarte cuando llegue la autenticación real (Etapa 6).
+**4.2 — Mobile Executive Summary ✅ (completado y desplegado, 2026-07):** `app/perfil/page.tsx` reemplaza el placeholder — tarjeta "Resumen de hoy" (análisis, alertas nuevas, riesgo alto, % confirmadas), consumiendo `GET /api/v1/dashboard/resumen-ejecutivo`. Sin gráficas, sin tablas, sin filtros. Deliberadamente **sin** datos de la empresa (nombre, plan) — no existe todavía un endpoint que los expongan; se agrega cuando exista, no se inventa un valor fijo. El resto de `Perfil` (gestión de datos, preferencias, seguridad, suscripción) sigue como placeholder hasta Etapa 6. Verificado funcionando en producción.
 
-**4.3 — Desktop completo:** diferido a Etapa 5, donde ya existía como ítem propio. Consume `AggregationService` a través de los mismos endpoints de 4.1 — gráficas, tablas, filtros, exportación, drill-down viven ahí, no aquí.
+**4.3 — Desktop completo:** diferido formalmente a Etapa 5, donde ya existía como ítem propio — no se implementa en Etapa 4 (ver ADR "una sola experiencia, múltiples presentaciones"). Consume `AggregationService` a través de los mismos endpoints de 4.1 — gráficas, tablas, filtros, exportación, drill-down viven ahí, no aquí.
 
 ---
 
