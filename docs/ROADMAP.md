@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.20.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.21.0 · **Última actualización:** 05/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -266,23 +266,15 @@ Cada regla es una función que recibe el análisis recién guardado y devuelve `
 
 ---
 
-## Etapa 5 — Desktop
+## Etapa 5 — Presentation Expansion (antes "Desktop")
 
-**Objetivo:** nueva experiencia para clientes empresariales que procesan volúmenes altos. Se ubica después de Historial, Alertas y Dashboard porque para este punto ya está claro exactamente qué información debe consumir.
+**Objetivo:** desplegar en pantallas anchas lo que ya existe, no rediseñar. Ver `DECISION_LOG.md`, ADR "Desktop = Responsive Web" — es el mismo frontend Next.js respondiendo a breakpoints, no una aplicación separada (se descartó explícitamente Electron/Tauri).
 
-**Corrección (2026-07):** esta sección decía *"No es adaptar la UI móvil. Es diseñar desde cero para pantallas grandes"* — eso contradice el ADR "una sola experiencia, múltiples presentaciones" (`DECISION_LOG.md`), registrado antes de abrir Etapa 4. Es exactamente lo contrario: Desktop **sí es** la misma app móvil, aprovechando el espacio disponible para dejar de esconder detrás de divulgación progresiva lo que en móvil vive detrás de un botón expandible. No se rediseña desde cero — se despliega lo que ya existe.
+**Corrección (2026-07):** esta sección decía *"No es adaptar la UI móvil. Es diseñar desde cero para pantallas grandes"* — eso contradecía el ADR "una sola experiencia, múltiples presentaciones". Es exactamente lo contrario: Desktop **sí es** la misma app móvil, aprovechando el espacio disponible para dejar de esconder detrás de divulgación progresiva lo que en móvil vive detrás de un botón expandible.
 
-Contenido de Etapa 5, reformulado bajo ese principio:
-- Análisis de múltiples comprobantes simultáneos
-- La misma vista de Resultado/Historial, pero con Evidencias visibles simultáneamente en vez de detrás de "Ver detalles del análisis" (más espacio, misma información)
-- El Executive Summary de 4.2 se expande a Dashboard Empresa completo (gráficas, tablas, filtros, exportación, drill-down) — mismos endpoints de `AggregationService`, sin backend nuevo
-- Workflow de aprobación/rechazo por operador
+**Retirado de esta etapa (2026-07):** "Análisis de múltiples comprobantes simultáneos" (Batch Analysis) y "Workflow de aprobación/rechazo por operador" — ver ADR en `DECISION_LOG.md`. Ninguno de los dos es presentación; son capacidades de producto que, por el ADR de una sola experiencia, deberían existir también en móvil. Quedan sembrados como candidatos de una etapa funcional futura, sin número ni fecha — junto con colaboración, permisos y equipos.
 
-Desktop cambia el mercado: pasa de "analizo un comprobante" a "analizo 500 comprobantes diarios" — pero el producto que lo hace es el mismo.
-
-### 5.1 — Motor de Presentación (backend)
-
-Desktop es el segundo consumidor real del backend (después de Mobile). Por la regla de arquitectura fijada en `DECISION_LOG.md` ("Regla arquitectónica: la lógica de presentación migra al backend solo con múltiples consumidores"), este es el momento de mover la lógica de colores/iconos/niveles de severidad — hoy vive solo en `app/resultado/page.tsx` y en los componentes compartidos de `app/components/resultado/` — a un objeto `presentation` calculado por el backend:
+**5.1 — Motor de Presentación (backend):** Desktop es el segundo consumidor real del backend (después de Mobile). Por la regla de arquitectura fijada en `DECISION_LOG.md` ("la lógica de presentación migra al backend solo con múltiples consumidores"), este es el momento de mover la lógica de colores/iconos/niveles de severidad — hoy vive en `app/resultado/page.tsx` y en `app/components/resultado/` — a un objeto `presentation` calculado por el backend:
 
 ```json
 {
@@ -293,23 +285,37 @@ Desktop es el segundo consumidor real del backend (después de Mobile). Por la r
 }
 ```
 
-Antes de este sprint, el paso intermedio es exponer `evidencias` (hechos crudos: `xml_valido`, `xml_discrepancias`, `confianza_documental`, `verificabilidad`, `contexto_temporal`, `hash_reutilizado`) para que Mobile decida sobre datos explícitos mientras se estabiliza la UX — ver `DECISION_LOG.md`.
+Antes de este sprint, el paso intermedio es exponer `evidencias` (hechos crudos: `xml_valido`, `xml_discrepancias`, `confianza_documental`, `verificabilidad`, `contexto_temporal`, `hash_reutilizado`) para que Mobile decida sobre datos explícitos mientras se estabiliza la UX. Sin este motor, Mobile y Desktop terminarían con dos implementaciones distintas del mismo criterio de severidad, con alto riesgo de divergir silenciosamente.
 
-Sin este motor, Mobile y Desktop terminarían con dos implementaciones distintas del mismo criterio de severidad, con alto riesgo de divergir silenciosamente.
+**5.2 — Responsive Foundation:** antes de tocar una sola pantalla, un laboratorio de breakpoints (`#LAB-VP`, ver `LABORATORIO.md`) que defina, para cada rango de ancho, qué paneles aparecen, qué deja de ser colapsable, y qué se convierte en maestro-detalle. No es una discusión de CSS/Tailwind — es una discusión de comportamiento, resuelta una sola vez para toda la etapa.
+
+**5.3 — `/resultado` en pantalla ancha:** Resultado + Evidencias visibles simultáneamente (dos columnas), sin el botón "Ver detalles del análisis" — mismos componentes de `app/components/resultado/`, sin reimplementar.
+
+**5.4 — `/historial` en pantalla ancha:** patrón maestro-detalle — lista y detalle simultáneos, sin navegar a `/historial/[id]` como ruta separada.
+
+**5.5 — Dashboard Empresa Desktop:** el Executive Summary de 4.2 se expande a gráficas, tablas, filtros, exportación y drill-down — mismos endpoints de `AggregationService` (ítem 4.1), sin backend nuevo.
 
 ---
 
-## Etapa 6 — Seguridad
+## Etapa 6 — Seguridad e infraestructura para escala
 
-**Objetivo:** hacer el sistema seguro para escalar a usuarios reales. Se mueve al final de la secuencia deliberadamente — ver `DECISION_LOG.md` — porque buena parte de esta superficie cambiará de forma conforme se definan Historial, Alertas y Dashboard.
+**Objetivo:** hacer el sistema seguro y capaz de crecer a usuarios reales. Se mueve al final de la secuencia deliberadamente — ver `DECISION_LOG.md` — porque buena parte de esta superficie cambiará de forma conforme se definan Historial, Alertas y Dashboard.
+
+**Nota (2026-07):** "eliminación automática de imágenes tras el análisis" ya está, en la práctica, satisfecho por diseño desde Etapa 2 — el sistema nunca persiste la imagen del comprobante en disco, se procesa en memoria y se descarta (ver `historial/[id]/page.tsx`, nota de privacidad). Este ítem se conserva en la lista como verificación pendiente (confirmar que ningún mecanismo interno de FastAPI/Starlette esté dejando archivos temporales sin limpiar), no como funcionalidad por construir desde cero.
 
 - JWT / autenticación real (hoy no existe — `DEFAULT_EMPRESA_ID` para todos)
 - Rate limiting por IP y por cuenta
-- Eliminación automática de imágenes tras el análisis (no almacenar comprobantes en disco)
+- Eliminación automática de imágenes tras el análisis (verificación pendiente, ver nota arriba)
 - API Keys para acceso B2B
 - Auditoría de acceso (quién consultó qué y cuándo)
 - Sanitización de inputs (validación de tipos de archivo más estricta)
 - OAuth, encriptación adicional, observabilidad tipo SIEM, políticas de retención y borrado automático de logs
+- **CORS restringido** — hoy `allow_origins=["*"]` en `main.py`; restringir a los dominios reales antes de producción con empresas externas (hallazgo de la Architecture Readiness Review, ver `DECISION_LOG.md`)
+- **Logging estructurado** — hoy los errores se registran con `print(...)`, no con un logger centralizado; migrar a `logging` estándar + agregación de logs (mismo hallazgo)
+- **Cola de trabajos para consultas a Banxico** — hoy la descarga del XML/CEP es síncrona dentro de `/analizar`; a volumen alto, Banxico se vuelve el cuello de botella. Requiere cola (RabbitMQ/Redis Queue) + workers (mismo hallazgo)
+- **Cache y métricas distribuidas** — `cache_service.py` y `metrics_service.py` viven en memoria del proceso; si Render corre más de una instancia, cada una tiene su propio estado. Migrar a Redis sin cambiar la interfaz de cada servicio (mismo hallazgo)
+- **Modelo de costo unitario** — cada análisis cuesta una llamada a Claude Vision; modelar el costo antes de definir planes B2B por volumen (mismo hallazgo)
+- **Confirmar política de backups de Supabase** — no verificado explícitamente hasta ahora (mismo hallazgo)
 
 ---
 
@@ -323,6 +329,21 @@ Sin este motor, Mobile y Desktop terminarían con dos implementaciones distintas
 - Gestión de sucursales y permisos
 - Facturación por créditos o por volumen
 - API Keys por empresa para integración B2B
+
+---
+
+---
+
+## Etapa futura (sembrada, sin número ni fecha) — Capacidades avanzadas de operación
+
+Retirada de Etapa 5 en 2026-07 (ver `DECISION_LOG.md`) porque ninguno de estos ítems es presentación — son capacidades de producto que, por el ADR de una sola experiencia, deben existir también en móvil, no solo en Desktop:
+- Análisis de múltiples comprobantes simultáneos (Batch Analysis)
+- Workflow de aprobación/rechazo por operador
+- Colaboración entre usuarios de la misma empresa
+- Permisos y equipos
+- Aprobaciones multinivel
+
+No tiene número de etapa todavía — se abre cuando el producto lo necesite, probablemente después de Etapa 7 (Multiempresa real), ya que varias de estas capacidades (permisos, equipos) dependen de que exista autenticación multiempresa real.
 
 ---
 

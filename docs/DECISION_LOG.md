@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.18.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.21.0 · **Última actualización:** 05/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -268,6 +268,53 @@ Nunca `Dashboard → SELECT ... → Base de datos` directo.
 - Toda funcionalidad de Etapa 4 (Dashboard Empresa) en adelante debe justificar, antes de escribir código, en qué motor existente se apoya — no puede calcular su propia versión de "estado", "integridad" o "alerta".
 - La integración de Alertas al Modelo de Decisión Explicable (hallazgo #2) queda como decisión pendiente explícita — se revisará cuando Dashboard Empresa o Alertas evolucionen lo suficiente para necesitarla, no se fuerza ahora.
 - A partir de esta versión, actualizar el encabezado "Versión del documento" de cada archivo de `/docs` que se modifique es parte del flujo de trabajo, no un paso opcional.
+
+---
+
+## 2026-07 — 🏛️ ADR: Desktop = Responsive Web (no Electron/Tauri)
+
+**Decisión:** Etapa 5 se construye como el mismo frontend Next.js respondiendo a breakpoints anchos — no como una aplicación de escritorio empaquetada (Electron, Tauri).
+
+**Motivo:** coherente con el ADR "una sola experiencia, múltiples presentaciones" — una app empaquetada por separado ya no es una presentación distinta del mismo producto, es otra aplicación, con su propio pipeline de build, instaladores, actualizaciones y diferencias por sistema operativo, sin beneficio real para esta etapa. Los componentes ya construidos (`SemaforoSpei`, `QueSignificaEsto`, `DetalleExpandible`, etc.) no necesitan reimplementarse — solo reorganizarse con CSS/breakpoints.
+
+**Revisión:** esta decisión se reconsidera únicamente si en el futuro se vuelven requisitos centrales del producto: modo offline, integración con hardware, o funciones nativas del sistema operativo. Hoy sería complejidad sin beneficio.
+
+**Consecuencia:** `ROADMAP.md`, Etapa 5, renombrada a "Presentation Expansion".
+
+---
+
+## 2026-07 — 🏛️ ADR: Etapa 5 se redefine como presentación pura; Batch Analysis y Workflow se retiran
+
+**Decisión:** Etapa 5 se enfoca exclusivamente en presentación (5.1 Motor de Presentación → 5.5 Dashboard Empresa Desktop). El análisis de múltiples comprobantes simultáneos (Batch Analysis) y el workflow de aprobación/rechazo por operador, propuestos originalmente como parte de Desktop, se retiran de esta etapa.
+
+**Motivo:** ninguno de los dos es "presentación en pantalla ancha" — son capacidades de producto que, por el ADR de una sola experiencia, deberían existir también en móvil. Mezclarlos con una etapa dedicada a presentación diluye el enfoque de ambas.
+
+**Consecuencia:** `ROADMAP.md` registra Batch Analysis, Workflow de aprobación, y (a futuro) colaboración/permisos/equipos como candidatos de una etapa funcional posterior, sembrada sin número ni fecha, probablemente después de Etapa 7.
+
+---
+
+## 2026-07 — 🏛️ ADR: evaluación de preparación para escala — evolución incremental, sin reescritura
+
+**Decisión:** se documenta formalmente la primera "Architecture Readiness Review" del proyecto (ver `ARQUITECTURA.md`, sección "Evaluación de preparación para escala"). Conclusión: la arquitectura actual no requiere reescritura para escalar — requiere evolución incremental de piezas específicas, cada una activable sin cambiar el diseño alrededor.
+
+**Corrección a dos supuestos iniciales de la discusión (con ChatGPT) que motivó esta revisión:**
+- No es una arquitectura de "servicios independientes escalables horizontalmente" todavía — es un **monolito modular** (Motor SPEI, Motor Documental, Alert Engine, `AggregationService` como módulos de Python dentro de un solo proceso de Render). Es la arquitectura correcta para este tamaño; la separación en servicios desplegables por separado no está hecha ni es necesaria hoy.
+- El riesgo de "¿dónde vivirán las imágenes al escalar?" no aplica — las imágenes de comprobantes nunca se persisten (ver Etapa 2, `historial/[id]/page.tsx`, nota de privacidad). No hay archivos que migrar a almacenamiento externo porque no hay archivos guardados.
+
+**Riesgos reales identificados, con plan de evolución (ninguno bloquea Etapa 5):**
+1. **Servicios en memoria no distribuidos** — `cache_service.py` y `metrics_service.py` guardan estado en la memoria del proceso; con más de una instancia de Render, cada una tendría su propio cache/métricas, inconsistentes entre sí. Evolución: migrar a Redis sin cambiar la interfaz de cada servicio.
+2. **Descarga de XML/CEP síncrona** — cada `/analizar` consulta a Banxico dentro de la misma petición HTTP; a volumen alto, Banxico (no VerificaPago) se vuelve el cuello de botella. Evolución: cola de trabajos (RabbitMQ/Redis Queue) + workers.
+3. **Sin autenticación real** — `DEFAULT_EMPRESA_ID` hardcodeado en cada endpoint, nada verifica la identidad de quien llama. Ya cubierto en `ROADMAP.md`, Etapa 6/7.
+4. **CORS abierto** — `allow_origins=["*"]` en `main.py`. Evolución: restringir a los dominios reales antes de producción con empresas externas.
+5. **Logging no estructurado** — errores registrados con `print(...)`, no con un logger centralizado. Evolución: `logging` estándar + agregación de logs.
+6. **Costo económico no modelado** — cada análisis cuesta una llamada a Claude Vision, costo lineal con el volumen; sin modelo de costo unitario todavía. Es decisión de producto/pricing, no solo de infraestructura.
+7. **Backups y recuperación ante desastres** — no verificados explícitamente (Supabase probablemente tiene backups por defecto, pero no está confirmado ni documentado).
+
+**Motivo de fondo:** con 4 etapas completas y crecimiento sostenido, valía la pena confirmar antes de seguir invirtiendo en funcionalidades que no se estaba acumulando deuda técnica que forzara una migración costosa más adelante. La respuesta es que no — cada evolución identificada cambia un proveedor o una pieza interna (memoria → Redis, síncrono → cola, `print` → logger), no el modelo de datos ni la arquitectura de motores.
+
+**Nota de alcance:** esta evaluación es una revisión de arquitectura basada en el código existente, no una auditoría de penetración ni una prueba de carga formal. Ambas valen la pena por separado cuando el proyecto se acerque a clientes empresariales reales.
+
+**Consecuencia:** no se bloquea Etapa 5. Los hallazgos con hogar natural en seguridad (autenticación, rate limiting) ya estaban en `ROADMAP.md` Etapa 6; los puramente de infraestructura (cola, cache/métricas distribuidas, CORS, logging, costos, backups) se agregan ahí también — Etapa 6 ya funcionaba como el "bucket" de hardening pre-producción, no solo de seguridad estricta en sentido puro.
 
 ---
 

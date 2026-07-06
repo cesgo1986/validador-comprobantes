@@ -1,6 +1,6 @@
 # ARQUITECTURA.md — Arquitectura técnica de VerificaPago
 
-**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+**Versión del documento:** 0.21.0 · **Última actualización:** 05/07/2026
 
 ## Visión general
 
@@ -35,18 +35,25 @@ app/
 ├── page.tsx                     ← Pantalla 1: upload + campos opcionales
 ├── analizando/page.tsx          ← Pantalla 2: loading + banner fecha pasada
 ├── resultado/
-│   ├── page.tsx                 ← Pantalla 3: semáforo + 4 dimensiones
+│   ├── page.tsx                 ← Pantalla 3: semáforo + 4 dimensiones (usa components/resultado/)
+│   ├── mensajesContextuales.ts  ← Catálogo de mensajes por estado SPEI (ítem 1.2)
 │   ├── detalle/page.tsx         ← Pantalla 4: validaciones colapsables
 │   └── comprobante/page.tsx     ← Pantalla 5/6: vista comprobante + OCR
 ├── historial/
 │   ├── page.tsx                 ← Lista con filtros y divulgación progresiva (Etapa 2, ítem 2.1 ✅)
-│   └── [id]/page.tsx            ← Detalle de análisis histórico (Etapa 2, ítem 2.3 ✅) — hidrata AnalisisContext, reutiliza /resultado/detalle
+│   └── [id]/page.tsx            ← Detalle de análisis histórico (Etapa 2, ítem 2.3 ✅) — hidrata AnalisisContext, usa components/resultado/
+├── components/
+│   ├── resultado/                ← Compartido entre /resultado y /historial/[id] (refactor previo a Etapa 4, ver DECISION_LOG.md)
+│   │   ├── SemaforoSpei.tsx       ← Nivel 1: semáforo SPEI
+│   │   ├── QueSignificaEsto.tsx   ← Nivel 1: Interpretación + Impacto + Recomendación
+│   │   └── DetalleExpandible.tsx  ← Nivel 2+: integridad, evidencias, dimensiones, diagnóstico
+│   └── BottomNav.tsx             ← Navegación inferior fija, badge de Alertas conectado a /alertas/conteo (Etapa 3, ítem 3.5)
 ├── lib/
-│   └── estadoSpei.ts            ← Espejo de SEMAFORO_SPEI (backend), única fuente de verdad de color/etiqueta/icono fuera de /resultado
+│   ├── estadoSpei.ts            ← Espejo de SEMAFORO_SPEI (backend), única fuente de verdad de color/etiqueta/icono fuera de /resultado
+│   └── colores.ts               ← Paleta compartida (TEAL/GREEN/ORANGE/RED/GRAY), antes duplicada por archivo
 ├── alertas/page.tsx             ← Lista con divulgación progresiva (Etapa 3, ítem 3.4)
-├── perfil/page.tsx              ← Placeholder (Sprint E)
+├── perfil/page.tsx              ← "Perfil / Empresa": Resumen ejecutivo (Etapa 4, ítem 4.2) + placeholder de gestión de cuenta (Sprint E)
 ├── context/AnalisisContext.tsx  ← Estado compartido entre pantallas
-├── components/BottomNav.tsx     ← Navegación inferior fija, badge de Alertas conectado a /alertas/conteo (Etapa 3, ítem 3.5)
 └── layout.tsx                   ← AnalisisProvider + BottomNav
 ```
 
@@ -80,7 +87,8 @@ backend/
 │   ├── cep_xml_auto_service.py  ← Descarga automática del XML desde Banxico
 │   ├── cache_service.py         ← Cache genérico en memoria (get/set/delete + TTL), reutilizable por cualquier servicio
 │   ├── metrics_service.py       ← Métricas genéricas en memoria por namespace de servicio, reutilizable por cualquier servicio
-│   └── alerta_service.py        ← Persistencia de alertas (crear/listar/cambiar estado) — sin las reglas de detección, ver alert_engine/
+│   ├── alerta_service.py        ← Persistencia de alertas (crear/listar/cambiar estado) — sin las reglas de detección, ver alert_engine/
+│   └── aggregation_service.py   ← Única pieza autorizada a construir queries agregadas (Etapa 4, ítem 4.1); dashboard_service.py la consume, no la reemplaza
 ├── alert_engine/                ← (planeado, ítem 3.3 — Etapa 3, aún no creado) reglas de detección, cada una un archivo independiente
 └── alembic/
     └── versions/
@@ -166,6 +174,38 @@ hashes_documentos ← UNIQUE(empresa_id, hash_sha256) — detecta reutilización
 - **Alembic** corre automáticamente al inicio de cada deploy en Render
 
 No hay pipeline de CI separado — los deploys a producción son directos desde `main`. Para cambios de riesgo se recomienda usar una rama de feature y hacer merge después de probar localmente.
+
+---
+
+## Evaluación de preparación para escala (2026-07)
+
+Ver `DECISION_LOG.md`, ADR "evaluación de preparación para escala — evolución incremental, sin reescritura". Pregunta que responde esta evaluación: ¿la arquitectura actual aguanta crecer de decenas a miles de análisis diarios sin necesitar una reescritura? Respuesta corta: sí — lo que sigue es qué evoluciona y cuándo, no una lista de qué está mal.
+
+### Lo que ya está bien, y por qué importa
+
+- **Monolito modular, no microservicios prematuros.** Motor SPEI, Motor Documental, Alert Engine y `AggregationService` son módulos de Python dentro de un solo servicio (Render). Es la arquitectura correcta para este tamaño — separar en servicios independientes ahora sería complejidad sin beneficio real, mismo criterio que ya se aplicó para descartar Electron/Tauri en Desktop.
+- **Degradación con gracia como patrón consistente.** Cache, métricas, alertas, CEP, XML — cada servicio nuevo sigue el mismo principio: si algo falla, el análisis principal se completa igual. Reduce el riesgo de fallas en cascada conforme crece el volumen.
+- **Migraciones incrementales, nunca reescrituras.** Cada columna nueva llegó con su propia migración de Alembic, sin tocar retroactivamente lo que ya funcionaba.
+- **No hay archivos que migrar.** Las imágenes de comprobantes nunca se persisten — se procesan en memoria y se descartan (ver Etapa 2, `historial/[id]/page.tsx`). El riesgo de "¿dónde vivirán los archivos al crecer?" no aplica.
+
+### Riesgos identificados, con plan de evolución (sin código nuevo todavía)
+
+| Riesgo | Estado hoy | Evolución (cuando haga falta) |
+|---|---|---|
+| Servicios en memoria no distribuidos | `cache_service.py` y `metrics_service.py` guardan estado en la memoria del proceso. Con más de una instancia de Render, cada una tendría su propio cache/métricas — inconsistentes entre sí. | Migrar a Redis, sin cambiar la interfaz de cada servicio (`get`/`set`/`registrar_evento` siguen igual). |
+| Descarga de XML/CEP síncrona | Cada `/analizar` consulta a Banxico dentro de la misma petición HTTP. A volumen bajo no se nota; a volumen alto, Banxico se vuelve el cuello de botella, no VerificaPago. | Cola de trabajos (ej. RabbitMQ/Redis Queue + workers), desacoplando la respuesta al usuario de la consulta a Banxico. |
+| Sin autenticación real | `DEFAULT_EMPRESA_ID` hardcodeado en cada endpoint. Las columnas `empresa_id` ya existen, pero nada las protege. | Ya en `ROADMAP.md`, Etapa 6/7 — JWT + API Keys. |
+| CORS abierto | `allow_origins=["*"]` en `main.py`. | Restringir a los dominios reales antes de producción con empresas externas. |
+| Logging no estructurado | Errores registrados con `print(...)`, no con un logger centralizado. | Migrar a `logging` estándar de Python + agregación de logs. |
+| Costo económico no modelado | Cada análisis cuesta una llamada a Claude Vision — costo lineal con el volumen. | Modelar el costo unitario antes de definir planes B2B por volumen. |
+| Backups y recuperación ante desastres | No verificado explícitamente — Supabase probablemente tiene backups por defecto, pero no está confirmado ni documentado. | Confirmar la política de backups y documentar el procedimiento de recuperación. |
+
+### Lo que NO aplica (corrigiendo dos supuestos)
+
+- **No hay archivos de comprobantes que migrar a S3/R2** — nunca se guardan.
+- **Postgres no es el cuello de botella** — con los índices ya construidos en cada migración, aguanta mucho más volumen del que se anticipa a corto/mediano plazo.
+
+**Nota de alcance:** esta evaluación no es una auditoría de penetración ni una prueba de carga — es una revisión de arquitectura basada en el código existente. Ambas valen la pena por separado cuando el proyecto se acerque a clientes empresariales reales.
 
 ---
 

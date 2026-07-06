@@ -1,8 +1,22 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.20.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.21.0 · **Última actualización:** 05/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.21.0] — 2026-07 — Architecture Readiness Review; Etapa 5 redefinida como "Presentation Expansion"
+
+### Documentado (sin código todavía)
+- `DECISION_LOG.md`: 🏛️ ADR — Desktop = Responsive Web, se descarta Electron/Tauri explícitamente.
+- `DECISION_LOG.md`: 🏛️ ADR — Etapa 5 se redefine como presentación pura (5.1-5.5); Batch Analysis y Workflow de aprobación se retiran, sembrados como etapa funcional futura sin número ni fecha.
+- `DECISION_LOG.md`: 🏛️ ADR — primera Architecture Readiness Review del proyecto. Conclusión: no requiere reescritura, requiere evolución incremental. Se corrigen 2 supuestos (no es "servicios independientes escalables horizontalmente" todavía — es monolito modular; no hay archivos que migrar — nunca se persisten imágenes). 7 riesgos reales identificados con plan de evolución, ninguno bloqueante.
+- `ARQUITECTURA.md`: nueva sección "Evaluación de preparación para escala", con tabla de riesgos/evolución.
+- `ROADMAP.md`: Etapa 5 reescrita (5.1-5.5, sin batch/workflow); Etapa 6 ampliada con los hallazgos de infraestructura (cola para Banxico, cache/métricas distribuidas, CORS, logging, costos, backups); nueva sección "Etapa futura (sembrada)" para Batch/Workflow/colaboración.
+- `LABORATORIO.md`: sembrado el laboratorio de breakpoints pendiente (ítem 5.2).
+
+Sube a versión MINOR porque redefine una etapa completa del roadmap y documenta la primera revisión formal de arquitectura del proyecto, no un ajuste incremental.
 
 ---
 

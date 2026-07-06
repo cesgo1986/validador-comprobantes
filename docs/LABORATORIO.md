@@ -1,6 +1,6 @@
 # LABORATORIO.md — Investigaciones y hallazgos experimentales
 
-**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+**Versión del documento:** 0.21.0 · **Última actualización:** 05/07/2026
 
 Registro de experimentos, investigaciones técnicas, benchmarks e ideas descartadas de VerificaPago. **No es un registro de decisiones** — es el espacio para todo lo que se investigó, se probó o se descartó, tenga o no tenga una decisión oficial asociada todavía.
 
@@ -24,6 +24,12 @@ Durante las sesiones de trabajo, estas investigaciones se marcan con `🧪 #LAB-
 ---
 
 ## Investigaciones registradas
+
+### Pendiente de abrir — Breakpoints de Presentation Expansion (ítem 5.2, Etapa 5)
+
+Antes de tocar cualquier pantalla en Etapa 5, definir por comportamiento (no por CSS/Tailwind) qué cambia en cada rango de ancho: qué paneles aparecen, qué deja de ser colapsable, qué se convierte en maestro-detalle. Se abre como investigación cuando arranque 5.2, no antes — sembrado aquí para no perder la intención.
+
+---
 
 ### 2026-07 — Umbral del Motor de Prioridad (Evento vs. Notificación)
 
