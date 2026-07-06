@@ -8,9 +8,13 @@ dos responsabilidades genuinamente distintas de "agregar":
   1. Listado/detalle/exportación de análisis individuales
      (listar_analisis, obtener_analisis_detalle, exportar_analisis).
   2. Wrappers delgados hacia AggregationService, para no romper los
-     endpoints ya en producción que llaman a estas funciones por nombre
-     (mismo nombre, misma firma, mismo comportamiento -- solo cambió
-     dónde vive el SQL).
+     endpoints ya en producción que llaman a estas funciones por nombre.
+
+FIX (2026-07): _construir_filtros_analisis() parsea fecha_desde/
+fecha_hasta con _parsear_fecha() (de aggregation_service.py) antes de
+comparar contra Analisis.fecha -- bug real encontrado al construir el
+ítem 4.2 (ver aggregation_service.py para el detalle completo). Afecta
+los filtros de fecha de /analisis y /analisis/exportar (ítems 2.1/2.4).
 
 Todos los queries filtran por empresa_id. En este MVP siempre es
 DEFAULT_EMPRESA_ID, pero la firma de cada funcion ya recibe empresa_id
@@ -24,6 +28,7 @@ from models.hash_documento import HashDocumento
 from database import get_db_session, DEFAULT_EMPRESA_ID
 from services import aggregation_service
 from services import alerta_service
+from services.aggregation_service import _parsear_fecha
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -96,7 +101,8 @@ def obtener_resumen_ejecutivo(empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
 
 # ─────────────────────────────────────────────────────────────────
 # Listado / detalle / exportación de análisis individuales -- sin
-# cambios, no son agregaciones, se quedan aquí.
+# cambios de comportamiento, salvo el fix de fechas en
+# _construir_filtros_analisis().
 # ─────────────────────────────────────────────────────────────────
 
 def _parsear_monto_busqueda(texto: str) -> float | None:
@@ -125,9 +131,13 @@ def _construir_filtros_analisis(
     """
     Construye la lista de condiciones WHERE compartida entre listar_analisis()
     y exportar_analisis() (item 2.4) -- evita mantener la misma lógica de
-    filtros duplicada en dos funciones que deben comportarse idéntico
-    (si no, la exportación podría no coincidir con lo que el usuario ve
-    filtrado en pantalla, que sería un bug de confianza grave).
+    filtros duplicada en dos funciones que deben comportarse idéntico.
+
+    FIX (2026-07): fecha_desde/fecha_hasta se parsean con _parsear_fecha()
+    antes de comparar contra Analisis.fecha (TIMESTAMP) -- sin esto,
+    SQLAlchemy tipa el parámetro como VARCHAR y Postgres rechaza la
+    comparación. fecha_hasta ahora incluye el día completo (antes se
+    cortaba a las 00:00:00 de ese día).
     """
     filtros = [Analisis.empresa_id == empresa_id, Analisis.deleted_at.is_(None)]
     if riesgo:
@@ -138,10 +148,13 @@ def _construir_filtros_analisis(
         filtros.append(Analisis.hash_sha256 == hash_sha256)
     if banco:
         filtros.append(Analisis.banco_detectado.ilike(f"%{banco}%"))
-    if fecha_desde:
-        filtros.append(Analisis.fecha >= fecha_desde)
-    if fecha_hasta:
-        filtros.append(Analisis.fecha <= fecha_hasta)
+
+    fd = _parsear_fecha(fecha_desde)
+    fh = _parsear_fecha(fecha_hasta)
+    if fd:
+        filtros.append(Analisis.fecha >= fd)
+    if fh:
+        filtros.append(Analisis.fecha < (fh + datetime.timedelta(days=1)))
 
     if q and q.strip():
         texto = q.strip()

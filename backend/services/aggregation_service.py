@@ -10,22 +10,32 @@ Las funciones que ya existían en dashboard_service.py y eran, en
 esencia, agregaciones (obtener_stats, tendencia_diaria,
 distribucion_scores_por_banco, top_hashes_reutilizados) se movieron
 aquí sin cambiar su lógica -- dashboard_service.py ahora las expone
-como wrappers delgados que llaman a este servicio, para no romper los
-endpoints ya en producción (/stats, /tendencia, /metricas/scores-por-banco,
-/hashes).
+como wrappers delgados que llaman a este servicio.
 
-Gaps conocidos, deliberadamente NO resueltos en este primer corte (ver
-DECISION_LOG.md para la discusión):
+FIX (2026-07): se encontró un bug real al agregar resumen-ejecutivo
+(item 4.2) -- comparar Analisis.fecha (TIMESTAMP) contra un string
+plano ('2026-07-05') hace que SQLAlchemy tipe el parámetro como VARCHAR
+en vez de fecha, y Postgres rechaza la comparación
+(UndefinedFunction: operator does not exist: timestamp >= character
+varying). Este mismo patrón ya existía en
+dashboard_service._construir_filtros_analisis() desde el ítem 2.1
+(filtro de fecha del Historial) -- probablemente nunca se disparó de
+forma visible porque nadie forzó ese filtro con valores reales lo
+suficiente. _parsear_fecha() corrige esto en ambos archivos.
+
+También se corrige un segundo bug, más sutil, en la misma revisión:
+`fecha_hasta` comparado con `<=` excluye registros del mismo día
+después de la medianoche (comparación de timestamp contra fecha pura a
+las 00:00:00). Se corrige usando "antes del día siguiente" para
+incluir el día completo.
+
+Gaps conocidos, deliberadamente NO resueltos en este corte (ver
+DECISION_LOG.md):
   - "Tiempo promedio de validación" -- requeriría persistir una
-    duración por análisis en la tabla `analisis` (columna nueva); hoy
-    metrics_service solo tiene un promedio en memoria del proceso, no
-    histórico ni por periodo. No se implementa aquí para no exponer un
-    número que parezca histórico sin serlo.
-  - "Actividad por empresa" (comparar múltiples empresas) -- no tiene
-    sentido real todavía porque no existe autenticación multiempresa
-    (Etapa 6); hoy siempre hay una sola empresa activa
-    (DEFAULT_EMPRESA_ID). Cubierto por calcular_stats_generales() /
-    calcular_tendencia_diaria() para la empresa actual mientras tanto.
+    duración por análisis en `analisis` (columna nueva); hoy
+    metrics_service solo tiene un promedio en memoria del proceso.
+  - "Actividad por empresa" (comparar múltiples empresas) -- sin
+    sentido real hasta que exista autenticación multiempresa (Etapa 6).
 """
 import datetime
 from sqlalchemy import select, func, desc
@@ -35,8 +45,41 @@ from models.alerta import Alerta
 from database import get_db_session, DEFAULT_EMPRESA_ID
 
 
+def _parsear_fecha(valor: str | None) -> datetime.date | None:
+    """
+    Convierte un string de fecha ('2026-07-05') a un objeto date de
+    Python antes de compararlo contra Analisis.fecha. Si el string no
+    es parseable, devuelve None -- se ignora el filtro en vez de romper
+    la consulta completa por un dato malformado (degradación con
+    gracia, mismo criterio que el resto del sistema).
+    """
+    if not valor:
+        return None
+    try:
+        return datetime.date.fromisoformat(valor.strip())
+    except (ValueError, AttributeError):
+        return None
+
+
+def _filtro_rango_fechas(fecha_desde: str | None, fecha_hasta: str | None) -> list:
+    """
+    Construye las condiciones de rango de fecha para Analisis.fecha,
+    ya con el fix de tipos y el fix de "día completo" aplicados.
+    """
+    condiciones = []
+    fd = _parsear_fecha(fecha_desde)
+    fh = _parsear_fecha(fecha_hasta)
+    if fd:
+        condiciones.append(Analisis.fecha >= fd)
+    if fh:
+        # "< día siguiente" en vez de "<= fh" -- incluye todo el día,
+        # no solo el instante 00:00:00 de fh.
+        condiciones.append(Analisis.fecha < (fh + datetime.timedelta(days=1)))
+    return condiciones
+
+
 # ─────────────────────────────────────────────────────────────────
-# Movidas desde dashboard_service.py, sin cambios de lógica.
+# Movidas desde dashboard_service.py, con el fix de fechas aplicado.
 # ─────────────────────────────────────────────────────────────────
 
 def calcular_stats_generales(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_desde: str | None = None, fecha_hasta: str | None = None) -> dict:
@@ -49,10 +92,7 @@ def calcular_stats_generales(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_desde: 
             }
 
         base_filtro = [Analisis.empresa_id == empresa_id, Analisis.deleted_at.is_(None)]
-        if fecha_desde:
-            base_filtro.append(Analisis.fecha >= fecha_desde)
-        if fecha_hasta:
-            base_filtro.append(Analisis.fecha <= fecha_hasta)
+        base_filtro.extend(_filtro_rango_fechas(fecha_desde, fecha_hasta))
 
         total = db.execute(select(func.count(Analisis.id)).where(*base_filtro)).scalar() or 0
 
@@ -206,7 +246,9 @@ def calcular_top_hashes_reutilizados(empresa_id: str = DEFAULT_EMPRESA_ID, min_v
 
 
 # ─────────────────────────────────────────────────────────────────
-# Nuevas -- item 4.1, Etapa 4.
+# Nuevas -- item 4.1, Etapa 4. Con el fix de fechas aplicado desde el
+# principio (a diferencia de las funciones movidas arriba, que
+# heredaban el bug original).
 # ─────────────────────────────────────────────────────────────────
 
 def calcular_monto_total_procesado(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_desde: str | None = None, fecha_hasta: str | None = None) -> dict:
@@ -216,10 +258,7 @@ def calcular_monto_total_procesado(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_d
             return {"monto_total": 0.0, "total_analisis_con_monto": 0}
 
         filtros = [Analisis.empresa_id == empresa_id, Analisis.deleted_at.is_(None), Analisis.monto_detectado.is_not(None)]
-        if fecha_desde:
-            filtros.append(Analisis.fecha >= fecha_desde)
-        if fecha_hasta:
-            filtros.append(Analisis.fecha <= fecha_hasta)
+        filtros.extend(_filtro_rango_fechas(fecha_desde, fecha_hasta))
 
         suma = db.execute(select(func.sum(Analisis.monto_detectado)).where(*filtros)).scalar()
         total = db.execute(select(func.count(Analisis.id)).where(*filtros)).scalar() or 0
@@ -241,10 +280,7 @@ def calcular_banco_mas_frecuente(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_des
             return []
 
         filtros = [Analisis.empresa_id == empresa_id, Analisis.deleted_at.is_(None), Analisis.banco_detectado.is_not(None)]
-        if fecha_desde:
-            filtros.append(Analisis.fecha >= fecha_desde)
-        if fecha_hasta:
-            filtros.append(Analisis.fecha <= fecha_hasta)
+        filtros.extend(_filtro_rango_fechas(fecha_desde, fecha_hasta))
 
         rows = db.execute(
             select(Analisis.banco_detectado, func.count(Analisis.id))
@@ -268,10 +304,7 @@ def calcular_riesgo_por_periodo(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_desd
             return {"por_riesgo": [], "por_estado_operacion": []}
 
         filtros = [Analisis.empresa_id == empresa_id, Analisis.deleted_at.is_(None)]
-        if fecha_desde:
-            filtros.append(Analisis.fecha >= fecha_desde)
-        if fecha_hasta:
-            filtros.append(Analisis.fecha <= fecha_hasta)
+        filtros.extend(_filtro_rango_fechas(fecha_desde, fecha_hasta))
 
         por_riesgo_rows = db.execute(
             select(Analisis.riesgo, func.count(Analisis.id)).where(*filtros).group_by(Analisis.riesgo)
