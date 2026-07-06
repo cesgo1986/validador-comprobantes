@@ -1,8 +1,31 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.18.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.19.1 · **Última actualización:** 05/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.19.1] — 2026-07 — Fix: comparación de fechas contra Analisis.fecha (bug real, encontrado al construir 4.2)
+
+### Corregido (pendiente de deploy)
+- `services/aggregation_service.py`: nuevo helper `_parsear_fecha()` — convierte `fecha_desde`/`fecha_hasta` (string) a `date` antes de comparar contra `Analisis.fecha` (TIMESTAMP). Sin esto, SQLAlchemy tipaba el parámetro como `VARCHAR` y Postgres rechazaba la comparación (`UndefinedFunction: operator does not exist: timestamp >= character varying`) — error real encontrado en producción al probar `/resumen-ejecutivo`.
+- Mismo fix aplicado a `services/dashboard_service.py` (`_construir_filtros_analisis()`) — el mismo patrón ya existía ahí desde el ítem 2.1 (filtro de fecha del Historial) y el ítem 2.4 (exportación), probablemente sin dispararse de forma visible hasta ahora.
+- Segundo fix, más sutil, en el mismo commit: `fecha_hasta` con `<=` excluía registros del mismo día después de la medianoche (comparación de timestamp contra fecha pura a las 00:00:00). Corregido a "antes del día siguiente" para incluir el día completo — afecta también a Historial y Exportar.
+
+Este bug no rompía nada visible en Historial hasta ahora porque nadie forzó el filtro de fecha con suficiente consistencia para notar el error 500 (o los resultados incompletos por el bug de "día completo"). Se descubrió al construir el ítem 4.2 porque es el primer código que llama a estas funciones con fechas reales garantizadas, no opcionales.
+
+---
+
+## [0.19.0] — 2026-07 — Etapa 4, 4.1: AggregationService + backend empresarial — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `services/aggregation_service.py` (nuevo): única pieza autorizada a construir queries agregadas. Incluye las 4 agregaciones movidas desde `dashboard_service.py` (sin cambio de lógica) más 4 nuevas: monto total procesado, banco más frecuente por volumen, riesgo por periodo (Motor 1 + Motor 2 separados), alertas agregadas.
+- `services/dashboard_service.py`: reescrito — las 4 funciones de agregación existentes ahora son wrappers delgados hacia `aggregation_service` (mismo nombre/firma, cero riesgo para endpoints en producción); se agregan wrappers nuevos + `obtener_resumen_ejecutivo()` (ítem 4.2, compone `AggregationService` + `alerta_service`).
+- `main.py`: 5 endpoints nuevos — `/monto-total`, `/bancos-frecuentes`, `/riesgo-por-periodo`, `/alertas-agregadas`, `/resumen-ejecutivo`.
+
+### Documentado
+- `API.md`, `ARQUITECTURA.md`, `ROADMAP.md`: actualizados. Se documentan explícitamente 2 gaps no resueltos en este corte: "tiempo promedio de validación" (requeriría columna nueva en `analisis`) y "actividad por empresa" (sin sentido real hasta Etapa 6).
 
 ---
 
