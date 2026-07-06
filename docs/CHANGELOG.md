@@ -1,8 +1,16 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.21.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.21.1 · **Última actualización:** 05/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.21.1] — 2026-07 — Vigilancia a futuro + ritual de Architecture Review
+
+### Documentado (sin código, sin decisión de arquitectura — sembradas para no reinventarlas)
+- `ROADMAP.md`: nueva sección "Vigilancia a futuro" — costo por análisis (riesgo #1 de crecimiento), telemetría de negocio (distinta de las métricas técnicas ya existentes), Feature Flags, versionado de reglas del Alert Engine, abstracción del proveedor de IA de visión.
+- `README.md`: se documenta el ritual de Architecture Review al cierre de cada etapa — no es un marcador nuevo (se mantiene la estructura de 13 documentos y 3 marcadores activos congelada); solo genera documentación si surge una decisión permanente, que ahí sí se registra como `#ADR-VP`.
 
 ---
 

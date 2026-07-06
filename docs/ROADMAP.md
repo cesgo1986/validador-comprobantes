@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.21.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.21.1 · **Última actualización:** 05/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -333,6 +333,18 @@ Antes de este sprint, el paso intermedio es exponer `evidencias` (hechos crudos:
 ---
 
 ---
+
+---
+
+## Vigilancia a futuro (sin fecha, sin compromiso — revisar en cada Architecture Review)
+
+Ninguno de estos 5 puntos requiere código hoy. Se sembraron en la revisión de escalabilidad posterior a Etapa 4 para no reinventarlos cuando aparezcan — cada uno se activa cuando la señal de negocio lo justifique, no antes.
+
+- **Costo por análisis.** Hoy es el riesgo #1 de crecimiento (más que infraestructura): cada análisis implica OCR + Claude Vision + Banxico + XML + comparaciones + Alert Engine + persistencia, y cada paso tiene costo. Necesita un indicador de costo unitario antes de Beta — ver también Etapa 6, "Modelo de costo unitario".
+- **Telemetría de negocio**, distinta de las métricas técnicas que ya existen (`metrics_service.py`: duración/éxito de XML/CEP/análisis). Candidatos: costo promedio por análisis, análisis abandonados, empresas activas, alertas falsas vs. confirmadas, consultas CEP fallidas.
+- **Feature Flags.** No hacen falta todavía (una sola empresa activa hoy), pero se anticipan necesarios en cuanto existan varias empresas con necesidades distintas — para no terminar con lógica condicional por cliente repartida por el código.
+- **Versionado de reglas del Alert Engine.** Si una regla de `alert_engine/` cambia sus umbrales o su lógica en el futuro, las alertas ya generadas quedan sin forma de saber con qué versión de la regla se generaron — dificultando reconstruir por qué se disparó una alerta antigua. Posible solución futura: registrar la versión de la regla en el `metadata` JSONB de cada alerta (la columna ya existe y está diseñada para esto, ver `DECISION_LOG.md`).
+- **Abstracción del proveedor de IA de visión.** Hoy el análisis documental depende directamente de Claude Vision (`anthropic` SDK, llamado directo desde `main.py`). No se abstrae ahora, pero vale la pena tenerlo en mente si algún día conviene poder cambiar de proveedor sin tocar el resto del sistema.
 
 ## Etapa futura (sembrada, sin número ni fecha) — Capacidades avanzadas de operación
 

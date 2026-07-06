@@ -1,6 +1,6 @@
 # README.md — Índice de la documentación de VerificaPago
 
-**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+**Versión del documento:** 0.21.1 · **Última actualización:** 05/07/2026
 
 Este no es el README del repositorio (ese sigue viviendo en la raíz, en GitHub). Este es el punto de entrada a `/docs`: qué contiene, en qué orden leerlo, y cómo se mantiene actualizado.
 
@@ -69,6 +69,8 @@ Durante las sesiones de trabajo (Verificapago, Verificapago1.1, y cualquier sesi
 | 🎯 `#PDR-VP` *(reservado, no activo)* | Product Decision Record | Decisiones de producto que no son arquitectura ni investigación (renombrar un concepto, reordenar el roadmap, mover un entregable entre etapas) | Por definir — anotado como posible cuarto marcador, sin activar todavía |
 
 **Regla de fondo de todos los marcadores:** cada pieza de conocimiento tiene una única fuente de verdad. Las decisiones referencian investigaciones, pero no las duplican; los documentos especializados profundizan en su dominio, el resto solo enlaza o resume cuando hace falta. Ver `DECISION_LOG.md`, principio de gobernanza documental.
+
+**Ritual — Architecture Review al cierre de cada etapa (2026-07, no es un marcador nuevo):** al cerrar una etapa importante del roadmap, antes de abrir la siguiente, se hace una revisión rápida con estas preguntas: ¿sigue siendo coherente con la visión? ¿aumentó deuda técnica? ¿hay duplicación nueva? ¿apareció un cuello de botella? ¿cambió el costo unitario? ¿se puede seguir escalando sin reescribir? No genera documentación por sí sola — si de la revisión surge una decisión permanente, esa decisión sí se registra como `#ADR-VP`; si no surge nada, la revisión solo confirma que la dirección sigue siendo correcta. La primera se hizo al cerrar Etapa 4, antes de abrir Etapa 5 (ver `DECISION_LOG.md`, ADR "evaluación de preparación para escala").
 
 ---
 
