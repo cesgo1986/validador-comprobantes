@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.22.1 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.23.0 · **Última actualización:** 05/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -287,7 +287,7 @@ Cada regla es una función que recibe el análisis recién guardado y devuelve `
 
 Sin este motor, Mobile y Desktop terminarían con dos implementaciones distintas del mismo criterio de severidad, con alto riesgo de divergir silenciosamente. El objeto `presentation` completo (arriba) queda para cuando Desktop exista de verdad — `evidencias` es el paso de hoy.
 
-**5.2 — Responsive Foundation:** antes de tocar una sola pantalla, un laboratorio de breakpoints (`#LAB-VP`, ver `LABORATORIO.md`) que defina, para cada rango de ancho, qué paneles aparecen, qué deja de ser colapsable, y qué se convierte en maestro-detalle. No es una discusión de CSS/Tailwind — es una discusión de comportamiento, resuelta una sola vez para toda la etapa.
+**5.2 — Responsive Foundation ✅ (diseño completo, 2026-07, sin código todavía):** laboratorio de breakpoints completo — ver `LABORATORIO.md`. 4 rangos (Mobile <768px, Tablet 768-1199px, Desktop 1200-1599px, Wide Desktop ≥1600px), cada uno con ancho de contenedor y comportamiento definido para `/resultado`, `/historial` y `/perfil`. Hallazgo encontrado antes de definir cualquier rango: el contenido de las pantallas no tiene ningún ancho máximo propio hoy — solo `BottomNav` lo tiene (480px) — hay que corregir eso primero en 5.3, antes de introducir los rangos nuevos. También queda decidida la conversión de `BottomNav` a barra lateral en Desktop/Wide Desktop.
 
 **5.3 — `/resultado` en pantalla ancha:** Resultado + Evidencias visibles simultáneamente (dos columnas), sin el botón "Ver detalles del análisis" — mismos componentes de `app/components/resultado/`, sin reimplementar.
 

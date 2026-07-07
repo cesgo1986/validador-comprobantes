@@ -1,8 +1,16 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.22.1 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.23.0 · **Última actualización:** 05/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.23.0] — 2026-07 — Etapa 5, 5.2: laboratorio de breakpoints completo (Responsive Foundation)
+
+### Documentado (sin código todavía)
+- `LABORATORIO.md`: laboratorio completo de breakpoints — 4 rangos (Mobile/Tablet/Desktop/Wide Desktop), ancho de contenedor por rango, comportamiento definido para `/resultado`, `/historial`, `/perfil`. Hallazgo real: el contenido de las pantallas no tiene ancho máximo propio hoy, solo `BottomNav` (480px) — corrección necesaria antes de 5.3. Decisión de navegación: `BottomNav` se convierte en barra lateral en Desktop/Wide Desktop, sin cambios en Mobile/Tablet.
+- `ROADMAP.md`: ítem 5.2 marcado como diseño completo — 5.3 ya puede empezar con las reglas definidas.
 
 ---
 

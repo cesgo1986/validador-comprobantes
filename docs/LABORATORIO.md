@@ -1,6 +1,6 @@
 # LABORATORIO.md — Investigaciones y hallazgos experimentales
 
-**Versión del documento:** 0.21.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.23.0 · **Última actualización:** 05/07/2026
 
 Registro de experimentos, investigaciones técnicas, benchmarks e ideas descartadas de VerificaPago. **No es un registro de decisiones** — es el espacio para todo lo que se investigó, se probó o se descartó, tenga o no tenga una decisión oficial asociada todavía.
 
@@ -25,9 +25,41 @@ Durante las sesiones de trabajo, estas investigaciones se marcan con `🧪 #LAB-
 
 ## Investigaciones registradas
 
-### Pendiente de abrir — Breakpoints de Presentation Expansion (ítem 5.2, Etapa 5)
+### 2026-07 — Laboratorio de breakpoints para Presentation Expansion (ítem 5.2, Etapa 5)
 
-Antes de tocar cualquier pantalla en Etapa 5, definir por comportamiento (no por CSS/Tailwind) qué cambia en cada rango de ancho: qué paneles aparecen, qué deja de ser colapsable, qué se convierte en maestro-detalle. Se abre como investigación cuando arranque 5.2, no antes — sembrado aquí para no perder la intención.
+**Hallazgo previo, antes de definir cualquier rango:** `app/components/BottomNav.tsx` tiene `maxWidth: 480` hardcodeado — pero solo en el elemento `<nav>`, no en el contenido de las pantallas. `/resultado`, `/historial`, `/perfil` no tienen ningún contenedor con ancho máximo propio. Consecuencia real, hoy: si se abre la app en un navegador ancho (sin simular mobile), las tarjetas blancas de contenido se estiran de borde a borde mientras la barra de navegación inferior queda centrada en 480px — dos anchos distintos en la misma pantalla. Esto se corrige antes de introducir cualquier breakpoint nuevo, no después: se necesita un contenedor de ancho máximo compartido entre el contenido y la navegación, consistente en las 4 rangos.
+
+**Rangos definidos** (mismo criterio propuesto originalmente por ChatGPT, adoptado sin cambios en los cortes):
+
+| Rango | Nombre | Contenedor (ancho máximo, centrado) |
+|---|---|---|
+| < 768px | Mobile | 480px (comportamiento actual, sin cambios) |
+| 768px – 1199px | Tablet | ~720px |
+| 1200px – 1599px | Desktop | ~1140px |
+| ≥ 1600px | Wide Desktop | ~1400px (no crece indefinidamente — más ancho que esto solo agrega aire a los costados, no paneles nuevos) |
+
+**Comportamiento por pantalla y rango** — respondiendo, para cada uno: ¿qué paneles aparecen? ¿qué deja de ser colapsable? ¿qué se convierte en maestro-detalle?
+
+**`/resultado`**
+- Mobile / Tablet: igual que hoy — Nivel 1 fijo (`SemaforoSpei` + `QueSignificaEsto`), Nivel 2+ detrás del botón "Ver detalles del análisis" (`DetalleExpandible` colapsado). Tablet no alcanza el ancho cómodo para 2 columnas sin verse forzado.
+- Desktop / Wide Desktop: 2 columnas simultáneas — Resultado (semáforo + interpretación) a la izquierda, Evidencias (`DetalleExpandible`, siempre expandido, sin el botón de toggle) a la derecha. Ítem 5.3.
+
+**`/historial`**
+- Mobile / Tablet: igual que hoy — lista con búsqueda/filtros, tocar una tarjeta navega a la ruta `/historial/[id]`. Tablet tampoco alcanza el ancho cómodo para maestro-detalle sin que el panel de detalle se vea comprimido.
+- Desktop / Wide Desktop: maestro-detalle — lista a la izquierda (más angosta), detalle a la derecha, sin navegar a una ruta separada (la URL podría seguir cambiando vía query param o ruta anidada, a decidir en 5.4, pero visualmente ambos paneles coexisten). Ítem 5.4.
+
+**`/perfil` (Executive Summary → Dashboard Empresa)**
+- Mobile / Tablet: tarjeta única de resumen (comportamiento actual).
+- Desktop / Wide Desktop: se expande a Dashboard Empresa completo — gráficas, tabla, filtros, exportación, drill-down — mismos endpoints de `AggregationService` (ítem 4.1), sin backend nuevo. Wide Desktop puede mostrar más series/columnas simultáneas que Desktop, sin agregar funcionalidad nueva. Ítem 5.5.
+
+**Navegación — decisión nueva, no propuesta originalmente por ChatGPT:** `BottomNav` (5 íconos fijos abajo) se mantiene sin cambios en Mobile y Tablet — son dispositivos táctiles donde ese patrón es esperado. En Desktop y Wide Desktop, se reorganiza como barra lateral fija (izquierda), con los mismos 5 destinos y el mismo botón `+` — es una reorganización del mismo patrón (misma información, mismos destinos), no un rediseño, consistente con el ADR "una sola experiencia, múltiples presentaciones".
+
+**Por qué se registra como `#LAB-VP` y no directamente como ADR:** son valores de diseño (anchos de contenedor, cortes de breakpoint) que probablemente se ajustarán una o dos veces al implementar 5.3-5.5 contra pantallas reales — no una decisión arquitectónica en el sentido de origen de datos o jerarquía de motores. Si algo de esto cambia sustancialmente durante la implementación, se actualiza esta misma entrada.
+
+**Consecuencia (decisión de diseño derivada, vigente para 5.3-5.5):**
+- Antes de 5.3, se agrega un contenedor de ancho máximo compartido entre contenido y navegación (corrige el hallazgo inicial).
+- Los 4 rangos y sus anchos de contenedor quedan fijos para toda la Etapa 5, salvo ajuste documentado aquí mismo.
+- La conversión de `BottomNav` a barra lateral en Desktop/Wide Desktop queda decidida — se implementa en 5.3 (primer ítem que necesita el layout de escritorio).
 
 ---
 
