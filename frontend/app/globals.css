@@ -37,16 +37,12 @@ body {
    "@media (min-width: var(--vp-desktop-breakpoint))" NO es válido
    CSS. Los 4 rangos de breakpoint (ver LABORATORIO.md) siguen siendo
    números literales en cada @media de este archivo.
-   --vp-desktop-breakpoint es solo referencia/documentación (útil si
-   algún componente necesita la misma lógica de breakpoint en
-   JavaScript, ej. window.matchMedia), no funciona sola dentro de un
-   @media.
    ───────────────────────────────────────────────────────────────── */
 
 :root {
   --vp-container-width: 480px; /* Mobile, < 768px */
   --vp-sidebar-width: 280px;   /* Etapa 5, ítem 5.3 -- BottomNav como sidebar en Desktop+ */
-  --vp-desktop-breakpoint: 1200px; /* referencia para JS -- ver nota arriba, no usable dentro de @media */
+  --vp-desktop-breakpoint: 1200px; /* referencia para JS -- no usable dentro de @media */
 }
 
 @media (min-width: 768px) {
@@ -64,4 +60,103 @@ body {
 .vp-container {
   max-width: var(--vp-container-width);
   margin: 0 auto;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Item 5.3 (Etapa 5): BottomNav como barra fija abajo (Mobile/Tablet)
+   o como barra lateral fija a la izquierda (Desktop+, ≥1200px). El
+   cambio de eje/posición vive aquí -- BottomNav.tsx mantiene inline
+   solo lo que NO cambia con el breakpoint (colores, iconos, badge).
+   Estas propiedades no pueden quedarse inline en el componente porque
+   un estilo inline siempre gana sobre una regla de @media, sin
+   importar la especificidad de la clase.
+   ───────────────────────────────────────────────────────────────── */
+
+.vp-content-area {
+  /* Mobile/Tablet: BottomNav es una barra horizontal abajo, no ocupa
+     espacio lateral -- el contenido no necesita margen. */
+}
+
+.vp-page-padding {
+  padding-bottom: 90px; /* espacio para la barra inferior, Mobile/Tablet */
+}
+
+.vp-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
+  width: auto;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-around;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: none;
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
+}
+
+.vp-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 10px;
+  min-width: 52px;
+  border-radius: 0;
+}
+
+.vp-nav-label {
+  font-size: 10px;
+}
+
+.vp-nav-plus-wrapper {
+  margin-top: -22px;
+}
+
+@media (min-width: 1200px) {
+  .vp-content-area {
+    margin-left: var(--vp-sidebar-width);
+  }
+
+  .vp-page-padding {
+    padding-bottom: 0; /* la sidebar no ocupa espacio vertical abajo */
+  }
+
+  .vp-nav {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: auto;
+    width: var(--vp-sidebar-width);
+    height: 100vh;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    border-top: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 32px 16px;
+    gap: 8px;
+  }
+
+  .vp-nav-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    min-width: 0;
+    border-radius: 12px;
+  }
+
+  .vp-nav-label {
+    font-size: 13px;
+  }
+
+  .vp-nav-plus-wrapper {
+    margin-top: 0;
+    margin-bottom: 8px;
+  }
 }

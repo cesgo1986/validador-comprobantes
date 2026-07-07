@@ -20,10 +20,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         minHeight: "100vh",
       }}>
         <AnalisisProvider>
-          {/* item 5.2/5.3: ancho responsive vía .vp-container (globals.css),
-              ya no un valor fijo de 480px -- ver LABORATORIO.md */}
-          <div className="vp-container" style={{ paddingBottom: 90, minHeight: "100vh" }}>
-            {children}
+          {/* item 5.3: vp-content-area se corre a la derecha del sidebar
+              en Desktop+ (margin-left: var(--vp-sidebar-width)) -- en
+              Mobile/Tablet no hace nada, BottomNav es una barra abajo. */}
+          <div className="vp-content-area">
+            <div className="vp-container vp-page-padding" style={{ minHeight: "100vh" }}>
+              {children}
+            </div>
           </div>
           <BottomNav />
         </AnalisisProvider>

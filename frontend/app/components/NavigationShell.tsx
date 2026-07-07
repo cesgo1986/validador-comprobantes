@@ -3,7 +3,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const TEAL = "#00BFA5";
-const DARK = "#1A2340";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 const ICONS = {
@@ -34,6 +33,12 @@ const ICONS = {
   ),
 };
 
+// Item 5.3 (Etapa 5): el posicionamiento (barra abajo en Mobile/Tablet,
+// sidebar a la izquierda en Desktop+) vive en las clases .vp-nav,
+// .vp-nav-item, .vp-nav-label, .vp-nav-plus-wrapper de globals.css --
+// no puede quedarse inline aquí, porque un estilo inline siempre gana
+// sobre una regla de @media. Lo que sí sigue inline es lo que no
+// cambia con el breakpoint: colores, iconos, el badge.
 export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
@@ -79,37 +84,34 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="vp-container"
+      className="vp-nav"
       style={{
-        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50,
-        background: "rgba(13, 22, 41, 0.96)", backdropFilter: "blur(10px)",
-        borderTop: "1px solid rgba(255,255,255,0.08)",
-        display: "flex", alignItems: "center", justifyContent: "space-around",
-        padding: "10px 8px calc(10px + env(safe-area-inset-bottom))",
+        zIndex: 50,
+        background: "rgba(13, 22, 41, 0.96)",
+        backdropFilter: "blur(10px)",
       }}>
       {items.map((item) => {
         const active = isActive(item.href);
         if (item.isPlus) {
           return (
-            <button key={item.key} onClick={() => router.push(item.href)}
-              aria-label="Nuevo análisis"
-              style={{
-                width: 50, height: 50, borderRadius: "50%", background: TEAL,
-                border: "none", display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "pointer", boxShadow: `0 4px 14px ${TEAL}55`, marginTop: -22,
-              }}>
-              {item.icon(true)}
-            </button>
+            <div key={item.key} className="vp-nav-plus-wrapper">
+              <button onClick={() => router.push(item.href)}
+                aria-label="Nuevo análisis"
+                style={{
+                  width: 50, height: 50, borderRadius: "50%", background: TEAL,
+                  border: "none", display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", boxShadow: `0 4px 14px ${TEAL}55`,
+                }}>
+                {item.icon(true)}
+              </button>
+            </div>
           );
         }
         return (
           <button key={item.key} onClick={() => router.push(item.href)}
             aria-label={item.label}
-            style={{
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-              background: "none", border: "none", cursor: "pointer", position: "relative",
-              padding: "4px 10px", minWidth: 52,
-            }}>
+            className="vp-nav-item"
+            style={{ background: "none", border: "none", cursor: "pointer", position: "relative" }}>
             <div style={{ position: "relative" }}>
               {item.icon(active)}
               {item.badge > 0 && (
@@ -121,7 +123,7 @@ export default function BottomNav() {
                 }}>{item.badge}</span>
               )}
             </div>
-            <span style={{ fontSize: 10, fontWeight: 600, color: active ? TEAL : "rgba(255,255,255,0.45)" }}>
+            <span className="vp-nav-label" style={{ fontWeight: 600, color: active ? TEAL : "rgba(255,255,255,0.45)" }}>
               {item.label}
             </span>
           </button>
