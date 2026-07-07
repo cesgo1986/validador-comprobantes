@@ -26,23 +26,27 @@ body {
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   Contenedor responsive de VerificaPago -- ver LABORATORIO.md,
-   "Laboratorio de breakpoints para Presentation Expansion" (ítem 5.2,
-   Etapa 5). Fuente única de verdad del ancho: layout.tsx y
-   BottomNav.tsx comparten esta variable vía la clase .vp-container,
-   en vez de cada uno tener su propio valor fijo -- así nunca pueden
-   desincronizarse entre sí.
+   Design System incremental de VerificaPago -- ver DECISION_LOG.md,
+   ADR "Tailwind permanece instalado pero no se adopta como sistema
+   de estilos". Tailwind (arriba) está disponible pero deliberadamente
+   sin usar -- todo el proyecto consume estas variables desde estilos
+   inline, vía var(--token), para mantener un solo idioma de estilos.
 
-   Nota: el body de arriba (background/color/font-family) queda
-   sobreescrito en la práctica por el style inline de app/layout.tsx
-   (que pone su propio fondo degradado y font-family "Inter") -- un
-   estilo inline en el elemento siempre gana sobre una regla de clase
-   o de elemento en CSS. No se tocó esa regla existente porque no
-   estaba causando ningún problema, solo quedando sin efecto visible.
+   Nota técnica importante: las variables CSS (custom properties) NO
+   pueden usarse dentro de la condición de un @media -- por ejemplo,
+   "@media (min-width: var(--vp-desktop-breakpoint))" NO es válido
+   CSS. Los 4 rangos de breakpoint (ver LABORATORIO.md) siguen siendo
+   números literales en cada @media de este archivo.
+   --vp-desktop-breakpoint es solo referencia/documentación (útil si
+   algún componente necesita la misma lógica de breakpoint en
+   JavaScript, ej. window.matchMedia), no funciona sola dentro de un
+   @media.
    ───────────────────────────────────────────────────────────────── */
 
 :root {
   --vp-container-width: 480px; /* Mobile, < 768px */
+  --vp-sidebar-width: 280px;   /* Etapa 5, ítem 5.3 -- BottomNav como sidebar en Desktop+ */
+  --vp-desktop-breakpoint: 1200px; /* referencia para JS -- ver nota arriba, no usable dentro de @media */
 }
 
 @media (min-width: 768px) {
