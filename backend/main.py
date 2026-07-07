@@ -1017,6 +1017,31 @@ async def analizar(
                 "error": "Error inesperado al procesar el archivo.",
             }
 
+            # ── Evidencias (item 5.1, Etapa 5): hechos crudos, sin interpretar ────────
+    # Paso intermedio hacia el Motor de Presentación completo (ver ROADMAP.md).
+    # Mobile puede empezar a decidir sobre estos datos explícitos mientras se
+    # estabiliza el objeto `presentation` -- no reemplaza los campos que ya
+    # existen en el nivel superior de result (estado_operacion, etc.), los
+    # agrupa para que el frontend no tenga que rearmar esta forma cada vez.
+    cep_xml_data = result.get("cep_xml") or {}
+    if cep_xml_data.get("xml_proporcionado"):
+        xml_valido = cep_xml_data.get("estructura_xml_valida", False)
+        xml_discrepancias = cep_xml_data.get("comparacion_campos", {}).get("discrepancias")
+    else:
+        # No es lo mismo "no se intento obtener XML" que "XML invalido" --
+        # None distingue ambos casos en vez de forzar False.
+        xml_valido = None
+        xml_discrepancias = None
+ 
+    result["evidencias"] = {
+        "xml_valido": xml_valido,
+        "xml_discrepancias": xml_discrepancias,
+        "confianza_documental": confianza_documental,
+        "verificabilidad": verificabilidad_result["score"],
+        "contexto_temporal": contexto_temporal_result["score"],
+        "hash_reutilizado": hash_info["documento_reutilizado"],
+    }
+
     # ── Auditoría: guardar el análisis completo ────────────────────────────────
     # Si DATABASE_URL no está configurada, guardar_analisis() devuelve None
     # sin lanzar excepción y la respuesta se entrega igual al usuario.
