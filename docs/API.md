@@ -1,6 +1,6 @@
 # API.md — Documentación de endpoints
 
-**Versión del documento:** 0.11.0 · **Última actualización:** 02/07/2026
+**Versión del documento:** 0.22.1 · **Última actualización:** 05/07/2026
 
 Base URL producción: `https://validador-comprobantes.onrender.com`
 Base URL local: `http://localhost:8000`
@@ -50,6 +50,15 @@ Endpoint principal. Recibe un comprobante bancario, lo analiza y devuelve el res
     "color": "verde",
     "etiqueta": "Sin observaciones",
     "icono": "✅"
+  },
+
+  "evidencias": {
+    "xml_valido": true,
+    "xml_discrepancias": 0,
+    "confianza_documental": 85.0,
+    "verificabilidad": 75.0,
+    "contexto_temporal": 100,
+    "hash_reutilizado": false
   },
 
   "interpretacion": "El comprobante presenta alta consistencia documental (85/100)...",
@@ -141,6 +150,13 @@ Endpoint principal. Recibe un comprobante bancario, lo analiza y devuelve el res
 **Dimensiones adicionales**
 - `verificabilidad`: 0-100, qué tan corroborable es la operación externamente
 - `contexto_temporal`: 0-100, consistencia del tiempo transcurrido con SPEI
+
+**`evidencias` (Etapa 5, ítem 5.1 — agregado 2026-07)**
+Hechos crudos sin interpretar, paso intermedio hacia el objeto `presentation` completo del Motor de Presentación (ver `ROADMAP.md`). Agrupa datos que ya existían dispersos en el resultado, para que Mobile/Desktop no tengan que rearmar esta forma cada vez:
+- `xml_valido`: `true`/`false`, o **`null`** si no se intentó obtener el XML — `null` no es lo mismo que `false` (inválido)
+- `xml_discrepancias`: número de campos que no coincidieron entre XML y comprobante, o `null` si no aplica
+- `confianza_documental`, `verificabilidad`, `contexto_temporal`: mismos valores que los campos de nivel superior, agrupados aquí
+- `hash_reutilizado`: igual a `documento_reutilizado`
 
 **Legacy (compatibilidad)**
 - `score`: 0-100, score de riesgo fusionado (mantenido para compatibilidad)
@@ -370,6 +386,56 @@ Conteo de alertas para el badge inteligente de `BottomNav` (Etapa 3, ítem 3.5).
 **Query params:** `empresa_id`
 
 **Respuesta:** `{ "total_nuevas": 5, "notificables": 2 }`
+
+---
+
+## GET /api/v1/dashboard/monto-total
+
+Monto total procesado en el periodo (Etapa 4, ítem 4.1 — `AggregationService`).
+
+**Query params:** `empresa_id`, `fecha_desde`, `fecha_hasta`
+
+**Respuesta:** `{ "monto_total": 45230.50, "total_analisis_con_monto": 187 }`
+
+---
+
+## GET /api/v1/dashboard/bancos-frecuentes
+
+Top bancos por volumen de análisis (Etapa 4, ítem 4.1). Distinto de `/metricas/scores-por-banco` (Etapa 1), que responde "¿qué tan riesgoso es cada banco?" — este responde "¿de qué banco recibo más operaciones?".
+
+**Query params:** `empresa_id`, `fecha_desde`, `fecha_hasta`, `limit` (máx. 20, default 5)
+
+**Respuesta:** `[{ "banco": "BBVA", "total_analisis": 92 }]`
+
+---
+
+## GET /api/v1/dashboard/riesgo-por-periodo
+
+Distribución por riesgo documental (Motor 2) y por `estado_operacion` (Motor 1) en el periodo, sin mezclar ambos motores en un solo número (Etapa 4, ítem 4.1).
+
+**Query params:** `empresa_id`, `fecha_desde`, `fecha_hasta`
+
+**Respuesta:** `{ "por_riesgo": [{"riesgo": "BAJO", "total": 120}], "por_estado_operacion": [{"estado_operacion": "liquidada", "total": 98}] }`
+
+---
+
+## GET /api/v1/dashboard/alertas-agregadas
+
+Conteo de alertas `NUEVA` por severidad y por tipo (Etapa 4, ítem 4.1). Versión completa/desagregada — distinta de `/alertas/conteo` (Etapa 3, ítem 3.5), que es un conteo puntual para el badge de `BottomNav`.
+
+**Query params:** `empresa_id`
+
+**Respuesta:** `{ "por_severidad": [{"severidad": "ALTA", "total": 3}], "por_tipo": [{"tipo_alerta": "CLABE_FRECUENTE", "total": 2}], "activas": 5 }`
+
+---
+
+## GET /api/v1/dashboard/resumen-ejecutivo
+
+Bundle de datos para el Mobile Executive Summary (Etapa 4, ítem 4.2) — una sola llamada en vez de que el frontend orqueste varias peticiones. Compone datos de `AggregationService` y `alerta_service`, no calcula nada nuevo.
+
+**Query params:** `empresa_id`
+
+**Respuesta:** `{ "analisis_hoy": 12, "alertas_nuevas": 3, "alertas_notificables": 1, "riesgo_alto": 2, "pct_confirmadas": 91.7 }`
 
 ---
 
