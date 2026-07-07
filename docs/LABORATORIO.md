@@ -1,6 +1,6 @@
 # LABORATORIO.md — Investigaciones y hallazgos experimentales
 
-**Versión del documento:** 0.23.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.23.2 · **Última actualización:** 05/07/2026
 
 Registro de experimentos, investigaciones técnicas, benchmarks e ideas descartadas de VerificaPago. **No es un registro de decisiones** — es el espacio para todo lo que se investigó, se probó o se descartó, tenga o no tenga una decisión oficial asociada todavía.
 
@@ -27,7 +27,9 @@ Durante las sesiones de trabajo, estas investigaciones se marcan con `🧪 #LAB-
 
 ### 2026-07 — Laboratorio de breakpoints para Presentation Expansion (ítem 5.2, Etapa 5)
 
-**Hallazgo previo, antes de definir cualquier rango:** `app/components/BottomNav.tsx` tiene `maxWidth: 480` hardcodeado — pero solo en el elemento `<nav>`, no en el contenido de las pantallas. `/resultado`, `/historial`, `/perfil` no tienen ningún contenedor con ancho máximo propio. Consecuencia real, hoy: si se abre la app en un navegador ancho (sin simular mobile), las tarjetas blancas de contenido se estiran de borde a borde mientras la barra de navegación inferior queda centrada en 480px — dos anchos distintos en la misma pantalla. Esto se corrige antes de introducir cualquier breakpoint nuevo, no después: se necesita un contenedor de ancho máximo compartido entre el contenido y la navegación, consistente en las 4 rangos.
+**Corrección (2026-07, misma sesión — se verificó `app/layout.tsx` completo antes de escribir código de 5.3):** el hallazgo original decía que el contenido de las pantallas no tenía ningún ancho máximo propio, distinto del de `BottomNav`. Es incorrecto — `app/layout.tsx` ya envuelve `{children}` en `<div style={{ maxWidth: 480, margin: "0 auto" }}>`, exactamente el mismo ancho que usa `BottomNav.tsx`. **No hay inconsistencia real que corregir.** El trabajo genuino de 5.3 es hacer que ese ancho máximo (hoy fijo en 480px) responda a los 4 rangos definidos abajo — vía CSS con `@media`, no cambiando el valor a mano — y sincronizarlo entre `layout.tsx` y `BottomNav.tsx` a través de una sola fuente (una variable CSS), para que nunca puedan desincronizarse entre sí aunque uno se edite sin el otro.
+
+**Hallazgo previo (con el error ya corregido arriba, dejado por transparencia de proceso):** ~~`app/components/BottomNav.tsx` tiene `maxWidth: 480` hardcodeado — pero solo en el elemento `<nav>`, no en el contenido de las pantallas.~~
 
 **Rangos definidos** (mismo criterio propuesto originalmente por ChatGPT, adoptado sin cambios en los cortes):
 

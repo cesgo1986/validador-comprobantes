@@ -1,8 +1,37 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.23.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.23.2 · **Última actualización:** 05/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.23.2] — 2026-07 — Base del contenedor responsive desplegada y verificada; hallazgo: Tailwind ya está instalado
+
+### Desplegado en producción
+- `app/globals.css`, `app/layout.tsx`, `app/components/BottomNav.tsx`: verificado en escritorio ancho — el contenedor crece más allá de 480px según el ancho real de la ventana, sin afectar la vista móvil.
+
+### Corregido (al aplicar el cambio)
+- `app/globals.css` **ya existía** (scaffold de `create-next-app`, con `@import "tailwindcss"` — Tailwind v4 instalado y configurado, nunca usado hasta ahora). No se reemplazó el archivo — se le agregaron las reglas nuevas al final, conservando el contenido original completo. Corregido también en `ARQUITECTURA.md`.
+
+### Decisión pendiente de confirmar
+- Con Tailwind disponible, hay que decidir si el resto de la Etapa 5 (sidebar, layouts de 2 columnas) se construye con estilos inline + variables CSS (consistente con el 100% del código existente) o aprovechando las clases responsive de Tailwind (más simple de escribir, pero introduce un segundo patrón de estilos). Sin resolver todavía.
+
+---
+
+## [0.23.1] — 2026-07 — Etapa 5, 5.3 (en curso): base del contenedor responsive — código listo, pendiente de deploy
+
+### Corregido (documentación)
+- `LABORATORIO.md`, `ROADMAP.md`: se corrige un hallazgo falso de la entrada anterior (v0.23.0) — al ver `app/layout.tsx` completo, resultó que el contenido **ya** compartía el mismo ancho máximo (480px) que `BottomNav`, no había ninguna inconsistencia que corregir. El trabajo real es hacer que ese ancho responda a los 4 rangos, no corregir un bug que no existía.
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `app/globals.css` (nuevo): variable `--vp-container-width` con los 4 rangos vía `@media`, clase `.vp-container`.
+- `app/layout.tsx`: usa `.vp-container` en vez de `maxWidth: 480` fijo.
+- `app/components/BottomNav.tsx`: usa `.vp-container` en vez de `maxWidth: 480` fijo — layout y nav ahora comparten una sola fuente de verdad, no pueden desincronizarse entre sí.
+
+### Pendiente (mismo ítem 5.3)
+- Conversión de `BottomNav` a barra lateral en Desktop/Wide Desktop.
+- Layout de 2 columnas en `/resultado`.
 
 ---
 

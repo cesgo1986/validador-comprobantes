@@ -1,6 +1,6 @@
 # ARQUITECTURA.md — Arquitectura técnica de VerificaPago
 
-**Versión del documento:** 0.21.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.23.2 · **Última actualización:** 05/07/2026
 
 ## Visión general
 
@@ -54,6 +54,7 @@ app/
 ├── alertas/page.tsx             ← Lista con divulgación progresiva (Etapa 3, ítem 3.4)
 ├── perfil/page.tsx              ← "Perfil / Empresa": Resumen ejecutivo (Etapa 4, ítem 4.2) + placeholder de gestión de cuenta (Sprint E)
 ├── context/AnalisisContext.tsx  ← Estado compartido entre pantallas
+├── globals.css                  ← YA EXISTÍA desde el scaffold de create-next-app (trae `@import "tailwindcss"` — Tailwind está instalado pero nunca se ha usado, todo el proyecto usa estilos inline). Se le agregó al final la variable `--vp-container-width` (Etapa 5, ítem 5.2/5.3) — layout.tsx y BottomNav.tsx la comparten vía `.vp-container`
 └── layout.tsx                   ← AnalisisProvider + BottomNav
 ```
 
