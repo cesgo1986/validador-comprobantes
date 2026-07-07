@@ -24,3 +24,40 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   Contenedor responsive de VerificaPago -- ver LABORATORIO.md,
+   "Laboratorio de breakpoints para Presentation Expansion" (ítem 5.2,
+   Etapa 5). Fuente única de verdad del ancho: layout.tsx y
+   BottomNav.tsx comparten esta variable vía la clase .vp-container,
+   en vez de cada uno tener su propio valor fijo -- así nunca pueden
+   desincronizarse entre sí.
+
+   Nota: el body de arriba (background/color/font-family) queda
+   sobreescrito en la práctica por el style inline de app/layout.tsx
+   (que pone su propio fondo degradado y font-family "Inter") -- un
+   estilo inline en el elemento siempre gana sobre una regla de clase
+   o de elemento en CSS. No se tocó esa regla existente porque no
+   estaba causando ningún problema, solo quedando sin efecto visible.
+   ───────────────────────────────────────────────────────────────── */
+
+:root {
+  --vp-container-width: 480px; /* Mobile, < 768px */
+}
+
+@media (min-width: 768px) {
+  :root { --vp-container-width: 720px; } /* Tablet */
+}
+
+@media (min-width: 1200px) {
+  :root { --vp-container-width: 1140px; } /* Desktop */
+}
+
+@media (min-width: 1600px) {
+  :root { --vp-container-width: 1400px; } /* Wide Desktop */
+}
+
+.vp-container {
+  max-width: var(--vp-container-width);
+  margin: 0 auto;
+}

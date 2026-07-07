@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "./globals.css";
 import { AnalisisProvider } from "./context/AnalisisContext";
 import BottomNav from "./components/BottomNav";
 
@@ -19,7 +20,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         minHeight: "100vh",
       }}>
         <AnalisisProvider>
-          <div style={{ maxWidth: 480, margin: "0 auto", paddingBottom: 90, minHeight: "100vh" }}>
+          {/* item 5.2/5.3: ancho responsive vía .vp-container (globals.css),
+              ya no un valor fijo de 480px -- ver LABORATORIO.md */}
+          <div className="vp-container" style={{ paddingBottom: 90, minHeight: "100vh" }}>
             {children}
           </div>
           <BottomNav />

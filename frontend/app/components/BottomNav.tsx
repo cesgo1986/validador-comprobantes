@@ -38,10 +38,9 @@ export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
 
-  // Item 3.5: badge inteligente -- ya no hardcodeado. Usa "notificables"
-  // (Motor de Prioridad: severidad MEDIA o superior, ver
-  // services/alerta_service.py), no el total de alertas NUEVA -- una
-  // alerta BAJA no debe inflar el contador igual que una ALTA.
+  // Item 3.5: badge inteligente -- usa "notificables" (Motor de
+  // Prioridad, ver services/alerta_service.py), no el total de alertas
+  // NUEVA -- una alerta BAJA no debe inflar el contador igual que una ALTA.
   const [alertasBadge, setAlertasBadge] = useState(0);
 
   useEffect(() => {
@@ -54,15 +53,11 @@ export default function BottomNav() {
         const data = await resp.json();
         if (activo) setAlertasBadge(data.notificables ?? 0);
       } catch {
-        // El badge es un extra -- si falla, la navegación sigue funcionando
-        // con el badge en 0 en vez de romper la barra inferior.
+        // El badge es un extra -- si falla, la navegación sigue funcionando.
       }
     }
 
     cargarConteo();
-    // Refresca cada 60s mientras la app esté abierta -- suficiente para
-    // sentirse "vivo" sin necesitar WebSockets todavía (ver ROADMAP.md,
-    // posible evolución futura si se necesita tiempo real de verdad).
     const intervalo = setInterval(cargarConteo, 60000);
     return () => { activo = false; clearInterval(intervalo); };
   }, []);
@@ -83,14 +78,15 @@ export default function BottomNav() {
   };
 
   return (
-    <nav style={{
-      position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50,
-      background: "rgba(13, 22, 41, 0.96)", backdropFilter: "blur(10px)",
-      borderTop: "1px solid rgba(255,255,255,0.08)",
-      display: "flex", alignItems: "center", justifyContent: "space-around",
-      padding: "10px 8px calc(10px + env(safe-area-inset-bottom))",
-      maxWidth: 480, margin: "0 auto",
-    }}>
+    <nav
+      className="vp-container"
+      style={{
+        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50,
+        background: "rgba(13, 22, 41, 0.96)", backdropFilter: "blur(10px)",
+        borderTop: "1px solid rgba(255,255,255,0.08)",
+        display: "flex", alignItems: "center", justifyContent: "space-around",
+        padding: "10px 8px calc(10px + env(safe-area-inset-bottom))",
+      }}>
       {items.map((item) => {
         const active = isActive(item.href);
         if (item.isPlus) {
