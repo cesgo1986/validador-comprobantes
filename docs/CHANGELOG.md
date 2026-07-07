@@ -1,8 +1,33 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.21.1 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.22.1 · **Última actualización:** 05/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.22.1] — 2026-07 — 5.1 cerrado: objeto evidencias desplegado, sin regresión visual
+
+### Desplegado en producción
+- `main.py`, `app/context/AnalisisContext.tsx`, `app/components/resultado/DetalleExpandible.tsx`: verificado — `/resultado` e `/historial/[id]` se ven idénticos a como estaban antes del cambio.
+
+### Cerrado
+- `ROADMAP.md`: ítem **5.1** (paso intermedio del Motor de Presentación) pasa a ✅.
+
+---
+
+## [0.22.0] — 2026-07 — Etapa 5, 5.1: objeto `evidencias` (paso intermedio del Motor de Presentación) — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `main.py`: nuevo bloque `result["evidencias"]` — hechos crudos sin interpretar (`xml_valido`, `xml_discrepancias`, `confianza_documental`, `verificabilidad`, `contexto_temporal`, `hash_reutilizado`), construido después del procesamiento del XML para capturar los valores finales.
+- `app/context/AnalisisContext.tsx`: nueva interfaz `Evidencias`, agregada como campo opcional a `Resultado`.
+
+### Corregido
+- `app/components/resultado/DetalleExpandible.tsx`: se elimina un cast forzado (`as unknown as {...}`) que accedía a `cep_xml.comparacion_campos.discrepancias` manualmente — verificado contra `cep_xml_service.py` que la ruta era correcta, pero ahora usa `result.evidencias.xml_discrepancias` sin cast. De paso se corrige la precedencia de operadores confusa `?? 0 > 0` (se evaluaba como `?? (0 > 0)`, no como "usa 0 si falta, luego compara" — funcionaba por coincidencia con los valores reales, pero no decía lo que parecía decir).
+
+### Documentado
+- `API.md`: nueva sección `evidencias` en "Campos del resultado por categoría".
+- `ROADMAP.md`: ítem 5.1 actualizado.
 
 ---
 

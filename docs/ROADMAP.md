@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.21.1 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.22.1 · **Última actualización:** 05/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -274,7 +274,7 @@ Cada regla es una función que recibe el análisis recién guardado y devuelve `
 
 **Retirado de esta etapa (2026-07):** "Análisis de múltiples comprobantes simultáneos" (Batch Analysis) y "Workflow de aprobación/rechazo por operador" — ver ADR en `DECISION_LOG.md`. Ninguno de los dos es presentación; son capacidades de producto que, por el ADR de una sola experiencia, deberían existir también en móvil. Quedan sembrados como candidatos de una etapa funcional futura, sin número ni fecha — junto con colaboración, permisos y equipos.
 
-**5.1 — Motor de Presentación (backend):** Desktop es el segundo consumidor real del backend (después de Mobile). Por la regla de arquitectura fijada en `DECISION_LOG.md` ("la lógica de presentación migra al backend solo con múltiples consumidores"), este es el momento de mover la lógica de colores/iconos/niveles de severidad — hoy vive en `app/resultado/page.tsx` y en `app/components/resultado/` — a un objeto `presentation` calculado por el backend:
+**5.1 — Motor de Presentación ✅ (paso intermedio completado y desplegado, 2026-07):** se agrega `result["evidencias"]` en `main.py` — hechos crudos (`xml_valido`, `xml_discrepancias`, `confianza_documental`, `verificabilidad`, `contexto_temporal`, `hash_reutilizado`), sin interpretar todavía. Es el paso intermedio, no el objeto `presentation` completo — ese queda para cuando Desktop (5.3+) exista de verdad y se pueda diseñar `presentation` sabiendo qué necesita cada consumidor. De paso, se limpió un cast forzado (`as unknown as {...}`) en `DetalleExpandible.tsx` que accedía a `cep_xml.comparacion_campos.discrepancias` manualmente — la ruta resultó ser correcta (se verificó contra `cep_xml_service.py`), pero ahora usa `result.evidencias.xml_discrepancias` sin cast ni la precedencia de operadores confusa que tenía antes (`?? 0 > 0`). Verificado en producción: `/resultado` e `/historial/[id]` se ven idénticos a como estaban antes del cambio.
 
 ```json
 {
@@ -285,7 +285,7 @@ Cada regla es una función que recibe el análisis recién guardado y devuelve `
 }
 ```
 
-Antes de este sprint, el paso intermedio es exponer `evidencias` (hechos crudos: `xml_valido`, `xml_discrepancias`, `confianza_documental`, `verificabilidad`, `contexto_temporal`, `hash_reutilizado`) para que Mobile decida sobre datos explícitos mientras se estabiliza la UX. Sin este motor, Mobile y Desktop terminarían con dos implementaciones distintas del mismo criterio de severidad, con alto riesgo de divergir silenciosamente.
+Sin este motor, Mobile y Desktop terminarían con dos implementaciones distintas del mismo criterio de severidad, con alto riesgo de divergir silenciosamente. El objeto `presentation` completo (arriba) queda para cuando Desktop exista de verdad — `evidencias` es el paso de hoy.
 
 **5.2 — Responsive Foundation:** antes de tocar una sola pantalla, un laboratorio de breakpoints (`#LAB-VP`, ver `LABORATORIO.md`) que defina, para cada rango de ancho, qué paneles aparecen, qué deja de ser colapsable, y qué se convierte en maestro-detalle. No es una discusión de CSS/Tailwind — es una discusión de comportamiento, resuelta una sola vez para toda la etapa.
 
