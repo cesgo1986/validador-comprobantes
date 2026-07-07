@@ -57,7 +57,12 @@ export function DetalleExpandible({
   const speiEsFavorable = spei?.color === "verde";
 
   const integ = result.integridad_config;
-  const tieneXmlDiscrepante = (result as unknown as { cep_xml?: { comparacion_campos?: { discrepancias?: number } } }).cep_xml?.comparacion_campos?.discrepancias ?? 0 > 0;
+  // Item 5.1 (Etapa 5): antes usaba un cast forzado sobre cep_xml -- la
+  // ruta resultó ser correcta (verificado contra cep_xml_service.py),
+  // pero ahora usa el campo evidencias, ya sin cast ni la precedencia
+  // de operadores confusa que tenía "?? 0 > 0" (se evaluaba como
+  // "?? (0 > 0)", no como "usa 0 si falta, luego compara").
+  const tieneXmlDiscrepante = (result.evidencias?.xml_discrepancias ?? 0) > 0;
   const esCasoExtremo = result.confianza_documental < 30 || tieneXmlDiscrepante;
   const integIcono = integ?.icono === "✅" ? "✓" : "⚠";
   const colorInteg = integ?.color === "verde" ? GREEN
