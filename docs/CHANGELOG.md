@@ -1,8 +1,21 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.23.2 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.24.0 · **Última actualización:** 05/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.24.0] — 2026-07 — 🏛️ ADR: Tailwind no se adopta; globals.css como Design System incremental
+
+### Documentado
+- `DECISION_LOG.md`: ADR — Tailwind permanece instalado (scaffold del proyecto, v4) pero no se adopta como sistema de estilos, por consistencia arquitectónica, no por limitación técnica. `globals.css` se refuerza como Design System incremental.
+- `ROADMAP.md`: nota de la decisión agregada al ítem 5.2.
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `app/globals.css`: se agrega `--vp-sidebar-width` (280px, para la conversión de `BottomNav` a sidebar) y `--vp-desktop-breakpoint` (1200px, referencia para JS — con nota explícita de que las variables CSS no funcionan dentro de la condición de un `@media`, los 4 rangos siguen como números literales).
+
+Sube a versión MINOR porque registra una decisión de arquitectura permanente sobre el sistema de estilos de todo el proyecto, no un ajuste incremental.
 
 ---
 

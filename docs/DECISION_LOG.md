@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.21.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.24.0 · **Última actualización:** 05/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -268,6 +268,19 @@ Nunca `Dashboard → SELECT ... → Base de datos` directo.
 - Toda funcionalidad de Etapa 4 (Dashboard Empresa) en adelante debe justificar, antes de escribir código, en qué motor existente se apoya — no puede calcular su propia versión de "estado", "integridad" o "alerta".
 - La integración de Alertas al Modelo de Decisión Explicable (hallazgo #2) queda como decisión pendiente explícita — se revisará cuando Dashboard Empresa o Alertas evolucionen lo suficiente para necesitarla, no se fuerza ahora.
 - A partir de esta versión, actualizar el encabezado "Versión del documento" de cada archivo de `/docs` que se modifique es parte del flujo de trabajo, no un paso opcional.
+
+---
+
+## 2026-07 — 🏛️ ADR: Tailwind permanece instalado pero no se adopta como sistema de estilos
+
+**Decisión:** Tailwind CSS (ya instalado en el scaffold del proyecto — `@import "tailwindcss"` en `globals.css`, Tailwind v4) permanece como dependencia, pero no se adopta como sistema de estilos mientras la arquitectura de estilos inline + variables CSS (`globals.css` como Design System incremental) siga satisfaciendo las necesidades del producto. No es una limitación técnica ni un descuido — es una decisión consciente de consistencia arquitectónica.
+
+**Motivo:** el 100% del proyecto (Etapas 1-4, y el inicio de Etapa 5) usa estilos inline. Introducir Tailwind justo al comenzar el Motor de Presentación (Etapa 5) crearía dos idiomas de estilos convivientes sin necesidad real — cada componente nuevo generaría la pregunta "¿esto va en Tailwind o en `style={{}}`?", y el Motor de Presentación (que debería ser independiente de cómo se pinta la interfaz) no se beneficia de ese cambio.
+
+**Consecuencia:**
+- `globals.css` se refuerza como **Design System incremental** del proyecto — variables CSS que los componentes inline consumen vía `var(--token)`, empezando por lo que ya se necesita (`--vp-container-width`, y ahora `--vp-sidebar-width`), no por una tokenización especulativa de todo el sistema de un solo golpe.
+- Spacing, radios de borde y elevaciones **no se tokenizan todavía** — los valores actuales en los componentes existentes no son consistentes entre sí (12px/14px/16px/20px de radio, según el componente), y forzar una tokenización ahora significaría inventar una convención nueva sin adopción real, o refactorizar componentes ya estables sin necesidad funcional. Se tokenizan progresivamente conforme se construyan o toquen componentes nuevos, no retroactivamente.
+- Esta decisión se revisa si algún día Tailwind (u otra herramienta) resuelve un problema real que los estilos inline + variables no puedan resolver razonablemente — no antes.
 
 ---
 

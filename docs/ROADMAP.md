@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.23.2 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.24.0 · **Última actualización:** 05/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -288,6 +288,8 @@ Cada regla es una función que recibe el análisis recién guardado y devuelve `
 Sin este motor, Mobile y Desktop terminarían con dos implementaciones distintas del mismo criterio de severidad, con alto riesgo de divergir silenciosamente. El objeto `presentation` completo (arriba) queda para cuando Desktop exista de verdad — `evidencias` es el paso de hoy.
 
 **5.2 — Responsive Foundation ✅ (diseño completo, 2026-07, sin código todavía):** laboratorio de breakpoints completo — ver `LABORATORIO.md`. 4 rangos (Mobile <768px, Tablet 768-1199px, Desktop 1200-1599px, Wide Desktop ≥1600px), cada uno con ancho de contenedor y comportamiento definido para `/resultado`, `/historial` y `/perfil`. **Corrección (misma sesión):** el hallazgo original sobre una inconsistencia entre el ancho de `BottomNav` y el del contenido era incorrecto — `app/layout.tsx` ya envuelve el contenido en el mismo ancho máximo (480px). El trabajo real de 5.3 es hacer que ese ancho responda a los 4 rangos vía CSS, no corregir una inconsistencia que no existía. También queda decidida la conversión de `BottomNav` a barra lateral en Desktop/Wide Desktop.
+
+**Decisión de estilos (2026-07):** ver `DECISION_LOG.md`, ADR "Tailwind permanece instalado pero no se adopta como sistema de estilos" — `globals.css` (que ya existía desde el scaffold del proyecto, con Tailwind instalado sin usar) se refuerza como **Design System incremental**: variables CSS que los componentes inline consumen vía `var(--token)`, empezando por `--vp-container-width` y `--vp-sidebar-width`. Spacing/radios/elevaciones no se tokenizan todavía — se hace progresivamente, no retroactivamente sobre componentes ya estables.
 
 **5.3 — `/resultado` en pantalla ancha (en curso, 2026-07):** Resultado + Evidencias visibles simultáneamente (dos columnas), sin el botón "Ver detalles del análisis" — mismos componentes de `app/components/resultado/`, sin reimplementar. Sub-pasos:
 - ✅ **Base del contenedor responsive** (código listo, pendiente de aplicar y desplegar): `app/globals.css` (nuevo) — variable `--vp-container-width` con los 4 rangos de `LABORATORIO.md`; `app/layout.tsx` y `app/components/BottomNav.tsx` la comparten vía clase `.vp-container` en vez de un valor de 480px fijo cada uno.
