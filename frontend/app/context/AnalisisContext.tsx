@@ -37,6 +37,20 @@ export interface CepResultado {
   detalle?: string;
 }
 
+// Item 5.1 (Etapa 5): hechos crudos sin interpretar, paso intermedio hacia
+// el objeto `presentation` completo del Motor de Presentación. Ver
+// ROADMAP.md y DECISION_LOG.md. xml_valido/xml_discrepancias son `null`
+// (no `false`/`0`) cuando no se intentó obtener XML -- no es lo mismo
+// que "XML inválido".
+export interface Evidencias {
+  xml_valido: boolean | null;
+  xml_discrepancias: number | null;
+  confianza_documental: number;
+  verificabilidad: number;
+  contexto_temporal: number;
+  hash_reutilizado: boolean;
+}
+
 export interface Resultado {
   riesgo: "BAJO" | "MEDIO" | "ALTO" | "CRITICO" | "INDETERMINADO";
   score: number;
@@ -69,6 +83,9 @@ export interface Resultado {
   // Motor 2 — Integridad documental (fuente: VerificaPago)
   integridad_comprobante?: string;
   integridad_config?: { color: string; etiqueta: string; icono: string };
+
+  // Item 5.1 (Etapa 5) — ver interfaz Evidencias arriba
+  evidencias?: Evidencias;
 
   hash_documento?: string;
   veces_visto?: number;
