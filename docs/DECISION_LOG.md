@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.24.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.24.2 · **Última actualización:** 07/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -268,6 +268,20 @@ Nunca `Dashboard → SELECT ... → Base de datos` directo.
 - Toda funcionalidad de Etapa 4 (Dashboard Empresa) en adelante debe justificar, antes de escribir código, en qué motor existente se apoya — no puede calcular su propia versión de "estado", "integridad" o "alerta".
 - La integración de Alertas al Modelo de Decisión Explicable (hallazgo #2) queda como decisión pendiente explícita — se revisará cuando Dashboard Empresa o Alertas evolucionen lo suficiente para necesitarla, no se fuerza ahora.
 - A partir de esta versión, actualizar el encabezado "Versión del documento" de cada archivo de `/docs` que se modifique es parte del flujo de trabajo, no un paso opcional.
+
+---
+
+## 2026-07 — 🏛️ ADR: no se diseña "Desktop" — se diseña el lenguaje visual definitivo de VerificaPago
+
+**Decisión:** el trabajo de presentación de Etapa 5 no produce un diseño específico para escritorio — produce el lenguaje visual único del producto, del cual móvil y escritorio son dos manifestaciones. Se registra en un documento nuevo, `DESIGN_SYSTEM.md` (14º documento de `docs/`, ver README.md), no `DESIGN_SYSTEM_DESKTOP.md` — el nombre importa: el día que exista Tablet, Portal Cliente o cualquier otra presentación, ese documento seguiría siendo el correcto, no quedaría mal nombrado.
+
+**Motivo:** la filosofía debe ser "menos navegación, más contexto simultáneo" al ganar espacio, no "más espacio, luego lo lleno" — dos formas de pensar completamente distintas. Cuando alguien vea la versión móvil y la de escritorio, debe pensar inmediatamente "esto es VerificaPago", no "esto se siente como dos productos distintos". Mismo espíritu que el ADR "una sola experiencia, múltiples presentaciones", pero aplicado ahora al lenguaje visual (color, tipografía, espaciado, jerarquía), no solo a la lógica de producto.
+
+**Consecuencia:**
+- `NavigationShell` (renombrado de `BottomNav.tsx`) es el primer componente diseñado bajo este principio — un componente, presentación que cambia según el viewport, el resto de la app nunca sabe cuál está viendo.
+- El flujo de trabajo para el resto de Etapa 5 cambia: `ROADMAP → DESIGN_SYSTEM.md → Wireframes/Mockups → Validación → Código` — distinto del `ROADMAP → Implementación → Código` usado hasta ahora para motores y backend, porque un mal diseño cuesta mucho menos corregir en un documento que después de implementar veinte pantallas.
+- Se rechazan explícitamente 4 elementos del mockup de referencia por romper decisiones ya tomadas (no por gusto de diseño): imagen del comprobante en vista histórica (rompe la decisión de no persistir imágenes), botones de aprobación/rechazo (es el Workflow que se retiró explícitamente de Etapa 5), navegación con destinos que no existen (Plantillas/Integraciones/Reportes/Configuración), y avatar/créditos de usuario (implica autenticación real, Etapa 6/7). Se rescata la filosofía de 3 zonas (navegación/workspace/contexto), el timeline de pasos, y el criterio de "menos cajas, más aire" — eso sí es diseño puro, no funcionalidad inventada.
+- El escudo animado de móvil se queda exclusivo de móvil — la versión de escritorio se diseña por separado cuando llegue esa pantalla (más conservador, más "Stripe calculando algo importante"), no se resuelve especulativamente ahora.
 
 ---
 

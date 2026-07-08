@@ -1,6 +1,6 @@
 # ARQUITECTURA.md — Arquitectura técnica de VerificaPago
 
-**Versión del documento:** 0.23.2 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.24.2 · **Última actualización:** 07/07/2026
 
 ## Visión general
 
@@ -47,14 +47,14 @@ app/
 │   │   ├── SemaforoSpei.tsx       ← Nivel 1: semáforo SPEI
 │   │   ├── QueSignificaEsto.tsx   ← Nivel 1: Interpretación + Impacto + Recomendación
 │   │   └── DetalleExpandible.tsx  ← Nivel 2+: integridad, evidencias, dimensiones, diagnóstico
-│   └── BottomNav.tsx             ← Navegación inferior fija, badge de Alertas conectado a /alertas/conteo (Etapa 3, ítem 3.5)
+│   └── NavigationShell.tsx       ← Renombrado de BottomNav.tsx (2026-07, ver DECISION_LOG.md). Navegación responsive: barra fija abajo (Mobile/Tablet) o sidebar a la izquierda (Desktop+, ≥1200px) — ver .vp-nav en globals.css, y DESIGN_SYSTEM.md sección 7. Badge de Alertas conectado a /alertas/conteo (Etapa 3, ítem 3.5)
 ├── lib/
 │   ├── estadoSpei.ts            ← Espejo de SEMAFORO_SPEI (backend), única fuente de verdad de color/etiqueta/icono fuera de /resultado
 │   └── colores.ts               ← Paleta compartida (TEAL/GREEN/ORANGE/RED/GRAY), antes duplicada por archivo
 ├── alertas/page.tsx             ← Lista con divulgación progresiva (Etapa 3, ítem 3.4)
 ├── perfil/page.tsx              ← "Perfil / Empresa": Resumen ejecutivo (Etapa 4, ítem 4.2) + placeholder de gestión de cuenta (Sprint E)
 ├── context/AnalisisContext.tsx  ← Estado compartido entre pantallas
-├── globals.css                  ← YA EXISTÍA desde el scaffold de create-next-app (trae `@import "tailwindcss"` — Tailwind está instalado pero nunca se ha usado, todo el proyecto usa estilos inline). Se le agregó al final la variable `--vp-container-width` (Etapa 5, ítem 5.2/5.3) — layout.tsx y BottomNav.tsx la comparten vía `.vp-container`
+├── globals.css                  ← YA EXISTÍA desde el scaffold de create-next-app (trae `@import "tailwindcss"` — Tailwind está instalado pero deliberadamente no adoptado, ver DECISION_LOG.md). Design System incremental: `--vp-container-width` (contenedor responsive), `--vp-sidebar-width`, y las clases `.vp-nav`/`.vp-nav-item`/`.vp-nav-label`/`.vp-nav-plus-wrapper`/`.vp-content-area`/`.vp-page-padding` (Etapa 5, ítem 5.3 — conversión de BottomNav a sidebar)
 └── layout.tsx                   ← AnalisisProvider + BottomNav
 ```
 

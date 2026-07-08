@@ -1,6 +1,6 @@
 # README.md — Índice de la documentación de VerificaPago
 
-**Versión del documento:** 0.21.1 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.24.2 · **Última actualización:** 07/07/2026
 
 Este no es el README del repositorio (ese sigue viviendo en la raíz, en GitHub). Este es el punto de entrada a `/docs`: qué contiene, en qué orden leerlo, y cómo se mantiene actualizado.
 
@@ -24,6 +24,9 @@ docs/
 │   ├── XML_CEP.md                   — todo lo investigado sobre el CEP de Banxico y su XML
 │   └── API.md                       — documentación de endpoints
 │
+├── DISEÑO
+│   └── DESIGN_SYSTEM.md             — lenguaje visual único del producto (Etapa 5, 2026-07) — filosofía, jerarquía, grid, espaciados, componentes base, color, animación, comportamiento móvil↔escritorio. No es "el diseño de Desktop": es el lenguaje visual de VerificaPago, del cual móvil y escritorio son dos presentaciones
+│
 ├── DECISIONES
 │   ├── DECISION_LOG.md              — el "por qué" de cada decisión de arquitectura y producto
 │   └── MODELO_DECISION_EXPLICABLE.md — cómo "piensa" VerificaPago (Hechos → Interpretación → Recomendación → Evidencia)
@@ -44,14 +47,15 @@ docs/
 2. **`PRODUCT.md`** — qué es concretamente, stack y filosofía de diseño
 3. **`PRINCIPIOS_DE_PRODUCTO.md`** — cuando exista (Beta)
 4. **`ARQUITECTURA.md`** — cómo está construido
-5. **`MODELO_DECISION_EXPLICABLE.md`** — cómo razona el sistema
-6. **`MOTOR_DECISIONES.md`** — el detalle de los 2 motores
-7. **`SCORING.md`** — el detalle de las 4 dimensiones
-8. **`XML_CEP.md`** — el detalle de la integración con Banxico
-9. **`API.md`** — los endpoints concretos
-10. **`DECISION_LOG.md`** — por qué se tomó cada decisión relevante en el camino
-11. **`ROADMAP.md`** — qué sigue
-12. **`CHANGELOG.md`** — el historial de todo lo anterior
+5. **`DESIGN_SYSTEM.md`** — el lenguaje visual del producto (desde Etapa 5)
+6. **`MODELO_DECISION_EXPLICABLE.md`** — cómo razona el sistema
+7. **`MOTOR_DECISIONES.md`** — el detalle de los 2 motores
+8. **`SCORING.md`** — el detalle de las 4 dimensiones
+9. **`XML_CEP.md`** — el detalle de la integración con Banxico
+10. **`API.md`** — los endpoints concretos
+11. **`DECISION_LOG.md`** — por qué se tomó cada decisión relevante en el camino
+12. **`ROADMAP.md`** — qué sigue
+13. **`CHANGELOG.md`** — el historial de todo lo anterior
 
 Con este orden, cualquier desarrollador nuevo debería entender el proyecto en una o dos horas, en vez de varios días.
 
@@ -88,7 +92,7 @@ Cada versión queda registrada en `CHANGELOG.md`. El número de versión y la fe
 
 ## Estructura documental congelada
 
-**Principio (2026-07):** no se crean documentos nuevos en `/docs` salvo que representen un dominio propio y reutilizable — el mismo criterio que ya se aplicó al crear `MODELO_DECISION_EXPLICABLE.md` y `LABORATORIO.md`. Toda funcionalidad nueva se integra primero a la estructura documental existente. Ver `DECISION_LOG.md` para el principio completo.
+**Principio (2026-07):** no se crean documentos nuevos en `/docs` salvo que representen un dominio propio y reutilizable — el mismo criterio que ya se aplicó al crear `MODELO_DECISION_EXPLICABLE.md`, `LABORATORIO.md`, y más recientemente `DESIGN_SYSTEM.md` (2026-07, Etapa 5 — ver `DECISION_LOG.md`, ADR "no se diseña Desktop, se diseña el lenguaje visual definitivo de VerificaPago"). `/docs` tiene hoy **14 documentos**, no 13 — el número no está congelado, el *criterio* para agregar uno nuevo sí lo está. Toda funcionalidad nueva se integra primero a la estructura documental existente; solo se agrega un documento cuando de verdad representa un dominio que no cabe en ninguno de los existentes sin diluirlo.
 
 A partir de esta versión, `/docs` se actualiza solo cuando ocurre alguno de estos eventos — no como tarea de mantenimiento aparte:
 

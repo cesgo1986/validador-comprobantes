@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.24.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.24.2 · **Última actualización:** 07/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -292,8 +292,8 @@ Sin este motor, Mobile y Desktop terminarían con dos implementaciones distintas
 **Decisión de estilos (2026-07):** ver `DECISION_LOG.md`, ADR "Tailwind permanece instalado pero no se adopta como sistema de estilos" — `globals.css` (que ya existía desde el scaffold del proyecto, con Tailwind instalado sin usar) se refuerza como **Design System incremental**: variables CSS que los componentes inline consumen vía `var(--token)`, empezando por `--vp-container-width` y `--vp-sidebar-width`. Spacing/radios/elevaciones no se tokenizan todavía — se hace progresivamente, no retroactivamente sobre componentes ya estables.
 
 **5.3 — `/resultado` en pantalla ancha (en curso, 2026-07):** Resultado + Evidencias visibles simultáneamente (dos columnas), sin el botón "Ver detalles del análisis" — mismos componentes de `app/components/resultado/`, sin reimplementar. Sub-pasos:
-- ✅ **Base del contenedor responsive** (código listo, pendiente de aplicar y desplegar): `app/globals.css` (nuevo) — variable `--vp-container-width` con los 4 rangos de `LABORATORIO.md`; `app/layout.tsx` y `app/components/BottomNav.tsx` la comparten vía clase `.vp-container` en vez de un valor de 480px fijo cada uno.
-- ⏳ Conversión de `BottomNav` a barra lateral en Desktop/Wide Desktop — pendiente.
+- ✅ **Base del contenedor responsive** (desplegado y verificado): `app/globals.css`, `app/layout.tsx`, `app/components/NavigationShell.tsx` (renombrado de `BottomNav.tsx`, ver `DECISION_LOG.md`) comparten `.vp-container` en vez de un valor de 480px fijo cada uno.
+- ✅ **Conversión de `NavigationShell` a barra lateral en Desktop/Wide Desktop** (código listo, 2026-07, pendiente de aplicar y desplegar): nuevas clases `.vp-nav`, `.vp-nav-item`, `.vp-nav-label`, `.vp-nav-plus-wrapper` en `globals.css` — el posicionamiento (barra abajo vs. sidebar a la izquierda) se movió de estilos inline a clases CSS, porque un estilo inline siempre gana sobre una regla de `@media`, sin importar la especificidad de la clase. `app/layout.tsx` agrega `.vp-content-area` (se corre a la derecha del sidebar en Desktop+) y `.vp-page-padding` (el espacio para la barra inferior solo aplica en Mobile/Tablet). Componente renombrado de `BottomNav.tsx` a `NavigationShell.tsx` antes de desplegar — ver `DECISION_LOG.md` y `DESIGN_SYSTEM.md`.
 - ⏳ Layout de 2 columnas en `/resultado` (Resultado + Evidencias simultáneas) — pendiente.
 
 **5.4 — `/historial` en pantalla ancha:** patrón maestro-detalle — lista y detalle simultáneos, sin navegar a `/historial/[id]` como ruta separada.

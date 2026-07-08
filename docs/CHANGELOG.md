@@ -1,8 +1,36 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.24.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.24.2 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.24.2] — 2026-07 — DESIGN_SYSTEM.md (14º documento); BottomNav.tsx renombrado a NavigationShell.tsx; pausa de diseño antes de seguir 5.3
+
+### Documentado
+- `DESIGN_SYSTEM.md` (nuevo, 14º documento de `/docs`): lenguaje visual único de VerificaPago — filosofía, jerarquía lineal (Mobile) vs. exploratoria (Desktop), grid de 3 zonas, espaciados (principio, sin tokens fijos todavía), componentes base (reutilizar, no reimplementar), color, `NavigationShell`, animaciones (escudo exclusivo de Mobile), y una sección explícita de preguntas abiertas sin resolver (imagen del comprobante en Desktop, contenido de la zona de Context sin imagen, espaciados concretos, reducción de cajas, animación de Desktop).
+- `README.md`: estructura documental actualizada — 14 documentos, no 13. El principio de "no crear documentos nuevos salvo dominio propio y reutilizable" se mantiene; lo que cambia es que ya se aplicó una vez más (como con `MODELO_DECISION_EXPLICABLE.md` y `LABORATORIO.md` en su momento).
+- `DECISION_LOG.md`: ADR — "no se diseña Desktop, se diseña el lenguaje visual definitivo de VerificaPago". Se rechazan 4 elementos de un mockup de referencia por romper decisiones ya tomadas (imagen de comprobante histórico, workflow de aprobación, navegación con destinos inexistentes, datos de usuario/facturación) y se rescata la filosofía de 3 zonas + "menos cajas, más aire". Se registra el nuevo flujo de trabajo para presentación: `ROADMAP → DESIGN_SYSTEM.md → Wireframes/Mockups → Validación → Código`.
+- `ARQUITECTURA.md`, `ROADMAP.md`: `BottomNav.tsx` renombrado a `NavigationShell.tsx` en las referencias de trabajo pendiente (5.3) — las menciones históricas de sesiones ya cerradas se dejan como `BottomNav`, porque ese era el nombre correcto en su momento.
+
+### Agregado (código pendiente de aplicar y desplegar — reemplaza el código de la sesión anterior, todavía no desplegado)
+- `app/components/NavigationShell.tsx` (renombrado de `BottomNav.tsx`, contenido funcional sin cambios respecto a la versión anterior — solo el nombre y los comentarios).
+- `app/layout.tsx`: import actualizado a `NavigationShell`.
+
+Sube a versión MINOR porque agrega un documento nuevo a la estructura congelada y registra una decisión de arquitectura permanente sobre el lenguaje visual del producto.
+
+---
+
+## [0.24.1] — 2026-07 — Etapa 5, 5.3: BottomNav → sidebar en Desktop/Wide Desktop — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `app/globals.css`: nuevas clases `.vp-nav`, `.vp-nav-item`, `.vp-nav-label`, `.vp-nav-plus-wrapper`, `.vp-content-area`, `.vp-page-padding` — el posicionamiento de la navegación (barra abajo vs. sidebar a la izquierda) se movió de estilos inline a clases CSS, porque un estilo inline siempre gana sobre una regla de `@media`.
+- `app/layout.tsx`: envuelve el contenido en `.vp-content-area` (se corre a la derecha del sidebar en Desktop+) y `.vp-page-padding` (el padding para la barra inferior solo aplica en Mobile/Tablet).
+- `app/components/BottomNav.tsx`: usa las clases nuevas en vez de estilos inline para posición/eje/bordes — colores, iconos y badge siguen inline (no cambian con el breakpoint).
+
+### Documentado
+- `ARQUITECTURA.md`, `ROADMAP.md`: actualizados.
 
 ---
 
