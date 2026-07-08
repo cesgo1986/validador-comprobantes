@@ -33,13 +33,31 @@ const ICONS = {
   ),
 };
 
-// Item 5.3 (Etapa 5): el posicionamiento (barra abajo en Mobile/Tablet,
-// sidebar a la izquierda en Desktop+) vive en las clases .vp-nav,
-// .vp-nav-item, .vp-nav-label, .vp-nav-plus-wrapper de globals.css --
-// no puede quedarse inline aquí, porque un estilo inline siempre gana
-// sobre una regla de @media. Lo que sí sigue inline es lo que no
-// cambia con el breakpoint: colores, iconos, el badge.
-export default function BottomNav() {
+/**
+ * NavigationShell — renombrado de BottomNav.tsx (2026-07, ver
+ * DECISION_LOG.md, ADR "no se diseña Desktop, se diseña el lenguaje
+ * visual definitivo de VerificaPago"). Un componente, dos
+ * presentaciones según el viewport -- el resto de la app nunca sabe
+ * cuál está renderizando, solo usa <NavigationShell />.
+ *
+ * Estado real hoy: la bifurcación es puramente CSS (.vp-nav/.vp-nav-item
+ * en globals.css) -- los 5 destinos son idénticos en CONTENIDO entre
+ * Mobile/Tablet (barra abajo) y Desktop/Wide Desktop (sidebar
+ * izquierda), solo cambia posición/orientación. No existen
+ * MobileNavigation/DesktopNavigation como subcomponentes separados
+ * todavía -- se introducirían el día que el contenido (no solo la
+ * posición) diverja entre presentaciones. Forzar esa separación hoy
+ * duplicaría el mismo .map() sin ninguna ganancia real. Ver
+ * DESIGN_SYSTEM.md, sección 7.
+ *
+ * El posicionamiento (barra abajo vs. sidebar) vive en las clases
+ * .vp-nav, .vp-nav-item, .vp-nav-label, .vp-nav-plus-wrapper de
+ * globals.css -- no puede quedarse inline aquí, porque un estilo
+ * inline siempre gana sobre una regla de @media. Lo que sí sigue
+ * inline es lo que no cambia con el breakpoint: colores, iconos, el
+ * badge.
+ */
+export default function NavigationShell() {
   const pathname = usePathname();
   const router = useRouter();
 
