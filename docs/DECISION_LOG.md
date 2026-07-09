@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.24.3 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.24.6 · **Última actualización:** 07/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -279,12 +279,15 @@ Nunca `Dashboard → SELECT ... → Base de datos` directo.
 
 **Hallazgo importante de esta discusión (no inventar desde cero):** buena parte de lo que un producto empresarial necesita **ya existe** como backend — `AggregationService` (`/monto-total`, `/bancos-frecuentes`, `/riesgo-por-periodo`), `alertas-agregadas`, `obtener_stats()`. Lo que falta no es reconstruir el backend — es (a) la pantalla que lo reúna con las prioridades correctas, y (b) posiblemente reglas nuevas del Alert Engine (detección de velocidad/anomalía: misma CLABE recibiendo múltiples pagos en poco tiempo, montos atípicos respecto al historial de una cuenta) que **no son presentación** — son capacidades de negocio reales, sujetas al mismo principio de "una sola experiencia": si son valiosas, alimentan Alertas en móvil también, no son exclusivas de escritorio.
 
-**Preguntas que la sesión de Centro Operativo debe responder antes de que 5.5 se retome:**
-- ¿Quién abre esta plataforma cada mañana, y qué necesita saber en menos de 30 segundos?
-- ¿Qué decisiones debe poder tomar sin abrir un solo comprobante individual?
-- ¿Cuál es el KPI principal — volumen (842 pagos), monto ($8.2M procesados), riesgo (12 bloqueados), o alertas (4 críticas)? Es decisión de negocio, no de diseño.
-- ¿Qué información genera tranquilidad (se revisa pero no requiere acción) vs. qué información requiere acción inmediata?
-- ¿Qué justificaría pagar una licencia empresarial recurrente, no solo probar el producto una vez?
+**Actualización (2026-07, misma sesión de definición) — KPI principal resuelto, 5.5 sigue congelada para código:**
+
+De las 5 preguntas planteadas arriba, se resolvió la del KPI principal — jerarquía de información para el Centro Operativo, definida por decisión de negocio explícita (no de diseño):
+
+- **Nivel 1 (hero stat, el número más grande — ofensivo, cuenta la historia de negocio):** monto total procesado en el periodo (`$4,850,230 MXN procesados hoy`). Se eligió sobre volumen o % de confianza porque es el único KPI que cualquier perfil (Director General, Finanzas, Operaciones, Comercial) interpreta igual sin explicación — volumen no dice si son $8,000 o $8M, y confianza/alertas son indicadores de calidad o excepción, no el estado normal del negocio.
+- **Nivel 2 (secundarios, más pequeños, justo debajo — defensivo, demuestran control):** volumen de pagos, % liquidados sin problema, alertas críticas activas. Primero se muestra el negocio, después se demuestra que está bajo control — no al revés.
+- **Cadencia de uso:** varias veces al día, no un reporte semanal. Esto es una decisión estratégica de posicionamiento, no solo de UX — si se revisa una vez por semana, el producto es un reporte; si se revisa varias veces al día, es un Centro Operativo. Técnicamente esto no requiere WebSockets ni tiempo real verdadero — los endpoints de `AggregationService` ya existentes, consultados on-demand cada vez que se abre/refresca la pantalla, son suficientes para ese patrón de uso.
+
+**Todavía sin resolver (5.5 sigue congelada):** las demás preguntas de la lista original — qué decisiones debe poder tomar el director sin abrir un comprobante individual, qué información es "tranquilidad" vs. "acción inmediata" en el detalle (más allá del hero stat), y el diseño visual concreto de la pantalla (eso es tarea de `DESIGN_SYSTEM.md` + wireframes, no de esta decisión).
 
 **Consecuencia:** `ROADMAP.md`, ítem 5.5, se marca como congelado con la razón explícita. Si de la sesión de Centro Operativo surgen reglas nuevas del Alert Engine, se siembran como ítems de una etapa funcional (no de Etapa 5) — mismo criterio ya aplicado a Batch Analysis y Workflow.
 

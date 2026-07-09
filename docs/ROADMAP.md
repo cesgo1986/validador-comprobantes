@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.24.3 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.24.6 · **Última actualización:** 07/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -298,7 +298,7 @@ Sin este motor, Mobile y Desktop terminarían con dos implementaciones distintas
 
 **5.4 — `/historial` en pantalla ancha:** patrón maestro-detalle — lista y detalle simultáneos, sin navegar a `/historial/[id]` como ruta separada.
 
-**5.5 — 🧊 CONGELADA (2026-07) — pendiente de "Centro Operativo VerificaPago":** ver `DECISION_LOG.md`, ADR "se congela 5.5 hasta definir el Centro Operativo VerificaPago". No se escribe ninguna pantalla de dashboard empresarial hasta responder: ¿qué vende VerificaPago Empresa? ¿cuál es el KPI principal? ¿qué decisiones debe poder tomar un director de operaciones sin abrir un comprobante individual? Antes esta sección decía "el Executive Summary de 4.2 se expande a gráficas, tablas, filtros, exportación y drill-down — mismos endpoints de `AggregationService`, sin backend nuevo" — sigue siendo cierto que el backend existente (`AggregationService`, `alertas-agregadas`) cubre buena parte de lo necesario, pero el **qué mostrar y en qué orden** es una decisión de producto pendiente, no de diseño.
+**5.5 — 🧊 CONGELADA para código (2026-07) — KPI principal ya definido, resto pendiente:** ver `DECISION_LOG.md`, ADR "se congela 5.5". **Resuelto:** jerarquía de información del hero stat — Nivel 1 (más grande): monto total procesado en el periodo. Nivel 2 (secundario): volumen de pagos, % liquidados sin problema, alertas críticas activas. Primero la historia del negocio (ofensivo), después la del control (defensivo) — no al revés. Cadencia de uso objetivo: varias veces al día (Centro Operativo, no reporte semanal); no requiere WebSockets, `AggregationService` consultado on-demand es suficiente. **Todavía sin resolver:** qué decisiones puede tomar el director sin abrir un comprobante individual, y el diseño visual concreto (tarea de `DESIGN_SYSTEM.md` + wireframes).
 
 ---
 

@@ -1,8 +1,16 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.24.5 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.24.6 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.24.6] — 2026-07 — KPI principal del Centro Operativo resuelto (5.5 sigue congelada para código)
+
+### Documentado (decisión de negocio, sin código)
+- `DECISION_LOG.md`, `ROADMAP.md`: jerarquía de información definida — Nivel 1 (hero stat): monto total procesado. Nivel 2: volumen, % liquidados, alertas críticas. Historia de negocio primero, historia de control después. Cadencia de uso objetivo: varias veces al día — decisión de posicionamiento (Centro Operativo, no reporte), no solo de UX. No requiere WebSockets — `AggregationService` on-demand es suficiente para ese patrón de uso.
+- Preguntas que siguen sin resolver antes de retomar 5.5: qué decisiones puede tomar el director sin abrir un comprobante individual, y el diseño visual concreto.
 
 ---
 
