@@ -1,6 +1,6 @@
 # PRODUCT_VISION.md — Visión estratégica de VerificaPago
 
-**Versión del documento:** 0.18.0 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.24.4 · **Última actualización:** 07/07/2026
 
 *Documento de producto, no técnico. Define qué es VerificaPago, hacia dónde va y qué no será nunca.*
 
@@ -79,6 +79,30 @@ Empresas que necesitan integrar la verificación en sus propios sistemas. ERP, W
 
 ---
 
+## Propuesta de valor para empresas (2026-07)
+
+**El "Job To Be Done" del producto no es "validar comprobantes"** — es permitir que una empresa acepte transferencias SPEI con la misma confianza operativa con la que hoy acepta tarjeta, y **crezca** con eso, no solo se defienda con eso. Dos ángulos de venta distintos, complementarios, no un solo argumento:
+
+- **Defensivo (elimina riesgo):** *"VerificaPago permite que las empresas adopten las transferencias SPEI como un método de cobro seguro, verificable y operativo, eliminando la incertidumbre, reduciendo el trabajo manual y acelerando la liberación de pedidos."*
+- **Ofensivo (habilita crecimiento):** una empresa que solo acepta tarjeta o *contactless* está limitando su catálogo de formas de cobro — y por lo tanto sus ventas — no por decisión estratégica, sino porque no tiene manera de aceptar transferencias con confianza operativa. VerificaPago no solo quita el miedo a SPEI, habilita un canal de cobro adicional real. El primer ángulo lo compra un director de operaciones/riesgo; el segundo lo compra un director comercial o el CEO — la propuesta de valor completa necesita hablarle a ambos.
+
+**Tabla de valor, ordenada por lo que compra la empresa (no por módulo técnico):**
+
+| Resultado que compra la empresa | Cómo lo consigue VerificaPago | Estado |
+|---|---|---|
+| Aceptar SPEI como método de cobro oficial, sin miedo | Validación SPEI + evidencia oficial de Banxico + modelo de decisión explicable | ✅ |
+| Vender más al ampliar su catálogo de formas de cobro | Confianza operativa consistente sobre el canal SPEI | ✅ (efecto indirecto del punto anterior) |
+| Liberar pedidos más rápido | Automatización del análisis (segundos, no minutos) | ✅ |
+| Reducir fraude | Motor Documental + Alert Engine | ✅ |
+| Reducir trabajo manual en picos de volumen | OCR + IA + verificación automática | ✅ |
+| Tener trazabilidad de cada operación | Historial con búsqueda unificada + auditoría | ✅ |
+| Entender qué está pasando en su operación completa | `AggregationService` + Dashboard Empresa | 🟡 backend listo, pantalla congelada (ver `ROADMAP.md`, 5.5) |
+| Conciliar pagos automáticamente contra lo que espera | Motor de Operaciones | 🔵 hipótesis, ver sección "Hipótesis de evolución del producto" |
+
+Este criterio —**¿esto ayuda a que SPEI sea un canal de cobro más confiable y operativo?**— es la prueba que debe pasar cualquier funcionalidad nueva antes de entrar al roadmap. Si la respuesta es no, probablemente sea una distracción, sin importar qué tan interesante sea técnicamente.
+
+---
+
 ## Modelo de negocio
 
 ### Plan Gratuito
@@ -146,6 +170,20 @@ Empresas que necesitan integrar la verificación en sus propios sistemas. ERP, W
 - API para participantes del sistema bancario
 - Expansión a otros casos de uso (SPID, CoDi)
 - Posible expansión regional (otros países con sistemas de pago similares)
+
+---
+
+## Hipótesis de evolución del producto (sin comprometer roadmap ni arquitectura)
+
+**Qué es esta sección:** ideas estratégicas grandes, capturadas para no perderlas, pero deliberadamente **sin** tablas, sin arquitectura, sin endpoints, sin ítems de roadmap. Se registran aquí — no como documento propio — porque `PRODUCT_VISION.md` existe exactamente para "hacia dónde puede evolucionar VerificaPago", no para comprometer qué se construye a continuación. Pasar de esta sección a una etapa real de `ROADMAP.md` requiere una validación de negocio explícita primero, no ocurre automáticamente por estar escrito aquí.
+
+**2026-07 — Motor de Operaciones (hipótesis):** surgió de una discusión sobre conciliación — hoy VerificaPago siempre llega *después* del pago (transferencia → comprobante → validación). La hipótesis es que exista una identidad de operación que viva *antes* del pago también: una empresa genera una solicitud de cobro con un identificador (ej. `VP-H7A2QX`), el cliente lo incluye en el concepto de su transferencia (campo que VerificaPago ya extrae, tanto por OCR como del XML oficial de Banxico), y el sistema concilia automáticamente en vez de que la empresa tenga que adivinar a quién corresponde cada depósito. El estado de una operación evolucionaría: Esperada → Pagada → Validada → Conciliada → Liberada → Auditada.
+
+**2026-07 — Niveles de confianza progresivos (hipótesis, ligada a la anterior):** en vez de un modelo de "identidad validada" (que implicaría KYC — INE, biometría, listas negras, regulación AML, un costo de cumplimiento que no encaja en el producto actual), la hipótesis es construir confianza por **comportamiento observado**, no por identidad verificada: cliente habitual, cuenta habitual, banco habitual, montos habituales. Tres niveles posibles sin comprometer ninguno: (0) hoy — validación de comprobante individual; (1) empresa registrada genera solicitudes de cobro con token; (2) el sistema reconoce relaciones recurrentes cliente↔cuenta↔empresa sin necesitar saber quién es la persona.
+
+**Riesgo regulatorio identificado, sin resolver:** correlacionar identidad de cliente + cuenta bancaria + comportamiento **a través de múltiples empresas distintas** ya es procesamiento de datos personales financieros bajo la LFPDPPP (Ley Federal de Protección de Datos Personales en Posesión de los Particulares), incluso sin hacer KYC. Cualquier diseño real de esto necesita opinión legal explícita antes de construirse — no es un supuesto que el equipo de producto pueda resolver por su cuenta.
+
+**Explícitamente descartado, no solo pospuesto:** integración vía Open Banking (leer directamente las apps bancarias de los usuarios) — en México cae bajo la Ley Fintech, requeriría convertirse en entidad regulada o asociarse con un agregador ya autorizado por la CNBV (ej. Belvo, Finerio Connect, Prometeo). Es una empresa distinta, con una licencia distinta — no una función más de VerificaPago. Ver `DECISION_LOG.md` si esta discusión se retoma alguna vez, para no reabrir el mismo análisis desde cero.
 
 ---
 

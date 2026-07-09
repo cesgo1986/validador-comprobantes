@@ -1,8 +1,18 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.24.3 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.24.4 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.24.4] — 2026-07 — Propuesta de valor para empresas + hipótesis de evolución del producto (sin comprometer roadmap)
+
+### Documentado (sin código, sin arquitectura, sin roadmap nuevo — deliberadamente)
+- `PRODUCT_VISION.md`: nueva sección "Propuesta de valor para empresas" — el "Job To Be Done" del producto (no "validar comprobantes", sino "aceptar SPEI con la confianza de tarjeta, y crecer con eso"), con dos ángulos de venta (defensivo: elimina riesgo; ofensivo: habilita un canal de cobro adicional). Tabla de valor reordenada por resultado de negocio, no por módulo técnico. Criterio de filtro para funcionalidades futuras: "¿esto ayuda a que SPEI sea un canal de cobro más confiable y operativo?".
+- `PRODUCT_VISION.md`: nueva sección "Hipótesis de evolución del producto" — Motor de Operaciones (conciliación automática vía identificador de operación en el campo concepto) y Niveles de confianza progresivos (comportamiento observado, no KYC), ambas capturadas como hipótesis sin comprometer arquitectura ni roadmap. Riesgo regulatorio de LFPDPPP identificado y sin resolver. Open Banking descartado explícitamente (cae bajo Ley Fintech, requeriría entidad regulada o agregador autorizado por CNBV — otro negocio, no una función más).
+
+Sube a versión MINOR porque redefine el posicionamiento comercial del producto — no es un ajuste incremental, aunque no toque ni una línea de código.
 
 ---
 
