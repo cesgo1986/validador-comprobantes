@@ -1,8 +1,15 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.24.4 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.24.5 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.24.5] — 2026-07 — Corrección de alcance: "canal de cobro" (SPEI), no "canales de cobro" en plural
+
+### Corregido (documentación)
+- `PRODUCT_VISION.md`: se corrige una imprecisión que apareció en la síntesis de la sesión anterior — "habilitador de canales de cobro" (plural, genérico) sonaba a pasarela de pagos completa (Stripe/Conekta/Clip), una promesa mucho más grande de la que el producto sostiene. VerificaPago habilita **un canal específico — SPEI** — no canales de cobro en general. Eslogan de trabajo fijado: "Convierte SPEI en un canal de cobro confiable". Criterio de filtro para funcionalidades futuras actualizado para ser explícito en esto.
 
 ---
 

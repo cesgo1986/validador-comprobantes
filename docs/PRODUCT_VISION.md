@@ -1,6 +1,6 @@
 # PRODUCT_VISION.md — Visión estratégica de VerificaPago
 
-**Versión del documento:** 0.24.4 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.24.5 · **Última actualización:** 07/07/2026
 
 *Documento de producto, no técnico. Define qué es VerificaPago, hacia dónde va y qué no será nunca.*
 
@@ -86,6 +86,12 @@ Empresas que necesitan integrar la verificación en sus propios sistemas. ERP, W
 - **Defensivo (elimina riesgo):** *"VerificaPago permite que las empresas adopten las transferencias SPEI como un método de cobro seguro, verificable y operativo, eliminando la incertidumbre, reduciendo el trabajo manual y acelerando la liberación de pedidos."*
 - **Ofensivo (habilita crecimiento):** una empresa que solo acepta tarjeta o *contactless* está limitando su catálogo de formas de cobro — y por lo tanto sus ventas — no por decisión estratégica, sino porque no tiene manera de aceptar transferencias con confianza operativa. VerificaPago no solo quita el miedo a SPEI, habilita un canal de cobro adicional real. El primer ángulo lo compra un director de operaciones/riesgo; el segundo lo compra un director comercial o el CEO — la propuesta de valor completa necesita hablarle a ambos.
 
+**Precisión de alcance (2026-07):** VerificaPago habilita **un canal específico — transferencias SPEI** — no "canales de cobro" en plural ni de forma genérica. No procesa tarjetas, no procesa OXXO, no compite con una pasarela de pagos completa (Stripe, Conekta, Clip). Esta precisión importa: prometer "habilitador de canales de cobro" sin más sería exactamente el tipo de expansión de alcance que este mismo documento ya frena en la sección de hipótesis de evolución (Open Banking, KYC) — cada promesa comercial debe sostenerse en lo que el producto realmente hace hoy.
+
+**Eslogan de trabajo:** *"Convierte SPEI en un canal de cobro confiable"* — específico, defendible, sin prometer de más.
+
+**Criterio de filtro para cualquier funcionalidad futura:** ¿esto hace que una empresa pueda adoptar **SPEI específicamente** con mayor confianza, eficiencia o escala? Si la respuesta es sí, pertenece a VerificaPago. Si no, puede ser una buena idea — para otro producto.
+
 **Tabla de valor, ordenada por lo que compra la empresa (no por módulo técnico):**
 
 | Resultado que compra la empresa | Cómo lo consigue VerificaPago | Estado |
@@ -99,7 +105,7 @@ Empresas que necesitan integrar la verificación en sus propios sistemas. ERP, W
 | Entender qué está pasando en su operación completa | `AggregationService` + Dashboard Empresa | 🟡 backend listo, pantalla congelada (ver `ROADMAP.md`, 5.5) |
 | Conciliar pagos automáticamente contra lo que espera | Motor de Operaciones | 🔵 hipótesis, ver sección "Hipótesis de evolución del producto" |
 
-Este criterio —**¿esto ayuda a que SPEI sea un canal de cobro más confiable y operativo?**— es la prueba que debe pasar cualquier funcionalidad nueva antes de entrar al roadmap. Si la respuesta es no, probablemente sea una distracción, sin importar qué tan interesante sea técnicamente.
+(Criterio de filtro completo arriba, antes de la tabla — se aplica igual a esta lista: si una funcionalidad no ayuda a que SPEI específicamente sea más confiable, eficiente o escalable como canal de cobro, probablemente sea una distracción, sin importar qué tan interesante sea técnicamente.)
 
 ---
 
