@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.24.6 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.24.7 · **Última actualización:** 07/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -279,15 +279,30 @@ Nunca `Dashboard → SELECT ... → Base de datos` directo.
 
 **Hallazgo importante de esta discusión (no inventar desde cero):** buena parte de lo que un producto empresarial necesita **ya existe** como backend — `AggregationService` (`/monto-total`, `/bancos-frecuentes`, `/riesgo-por-periodo`), `alertas-agregadas`, `obtener_stats()`. Lo que falta no es reconstruir el backend — es (a) la pantalla que lo reúna con las prioridades correctas, y (b) posiblemente reglas nuevas del Alert Engine (detección de velocidad/anomalía: misma CLABE recibiendo múltiples pagos en poco tiempo, montos atípicos respecto al historial de una cuenta) que **no son presentación** — son capacidades de negocio reales, sujetas al mismo principio de "una sola experiencia": si son valiosas, alimentan Alertas en móvil también, no son exclusivas de escritorio.
 
-**Actualización (2026-07, misma sesión de definición) — KPI principal resuelto, 5.5 sigue congelada para código:**
+**Actualización (2026-07, misma sesión) — KPI principal resuelto, 5.5 sigue congelada para código:**
 
 De las 5 preguntas planteadas arriba, se resolvió la del KPI principal — jerarquía de información para el Centro Operativo, definida por decisión de negocio explícita (no de diseño):
 
-- **Nivel 1 (hero stat, el número más grande — ofensivo, cuenta la historia de negocio):** monto total procesado en el periodo (`$4,850,230 MXN procesados hoy`). Se eligió sobre volumen o % de confianza porque es el único KPI que cualquier perfil (Director General, Finanzas, Operaciones, Comercial) interpreta igual sin explicación — volumen no dice si son $8,000 o $8M, y confianza/alertas son indicadores de calidad o excepción, no el estado normal del negocio.
-- **Nivel 2 (secundarios, más pequeños, justo debajo — defensivo, demuestran control):** volumen de pagos, % liquidados sin problema, alertas críticas activas. Primero se muestra el negocio, después se demuestra que está bajo control — no al revés.
-- **Cadencia de uso:** varias veces al día, no un reporte semanal. Esto es una decisión estratégica de posicionamiento, no solo de UX — si se revisa una vez por semana, el producto es un reporte; si se revisa varias veces al día, es un Centro Operativo. Técnicamente esto no requiere WebSockets ni tiempo real verdadero — los endpoints de `AggregationService` ya existentes, consultados on-demand cada vez que se abre/refresca la pantalla, son suficientes para ese patrón de uso.
+- **Hero stat (el número más grande — ofensivo, cuenta la historia de negocio):** monto total procesado en el periodo (`$4,850,230 MXN procesados hoy`). Se eligió sobre volumen o % de confianza porque es el único KPI que cualquier perfil (Director General, Finanzas, Operaciones, Comercial) interpreta igual sin explicación — volumen no dice si son $8,000 o $8M, y confianza/alertas son indicadores de calidad o excepción, no el estado normal del negocio.
+- **Secundarios (más pequeños, justo debajo — defensivo, demuestran control):** volumen de pagos, % liquidados sin problema, alertas críticas activas. Primero se muestra el negocio, después se demuestra que está bajo control — no al revés.
+- **Cadencia de uso:** varias veces al día, no un reporte semanal. Decisión estratégica de posicionamiento, no solo de UX — si se revisa una vez por semana, el producto es un reporte; si se revisa varias veces al día, es un Centro Operativo. No requiere WebSockets — `AggregationService` consultado on-demand cada vez que se abre/refresca la pantalla es suficiente.
 
-**Todavía sin resolver (5.5 sigue congelada):** las demás preguntas de la lista original — qué decisiones debe poder tomar el director sin abrir un comprobante individual, qué información es "tranquilidad" vs. "acción inmediata" en el detalle (más allá del hero stat), y el diseño visual concreto de la pantalla (eso es tarea de `DESIGN_SYSTEM.md` + wireframes, no de esta decisión).
+**Actualización (misma sesión, continuación) — modelo de datos de 3 niveles + principio de diseño final:**
+
+**Principio de diseño adoptado como permanente:** *"Cada dato mostrado debe responder una pregunta de negocio o provocar una acción — si un widget no cambia ninguna decisión del usuario, no pertenece al Centro Operativo."* El Dashboard no responde "¿qué pasó?" — responde "¿qué hago ahora?". Un número crudo ("BBVA: 41%") no pasa esta prueba; el mismo número contextualizado como decisión ("BBVA concentra el 41% de las incidencias de hoy") sí.
+
+**Modelo de 3 niveles de datos, resuelve el aparente bloqueo de "% de cobros por SPEI del total":**
+- **Nivel A — Motor de Verdad:** todo lo que VerificaPago puede afirmar por evidencia verificable, sin que la empresa capture nada (pagos, monto, estado SPEI, alertas, bancos, riesgo, tendencias internas, hashes reutilizados). Es el corazón del Centro Operativo — funciona completo desde el primer día.
+- **Nivel B — Datos enriquecidos, opcionales:** sucursales, centros de costo, clientes, pedidos, % de cobros por canal distinto a SPEI. El sistema funciona perfectamente sin ellos; si existen, el dashboard se vuelve más rico. Mismo patrón que Stripe/Shopify — primero funciona, después se enriquece.
+- **Nivel C — Integraciones:** ERP, POS, Shopify, Odoo, SAP. Etapa completamente distinta, no se diseña ahora.
+
+**Corrección de una evaluación de factibilidad hecha en esta misma sesión:** se había marcado "banco con más incidencias/alertas" como no construible por falta de dato. Es incorrecto — `Alerta.analisis_origen` (FK existente) permite cruzar cada alerta con `Analisis.banco_detectado` del análisis que la originó. Es una agregación nueva sobre datos que ya existen, no una captura de dato nueva. Mismo patrón para "alertas +23% vs. ayer" y "18% más volumen que el promedio" — ambos son cálculos nuevos (comparación contra periodo anterior) sobre agregaciones que ya existen (`tendencia_diaria`, conteo por fecha de `Alerta.created_at`), no datos nuevos.
+
+**Lo único que sigue genuinamente bloqueado:** tiempo de liberación / duración del análisis — mismo gap ya documentado en el ítem 4.1 (`ROADMAP.md`): requeriría una columna `duracion_ms` en `analisis`, que se decidió no construir todavía.
+
+**Todavía sin resolver antes de retomar 5.5 con código:** qué decisiones exactas puede tomar el director sin abrir un comprobante individual (más allá del hero stat), y el diseño visual concreto (tarea de `DESIGN_SYSTEM.md` + wireframes).
+
+**Consecuencia:** cuando 5.5 se retome, el Nivel A (Motor de Verdad) es prácticamente construible completo con `AggregationService` más un puñado de agregaciones nuevas pequeñas (banco-por-alertas, comparación contra periodo anterior) — no requiere backend mayor ni columnas nuevas, salvo el caso ya conocido de duración. El Nivel B se diseña como formulario opcional de "enriquecer tu cuenta", sin bloquear el lanzamiento del Nivel A.
 
 **Consecuencia:** `ROADMAP.md`, ítem 5.5, se marca como congelado con la razón explícita. Si de la sesión de Centro Operativo surgen reglas nuevas del Alert Engine, se siembran como ítems de una etapa funcional (no de Etapa 5) — mismo criterio ya aplicado a Batch Analysis y Workflow.
 

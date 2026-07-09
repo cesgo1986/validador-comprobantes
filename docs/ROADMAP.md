@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.24.6 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.24.7 · **Última actualización:** 07/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -298,7 +298,7 @@ Sin este motor, Mobile y Desktop terminarían con dos implementaciones distintas
 
 **5.4 — `/historial` en pantalla ancha:** patrón maestro-detalle — lista y detalle simultáneos, sin navegar a `/historial/[id]` como ruta separada.
 
-**5.5 — 🧊 CONGELADA para código (2026-07) — KPI principal ya definido, resto pendiente:** ver `DECISION_LOG.md`, ADR "se congela 5.5". **Resuelto:** jerarquía de información del hero stat — Nivel 1 (más grande): monto total procesado en el periodo. Nivel 2 (secundario): volumen de pagos, % liquidados sin problema, alertas críticas activas. Primero la historia del negocio (ofensivo), después la del control (defensivo) — no al revés. Cadencia de uso objetivo: varias veces al día (Centro Operativo, no reporte semanal); no requiere WebSockets, `AggregationService` consultado on-demand es suficiente. **Todavía sin resolver:** qué decisiones puede tomar el director sin abrir un comprobante individual, y el diseño visual concreto (tarea de `DESIGN_SYSTEM.md` + wireframes).
+**5.5 — 🧊 CONGELADA para código (2026-07) — KPI principal y modelo de datos ya definidos, resto pendiente:** ver `DECISION_LOG.md`, ADR "se congela 5.5". **Resuelto:** hero stat = monto total procesado; secundarios = volumen, % liquidados, alertas críticas. Historia de negocio primero, historia de control después. Cadencia objetivo: varias veces al día — `AggregationService` on-demand es suficiente, no requiere WebSockets. **Modelo de 3 niveles de datos** (Nivel A: Motor de Verdad, sin captura de la empresa — es el corazón del Centro Operativo; Nivel B: datos enriquecidos opcionales — sucursales, clientes, % de cobros por otros canales; Nivel C: integraciones ERP/POS, etapa aparte). **Principio de diseño permanente:** cada dato debe responder una pregunta de negocio o provocar una acción — si un widget no cambia ninguna decisión, no pertenece al Dashboard. **Corrección de factibilidad:** "banco con más incidencias" y comparaciones contra periodo anterior ("+23% vs. ayer") sí son construibles con `AggregationService` + agregaciones nuevas pequeñas sobre datos existentes (`Alerta.analisis_origen` ya permite cruzar alertas con banco) — no requieren dato nuevo. Solo "tiempo de liberación" sigue bloqueado por el gap ya conocido de 4.1 (columna `duracion_ms` no construida). **Todavía sin resolver:** qué decisiones exactas toma el director sin abrir un comprobante individual, y el diseño visual concreto (`DESIGN_SYSTEM.md` + wireframes).
 
 ---
 

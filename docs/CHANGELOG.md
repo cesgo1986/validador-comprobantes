@@ -1,8 +1,17 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.24.6 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.24.7 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.24.7] — 2026-07 — Centro Operativo: modelo de datos de 3 niveles + principio de "acción, no KPI" (5.5 sigue congelada)
+
+### Documentado (decisión de producto, sin código)
+- `DECISION_LOG.md`, `ROADMAP.md`: principio de diseño permanente adoptado — "cada dato debe responder una pregunta de negocio o provocar una acción; si un widget no cambia ninguna decisión, no pertenece al Dashboard". Modelo de 3 niveles de datos: Nivel A (Motor de Verdad, sin captura de la empresa, corazón del Centro Operativo), Nivel B (datos enriquecidos opcionales — sucursales, clientes, % de cobros por otros canales, patrón Stripe/Shopify), Nivel C (integraciones ERP/POS, etapa aparte).
+- **Autocorrección registrada:** una evaluación de factibilidad de esta misma sesión (marcar "banco con más incidencias" como no construible) resultó incorrecta — `Alerta.analisis_origen` ya permite esa agregación sin dato nuevo. Se corrige explícitamente en vez de dejarlo pasar.
+- Confirmado: solo "tiempo de liberación" sigue genuinamente bloqueado (gap de 4.1, columna `duracion_ms`).
 
 ---
 
