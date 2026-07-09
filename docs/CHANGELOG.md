@@ -1,8 +1,17 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.24.2 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.24.3 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.24.3] — 2026-07 — 🏛️ ADR: se congela 5.5 (Dashboard Empresa Desktop) hasta definir el Centro Operativo VerificaPago
+
+### Documentado
+- `DECISION_LOG.md`: ADR — 5.5 congelada, no se construye ninguna pantalla de dashboard empresarial hasta responder qué vende VerificaPago Empresa (visibilidad/riesgo/control, no OCR/CEP/IA), cuál es el KPI principal, y qué decisiones debe poder tomar un director de operaciones sin abrir un comprobante individual. Hallazgo importante: buena parte del backend necesario (`AggregationService`, `alertas-agregadas`) ya existe — lo pendiente es la priorización de producto, no reconstruir backend.
+- `ROADMAP.md`: 5.5 marcada como congelada con la razón explícita; se siembra "reglas de detección de velocidad/anomalía" en la etapa funcional futura (Alert Engine, no presentación).
+- 5.3 y 5.4 **no se congelan** — continúan sin cambios, son reutilización de componentes ya construidos.
 
 ---
 

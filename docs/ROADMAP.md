@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.24.2 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.24.3 · **Última actualización:** 07/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -298,7 +298,7 @@ Sin este motor, Mobile y Desktop terminarían con dos implementaciones distintas
 
 **5.4 — `/historial` en pantalla ancha:** patrón maestro-detalle — lista y detalle simultáneos, sin navegar a `/historial/[id]` como ruta separada.
 
-**5.5 — Dashboard Empresa Desktop:** el Executive Summary de 4.2 se expande a gráficas, tablas, filtros, exportación y drill-down — mismos endpoints de `AggregationService` (ítem 4.1), sin backend nuevo.
+**5.5 — 🧊 CONGELADA (2026-07) — pendiente de "Centro Operativo VerificaPago":** ver `DECISION_LOG.md`, ADR "se congela 5.5 hasta definir el Centro Operativo VerificaPago". No se escribe ninguna pantalla de dashboard empresarial hasta responder: ¿qué vende VerificaPago Empresa? ¿cuál es el KPI principal? ¿qué decisiones debe poder tomar un director de operaciones sin abrir un comprobante individual? Antes esta sección decía "el Executive Summary de 4.2 se expande a gráficas, tablas, filtros, exportación y drill-down — mismos endpoints de `AggregationService`, sin backend nuevo" — sigue siendo cierto que el backend existente (`AggregationService`, `alertas-agregadas`) cubre buena parte de lo necesario, pero el **qué mostrar y en qué orden** es una decisión de producto pendiente, no de diseño.
 
 ---
 
@@ -359,6 +359,7 @@ Retirada de Etapa 5 en 2026-07 (ver `DECISION_LOG.md`) porque ninguno de estos �
 - Colaboración entre usuarios de la misma empresa
 - Permisos y equipos
 - Aprobaciones multinivel
+- **Reglas de detección de velocidad/anomalía** (sembrado 2026-07, surgido de la sesión de Centro Operativo): misma CLABE recibiendo múltiples pagos en poco tiempo más allá del umbral ya cubierto por `CLABE_FRECUENTE`, montos atípicos respecto al historial de una cuenta específica (ej. una cuenta que nunca superó $20,000 recibe $180,000). Son reglas nuevas del Alert Engine, no presentación — si son valiosas, alimentan Alertas en móvil también, no exclusivas del Centro Operativo de escritorio.
 
 No tiene número de etapa todavía — se abre cuando el producto lo necesite, probablemente después de Etapa 7 (Multiempresa real), ya que varias de estas capacidades (permisos, equipos) dependen de que exista autenticación multiempresa real.
 

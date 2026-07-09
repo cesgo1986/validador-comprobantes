@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.24.2 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.24.3 · **Última actualización:** 07/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -268,6 +268,25 @@ Nunca `Dashboard → SELECT ... → Base de datos` directo.
 - Toda funcionalidad de Etapa 4 (Dashboard Empresa) en adelante debe justificar, antes de escribir código, en qué motor existente se apoya — no puede calcular su propia versión de "estado", "integridad" o "alerta".
 - La integración de Alertas al Modelo de Decisión Explicable (hallazgo #2) queda como decisión pendiente explícita — se revisará cuando Dashboard Empresa o Alertas evolucionen lo suficiente para necesitarla, no se fuerza ahora.
 - A partir de esta versión, actualizar el encabezado "Versión del documento" de cada archivo de `/docs` que se modifique es parte del flujo de trabajo, no un paso opcional.
+
+---
+
+## 2026-07 — 🏛️ ADR: se congela 5.5 (Dashboard Empresa Desktop) hasta definir el Centro Operativo VerificaPago
+
+**Decisión:** se congela temporalmente el desarrollo de 5.5 — no se escribe ninguna pantalla de dashboard empresarial todavía. 5.3 y 5.4 continúan sin cambios (son reutilización y redistribución de componentes que ya existen, no dependen de esta decisión). Antes de retomar 5.5, se abre una sesión de definición de producto: **"Centro Operativo VerificaPago"** — no una sesión de diseño ni de código.
+
+**Motivo:** la pregunta correcta no es "¿qué necesita verse en la pantalla de Desktop?" — es "¿qué vende VerificaPago Empresa?". Un director de operaciones no compra OCR, ni CEP, ni IA — compra visibilidad, control de riesgo agregado, y la capacidad de tomar decisiones sin abrir comprobante por comprobante. Construir una pantalla bonita antes de responder eso arriesga construir una versión más grande de la misma aplicación, no un producto empresarial real.
+
+**Hallazgo importante de esta discusión (no inventar desde cero):** buena parte de lo que un producto empresarial necesita **ya existe** como backend — `AggregationService` (`/monto-total`, `/bancos-frecuentes`, `/riesgo-por-periodo`), `alertas-agregadas`, `obtener_stats()`. Lo que falta no es reconstruir el backend — es (a) la pantalla que lo reúna con las prioridades correctas, y (b) posiblemente reglas nuevas del Alert Engine (detección de velocidad/anomalía: misma CLABE recibiendo múltiples pagos en poco tiempo, montos atípicos respecto al historial de una cuenta) que **no son presentación** — son capacidades de negocio reales, sujetas al mismo principio de "una sola experiencia": si son valiosas, alimentan Alertas en móvil también, no son exclusivas de escritorio.
+
+**Preguntas que la sesión de Centro Operativo debe responder antes de que 5.5 se retome:**
+- ¿Quién abre esta plataforma cada mañana, y qué necesita saber en menos de 30 segundos?
+- ¿Qué decisiones debe poder tomar sin abrir un solo comprobante individual?
+- ¿Cuál es el KPI principal — volumen (842 pagos), monto ($8.2M procesados), riesgo (12 bloqueados), o alertas (4 críticas)? Es decisión de negocio, no de diseño.
+- ¿Qué información genera tranquilidad (se revisa pero no requiere acción) vs. qué información requiere acción inmediata?
+- ¿Qué justificaría pagar una licencia empresarial recurrente, no solo probar el producto una vez?
+
+**Consecuencia:** `ROADMAP.md`, ítem 5.5, se marca como congelado con la razón explícita. Si de la sesión de Centro Operativo surgen reglas nuevas del Alert Engine, se siembran como ítems de una etapa funcional (no de Etapa 5) — mismo criterio ya aplicado a Batch Analysis y Workflow.
 
 ---
 
