@@ -193,7 +193,7 @@ body {
    con !important sí. */
 @media (min-width: 1200px) {
   .vp-detalle-forzar-desktop .vp-detalle-toggle-btn {
-    display: none;
+    display: none !important;
   }
   .vp-detalle-forzar-desktop .vp-detalle-contenido {
     display: block !important;
