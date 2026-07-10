@@ -1,8 +1,42 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.24.8 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.25.0 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.25.0] — 2026-07 — 5.3 cerrado: layout de 2 columnas en /resultado desplegado, con 2 fixes reales
+
+### Desplegado en producción
+- Layout de 2 columnas en `/resultado` verificado — Resultado y Evidencias simultáneos en Desktop+, cero cambio en Mobile/Tablet, sidebar de `NavigationShell` funcionando junto con el nuevo grid.
+
+### Corregido durante el despliegue
+1. `app/layout.tsx` desplegado con el import viejo (`BottomNav`) de una sesión anterior — rompía el build (`module-not-found`). Corregido.
+2. Regla CSS que debía ocultar el botón de toggle en Desktop le faltaba `!important` — el botón tiene `display: "flex"` inline, así que la regla no podía ganarle sin `!important`. Mismo patrón que ya se había resuelto correctamente para la regla que fuerza visible el contenido; esta mitad se quedó sin el fix la primera vez.
+
+### Cerrado
+- `ROADMAP.md`: ítem **5.3** pasa a ✅, con los 2 bugs documentados explícitamente (no se ocultan como si el código hubiera funcionado a la primera).
+
+Sube a versión MINOR porque cierra un ítem completo de Etapa 5, mismo criterio que otros cierres de ítem.
+
+---
+
+## [0.24.9] — 2026-07 — Etapa 5, 5.3: layout de 2 columnas en /resultado — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `app/components/resultado/DetalleExpandible.tsx`: nuevo prop `siempreAbierto` (default `false`, no rompe consumidores existentes). El contenido siempre se renderiza en el DOM; la visibilidad se controla con `display: none/block` inline (estado de React) para Mobile/Tablet, y con una clase CSS (`.vp-detalle-forzar-desktop`, `!important`) que la sobreescribe solo a partir de 1200px — evita depender de detección de viewport en JS.
+- `app/globals.css`: nuevas clases `.vp-resultado-grid` (columna única en Mobile/Tablet, `3fr 2fr` en Desktop+) y `.vp-detalle-forzar-desktop` (oculta el botón de toggle y fuerza el contenido visible en Desktop+).
+- `app/resultado/page.tsx`: reestructurado para envolver `SemaforoSpei`+`QueSignificaEsto` (columna izquierda) y `DetalleExpandible` con `siempreAbierto` (columna derecha) en `.vp-resultado-grid`.
+
+### Corregido antes de compartir el código (encontrado en revisión propia)
+- La primera versión de `resultado/page.tsx` pasaba `siempreAbierto` de forma incondicional — habría roto el toggle también en Mobile, no solo activado la vista de Desktop. Corregido con el mecanismo de CSS `!important` antes de entregar el código.
+
+### Alcance
+- Deliberadamente limitado a `/resultado` — `historial/[id]/page.tsx` no se toca (su tratamiento en Desktop se decide en 5.4, que ya define que esa ruta deja de usarse para el detalle en pantallas anchas).
+
+### Documentado
+- `ROADMAP.md` actualizado.
 
 ---
 

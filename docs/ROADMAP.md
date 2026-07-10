@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.24.8 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.25.0 · **Última actualización:** 07/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -291,9 +291,14 @@ Sin este motor, Mobile y Desktop terminarían con dos implementaciones distintas
 
 **Decisión de estilos (2026-07):** ver `DECISION_LOG.md`, ADR "Tailwind permanece instalado pero no se adopta como sistema de estilos" — `globals.css` (que ya existía desde el scaffold del proyecto, con Tailwind instalado sin usar) se refuerza como **Design System incremental**: variables CSS que los componentes inline consumen vía `var(--token)`, empezando por `--vp-container-width` y `--vp-sidebar-width`. Spacing/radios/elevaciones no se tokenizan todavía — se hace progresivamente, no retroactivamente sobre componentes ya estables.
 
-**5.3 — `/resultado` en pantalla ancha (en curso, 2026-07):** Resultado + Evidencias visibles simultáneamente (dos columnas), sin el botón "Ver detalles del análisis" — mismos componentes de `app/components/resultado/`, sin reimplementar. Sub-pasos:
-- ✅ **Base del contenedor responsive** (desplegado y verificado): `app/globals.css`, `app/layout.tsx`, `app/components/NavigationShell.tsx` (renombrado de `BottomNav.tsx`, ver `DECISION_LOG.md`) comparten `.vp-container` en vez de un valor de 480px fijo cada uno.
-- ✅ **Conversión de `NavigationShell` a barra lateral en Desktop/Wide Desktop** (código listo, 2026-07, pendiente de aplicar y desplegar): nuevas clases `.vp-nav`, `.vp-nav-item`, `.vp-nav-label`, `.vp-nav-plus-wrapper` en `globals.css` — el posicionamiento (barra abajo vs. sidebar a la izquierda) se movió de estilos inline a clases CSS, porque un estilo inline siempre gana sobre una regla de `@media`, sin importar la especificidad de la clase. `app/layout.tsx` agrega `.vp-content-area` (se corre a la derecha del sidebar en Desktop+) y `.vp-page-padding` (el espacio para la barra inferior solo aplica en Mobile/Tablet). Componente renombrado de `BottomNav.tsx` a `NavigationShell.tsx` antes de desplegar — ver `DECISION_LOG.md` y `DESIGN_SYSTEM.md`.
+**5.3 — `/resultado` en pantalla ancha ✅ (completado y desplegado, 2026-07):** Resultado + Evidencias visibles simultáneamente (dos columnas), sin el botón "Ver detalles del análisis" — mismos componentes de `app/components/resultado/`, sin reimplementar. Sub-pasos:
+- ✅ **Base del contenedor responsive** (desplegado y verificado).
+- ✅ **Conversión de `NavigationShell` a barra lateral en Desktop/Wide Desktop** (desplegado y verificado).
+- ✅ **Layout de 2 columnas en `/resultado`** (desplegado y verificado): `app/components/resultado/DetalleExpandible.tsx` con el prop `siempreAbierto`; `app/globals.css` con `.vp-resultado-grid` y `.vp-detalle-forzar-desktop`; `app/resultado/page.tsx` reestructurado. **Alcance deliberado: solo `/resultado`** — `historial/[id]/page.tsx` no se toca, su tratamiento en Desktop se decide en 5.4.
+
+**Dos bugs reales encontrados y corregidos durante el despliegue de este ítem** (ambos por el mismo patrón: un estilo inline nunca cede ante una clase CSS sin `!important`):
+1. `app/layout.tsx` quedó desplegado con el import viejo (`BottomNav` en vez de `NavigationShell`) de una sesión anterior — rompía el build por completo (`module-not-found`). Corregido reemplazando el archivo.
+2. La regla que debía **ocultar** el botón de toggle en Desktop (`.vp-detalle-forzar-desktop .vp-detalle-toggle-btn { display: none; }`) le faltaba `!important` — el botón tiene `display: "flex"` inline (para centrar su contenido), así que la regla sin `!important` nunca podía ganarle. Se corrigió agregando `!important`, igual que ya se había hecho correctamente para la regla que fuerza visible el contenido.
 - ⏳ Layout de 2 columnas en `/resultado` (Resultado + Evidencias simultáneas) — pendiente.
 
 **5.4 — `/historial` en pantalla ancha:** patrón maestro-detalle — lista y detalle simultáneos, sin navegar a `/historial/[id]` como ruta separada.
