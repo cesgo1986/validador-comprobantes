@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AnalisisProvider } from "./context/AnalisisContext";
-import BottomNav from "./components/BottomNav";
+import NavigationShell from "./components/NavigationShell";
 
 export const metadata: Metadata = {
   title: "VerificaPago",
@@ -22,13 +22,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AnalisisProvider>
           {/* item 5.3: vp-content-area se corre a la derecha del sidebar
               en Desktop+ (margin-left: var(--vp-sidebar-width)) -- en
-              Mobile/Tablet no hace nada, BottomNav es una barra abajo. */}
+              Mobile/Tablet no hace nada, NavigationShell es una barra abajo. */}
           <div className="vp-content-area">
             <div className="vp-container vp-page-padding" style={{ minHeight: "100vh" }}>
               {children}
             </div>
           </div>
-          <BottomNav />
+          <NavigationShell />
         </AnalisisProvider>
       </body>
     </html>
