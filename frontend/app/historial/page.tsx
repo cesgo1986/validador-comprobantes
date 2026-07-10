@@ -2,6 +2,8 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getSemaforoSpei } from "../lib/estadoSpei";
+import { useAnalisis } from "../context/AnalisisContext";
+import { HistorialDetalleContenido, AnalisisDetalle } from "../components/historial/HistorialDetalleContenido";
 
 const TEAL = "#00BFA5";
 const GREEN = "#43A047";
@@ -10,6 +12,7 @@ const RED = "#E53935";
 const GRAY = "#9CA3AF";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const DESKTOP_BREAKPOINT_QUERY = "(min-width: 1200px)";
 
 interface AnalisisItem {
   id: string;
@@ -84,8 +87,18 @@ function formatearMonto(monto: number | null): string {
   return "$" + monto.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Item 5.4 (Etapa 5): en Desktop+ (≥1200px), tocar una tarjeta NO navega
+// a /historial/[id] -- selecciona el análisis y lo muestra en la
+// columna derecha (maestro-detalle), sin salir de /historial. En
+// Mobile/Tablet, navega exactamente como antes de 5.4. La decisión de
+// cuál comportamiento usar se toma DENTRO del clic (window.matchMedia),
+// nunca durante el renderizado -- así no hay riesgo de mismatch de
+// hidratación de Next.js: el HTML inicial es idéntico en servidor y
+// cliente, solo el comportamiento del clic (que no afecta el render)
+// cambia según el ancho real de la ventana en ese momento.
 export default function Historial() {
   const router = useRouter();
+  const { setResult } = useAnalisis();
 
   const [items, setItems] = useState<AnalisisItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -97,14 +110,17 @@ export default function Historial() {
   const [resumenAbierto, setResumenAbierto] = useState(false);
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
 
-  // Búsqueda unificada (item 2.2) -- el backend decide dónde buscar
-  // (banco, clave de rastreo, referencia, CLABE o monto) sin que el
-  // usuario tenga que elegir el campo.
   const [busqueda, setBusqueda] = useState("");
-  const [riesgo, setRiesgo] = useState("");             // Nivel 2 (Motor 2, avanzado)
-  const [fechaDesde, setFechaDesde] = useState("");     // Nivel 2
-  const [fechaHasta, setFechaHasta] = useState("");     // Nivel 2
-  const [hashBusqueda, setHashBusqueda] = useState(""); // Nivel 2 (avanzado)
+  const [riesgo, setRiesgo] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+  const [hashBusqueda, setHashBusqueda] = useState("");
+
+  // Item 5.4: estado del panel de detalle (Desktop+)
+  const [idSeleccionado, setIdSeleccionado] = useState<string | null>(null);
+  const [detalleSeleccionado, setDetalleSeleccionado] = useState<AnalisisDetalle | null>(null);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
+  const [errorDetalle, setErrorDetalle] = useState<string | null>(null);
 
   const hayFiltrosAvanzadosActivos = !!(riesgo || fechaDesde || fechaHasta || hashBusqueda);
 
@@ -120,9 +136,6 @@ export default function Historial() {
     return params.toString();
   }, [busqueda, riesgo, fechaDesde, fechaHasta, hashBusqueda]);
 
-  // Item 2.4: misma lógica de filtros que construirQuery(), pero sin
-  // limit/offset -- la exportación trae TODO lo que coincide con los
-  // filtros, no solo la página cargada en pantalla.
   const construirQueryExport = useCallback(() => {
     const params = new URLSearchParams();
     if (busqueda.trim()) params.set("q", busqueda.trim());
@@ -165,10 +178,35 @@ export default function Historial() {
     }
   }, [construirQuery]);
 
+  // Item 5.4: carga el detalle para el panel derecho (Desktop+)
+  const cargarDetalle = useCallback(async (id: string) => {
+    setCargandoDetalle(true);
+    setErrorDetalle(null);
+    try {
+      const resp = await fetch(`${API_URL}/api/v1/dashboard/analisis/${id}`);
+      if (!resp.ok) throw new Error();
+      const data: AnalisisDetalle = await resp.json();
+      setDetalleSeleccionado(data);
+      setResult(data.resultado);
+    } catch {
+      setErrorDetalle("No se pudo cargar este análisis. Intenta de nuevo.");
+    } finally {
+      setCargandoDetalle(false);
+    }
+  }, [setResult]);
+
+  const seleccionarItem = (id: string) => {
+    const esDesktop = typeof window !== "undefined" && window.matchMedia(DESKTOP_BREAKPOINT_QUERY).matches;
+    if (esDesktop) {
+      setIdSeleccionado(id);
+      cargarDetalle(id);
+    } else {
+      router.push(`/historial/${id}`);
+    }
+  };
+
   useEffect(() => { cargarStats(); }, [cargarStats]);
 
-  // Cambiar búsqueda o cualquier filtro reinicia la lista. Debounce simple
-  // en la búsqueda de texto para no disparar una petición por cada tecla.
   useEffect(() => {
     const t = setTimeout(() => cargarAnalisis(0, true), busqueda ? 350 : 0);
     return () => clearTimeout(t);
@@ -179,7 +217,6 @@ export default function Historial() {
     setRiesgo(""); setFechaDesde(""); setFechaHasta(""); setHashBusqueda("");
   };
 
-  // Agrupar por día para el encabezado tipo "Hoy" / "Ayer" / fecha
   const grupos = useMemo(() => {
     const mapa = new Map<string, AnalisisItem[]>();
     for (const item of items) {
@@ -196,158 +233,196 @@ export default function Historial() {
         <span style={{ color: "#fff", fontWeight: 700, fontSize: 18 }}>Historial</span>
       </div>
 
-      {/* Nivel 1: búsqueda unificada + entrada a filtros */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-        <input
-          value={busqueda}
-          onChange={e => setBusqueda(e.target.value)}
-          placeholder="🔎 Banco, clave de rastreo, cuenta o monto..."
-          style={{ flex: 1, padding: "12px 14px", borderRadius: 12, border: "1.5px solid #E2E8F0", background: "#fff", fontSize: 13 }}
-        />
-        <button onClick={() => setFiltrosAbiertos(o => !o)}
-          style={{
-            padding: "0 16px", borderRadius: 12, cursor: "pointer",
-            border: hayFiltrosAvanzadosActivos ? `1.5px solid ${TEAL}` : "1.5px solid #E2E8F0",
-            background: hayFiltrosAvanzadosActivos ? `${TEAL}12` : "#fff",
-            color: hayFiltrosAvanzadosActivos ? TEAL : "#334155", fontSize: 13, fontWeight: 700,
-          }}>
-          Filtros
-        </button>
-      </div>
+      {/* item 5.4: maestro-detalle -- 1 columna en Mobile/Tablet, 2 en Desktop+ */}
+      <div className="vp-historial-grid">
+        <div>
+          {/* Nivel 1: búsqueda unificada + entrada a filtros */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <input
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              placeholder="🔎 Banco, clave de rastreo, cuenta o monto..."
+              style={{ flex: 1, padding: "12px 14px", borderRadius: 12, border: "1.5px solid #E2E8F0", background: "#fff", fontSize: 13 }}
+            />
+            <button onClick={() => setFiltrosAbiertos(o => !o)}
+              style={{
+                padding: "0 16px", borderRadius: 12, cursor: "pointer",
+                border: hayFiltrosAvanzadosActivos ? `1.5px solid ${TEAL}` : "1.5px solid #E2E8F0",
+                background: hayFiltrosAvanzadosActivos ? `${TEAL}12` : "#fff",
+                color: hayFiltrosAvanzadosActivos ? TEAL : "#334155", fontSize: 13, fontWeight: 700,
+              }}>
+              Filtros
+            </button>
+          </div>
 
-      {/* Nivel 2: filtros avanzados, bajo demanda */}
-      {filtrosAbiertos && (
-        <div style={{ background: "#fff", borderRadius: 14, padding: 16, marginBottom: 10, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div>
-            <label style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              Riesgo documental (Motor 2)
-            </label>
-            <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-              {RIESGO_OPCIONES.map(r => (
-                <button key={r} onClick={() => setRiesgo(riesgo === r ? "" : r)}
-                  style={{
-                    padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                    border: `1.5px solid ${riesgo === r ? colorRiesgo(r) : "#E2E8F0"}`,
-                    background: riesgo === r ? `${colorRiesgo(r)}15` : "#fff",
-                    color: riesgo === r ? colorRiesgo(r) : "#64748B",
-                  }}>
-                  {r}
+          {filtrosAbiertos && (
+            <div style={{ background: "#fff", borderRadius: 14, padding: 16, marginBottom: 10, display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  Riesgo documental (Motor 2)
+                </label>
+                <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                  {RIESGO_OPCIONES.map(r => (
+                    <button key={r} onClick={() => setRiesgo(riesgo === r ? "" : r)}
+                      style={{
+                        padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                        border: `1.5px solid ${riesgo === r ? colorRiesgo(r) : "#E2E8F0"}`,
+                        background: riesgo === r ? `${colorRiesgo(r)}15` : "#fff",
+                        color: riesgo === r ? colorRiesgo(r) : "#64748B",
+                      }}>
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Desde</label>
+                  <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)}
+                    style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #E2E8F0", fontSize: 13 }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Hasta</label>
+                  <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)}
+                    style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #E2E8F0", fontSize: 13 }} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Hash exacto (avanzado)</label>
+                <input value={hashBusqueda} onChange={e => setHashBusqueda(e.target.value)} placeholder="Búsqueda exacta"
+                  style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #E2E8F0", fontSize: 13 }} />
+              </div>
+              {hayFiltrosAvanzadosActivos && (
+                <button onClick={limpiarFiltrosAvanzados}
+                  style={{ padding: "8px", borderRadius: 8, background: "#F1F5F9", border: "none", color: "#334155", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  Limpiar filtros
                 </button>
+              )}
+              <button onClick={exportarCSV}
+                style={{ padding: "10px", borderRadius: 8, background: "#fff", border: "1.5px solid #E2E8F0", color: "#334155", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                ⬇ Exportar a CSV (con estos filtros)
+              </button>
+            </div>
+          )}
+
+          <button onClick={() => setResumenAbierto(o => !o)}
+            style={{ width: "100%", padding: "12px 16px", marginBottom: 14, borderRadius: 12, background: "#fff", border: "none", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#334155", flex: 1, textAlign: "left" }}>Resumen de actividad</span>
+            <span style={{ color: "#CBD5E1", fontSize: 12 }}>{resumenAbierto ? "▲" : "▼"}</span>
+          </button>
+          {resumenAbierto && stats && (
+            <div style={{ background: "#fff", borderRadius: 14, padding: 16, marginTop: -8, marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+              <ResumenFila label="Total de análisis" valor={stats.total_analisis} />
+              <ResumenFila label="Hoy" valor={stats.analisis_hoy} />
+              {stats.distribucion_riesgo.map(d => (
+                <ResumenFila key={d.riesgo} label={`Riesgo ${d.riesgo}`} valor={d.total} color={colorRiesgo(d.riesgo)} />
               ))}
+              <ResumenFila label="Documentos reutilizados" valor={stats.documentos_reutilizados} color={stats.documentos_reutilizados > 0 ? ORANGE : undefined} />
             </div>
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Desde</label>
-              <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)}
-                style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #E2E8F0", fontSize: 13 }} />
+          )}
+
+          {error && (
+            <div style={{ background: "#fff", borderRadius: 14, padding: 20, textAlign: "center", marginBottom: 14 }}>
+              <p style={{ color: RED, fontSize: 13, margin: 0 }}>{error}</p>
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Hasta</label>
-              <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)}
-                style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #E2E8F0", fontSize: 13 }} />
+          )}
+
+          {!cargando && !error && items.length === 0 && (
+            <div style={{ background: "#fff", borderRadius: 16, padding: "40px 20px", textAlign: "center" }}>
+              <div style={{ fontSize: 32, marginBottom: 10 }}>📋</div>
+              <p style={{ color: "#64748B", fontSize: 13, lineHeight: 1.6, margin: 0 }}>
+                {busqueda || hayFiltrosAvanzadosActivos
+                  ? "No se encontraron análisis con esta búsqueda."
+                  : "Aquí verás tus análisis anteriores en cuanto proceses tu primer comprobante."}
+              </p>
             </div>
-          </div>
-          <div>
-            <label style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Hash exacto (avanzado)</label>
-            <input value={hashBusqueda} onChange={e => setHashBusqueda(e.target.value)} placeholder="Búsqueda exacta"
-              style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #E2E8F0", fontSize: 13 }} />
-          </div>
-          {hayFiltrosAvanzadosActivos && (
-            <button onClick={limpiarFiltrosAvanzados}
-              style={{ padding: "8px", borderRadius: 8, background: "#F1F5F9", border: "none", color: "#334155", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-              Limpiar filtros
+          )}
+
+          {grupos.map(([dia, itemsDelDia]) => (
+            <div key={dia} style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, paddingLeft: 4 }}>
+                {dia}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {itemsDelDia.map(item => {
+                  const spei = getSemaforoSpei(item.estado_operacion);
+                  const seleccionado = item.id === idSeleccionado;
+                  return (
+                    <div key={item.id} onClick={() => seleccionarItem(item.id)}
+                      style={{
+                        background: "#fff", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer",
+                        border: seleccionado ? `1.5px solid ${TEAL}` : "1.5px solid transparent",
+                      }}>
+                      <span style={{ fontSize: 18, flexShrink: 0 }}>{spei.icono}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: spei.color }}>
+                          {spei.etiqueta}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>
+                          {item.banco_detectado || item.archivo_nombre || "Comprobante"}
+                          {item.veces_visto > 1 ? ` · Reutilizado ${item.veces_visto} veces` : ""}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        {item.monto_detectado !== null && (
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#1E293B" }}>{formatearMonto(item.monto_detectado)}</div>
+                        )}
+                        <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>{tiempoRelativo(item.fecha)}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {!cargando && items.length > 0 && items.length < total && (
+            <button onClick={() => cargarAnalisis(offset + LIMIT, false)}
+              style={{ width: "100%", marginTop: 6, padding: 14, borderRadius: 12, background: "#fff", border: "1.5px solid #E2E8F0", color: "#334155", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+              Cargar más ({items.length} de {total})
             </button>
           )}
-          <button onClick={exportarCSV}
-            style={{ padding: "10px", borderRadius: 8, background: "#fff", border: "1.5px solid #E2E8F0", color: "#334155", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-            ⬇ Exportar a CSV (con estos filtros)
-          </button>
+
+          {cargando && (
+            <div style={{ textAlign: "center", padding: 20, color: "#94A3B8", fontSize: 12 }}>Cargando...</div>
+          )}
         </div>
-      )}
 
-      {/* Resumen de actividad — colapsado por defecto, no compite con la lista */}
-      <button onClick={() => setResumenAbierto(o => !o)}
-        style={{ width: "100%", padding: "12px 16px", marginBottom: 14, borderRadius: 12, background: "#fff", border: "none", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#334155", flex: 1, textAlign: "left" }}>Resumen de actividad</span>
-        <span style={{ color: "#CBD5E1", fontSize: 12 }}>{resumenAbierto ? "▲" : "▼"}</span>
-      </button>
-      {resumenAbierto && stats && (
-        <div style={{ background: "#fff", borderRadius: 14, padding: 16, marginTop: -8, marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-          <ResumenFila label="Total de análisis" valor={stats.total_analisis} />
-          <ResumenFila label="Hoy" valor={stats.analisis_hoy} />
-          {stats.distribucion_riesgo.map(d => (
-            <ResumenFila key={d.riesgo} label={`Riesgo ${d.riesgo}`} valor={d.total} color={colorRiesgo(d.riesgo)} />
-          ))}
-          <ResumenFila label="Documentos reutilizados" valor={stats.documentos_reutilizados} color={stats.documentos_reutilizados > 0 ? ORANGE : undefined} />
+        {/* Columna derecha -- oculta por completo en Mobile/Tablet vía
+            .vp-historial-detalle-panel (ver globals.css), para no
+            agregar contenido visible nuevo ahí (idSeleccionado nunca se
+            setea en Mobile/Tablet de todas formas -- seleccionarItem
+            navega en su lugar -- pero ocultarla explícitamente evita
+            depender de esa coincidencia). Solo visible en Desktop+. */}
+        <div className="vp-historial-detalle-panel">
+          {idSeleccionado && cargandoDetalle && (
+            <div style={{ background: "#fff", borderRadius: 20, padding: 40, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>
+              Cargando análisis...
+            </div>
+          )}
+          {idSeleccionado && errorDetalle && (
+            <div style={{ background: "#fff", borderRadius: 20, padding: 40, textAlign: "center" }}>
+              <p style={{ color: RED, fontSize: 13, margin: 0 }}>{errorDetalle}</p>
+            </div>
+          )}
+          {idSeleccionado && !cargandoDetalle && !errorDetalle && detalleSeleccionado && (
+            <HistorialDetalleContenido
+              detalle={detalleSeleccionado}
+              onVolver={() => { setIdSeleccionado(null); setDetalleSeleccionado(null); }}
+              onVerValidaciones={() => router.push("/resultado/detalle")}
+              textoBotonVolver="Cerrar detalle"
+            />
+          )}
+          {!idSeleccionado && (
+            <div style={{ background: "#fff", borderRadius: 20, padding: 60, textAlign: "center" }}>
+              <div style={{ fontSize: 32, marginBottom: 10 }}>👈</div>
+              <p style={{ color: "#94A3B8", fontSize: 13, margin: 0 }}>
+                Selecciona un análisis de la lista para ver su detalle.
+              </p>
+            </div>
+          )}
         </div>
-      )}
-
-      {/* Estado: error */}
-      {error && (
-        <div style={{ background: "#fff", borderRadius: 14, padding: 20, textAlign: "center", marginBottom: 14 }}>
-          <p style={{ color: RED, fontSize: 13, margin: 0 }}>{error}</p>
-        </div>
-      )}
-
-      {/* Estado: vacío */}
-      {!cargando && !error && items.length === 0 && (
-        <div style={{ background: "#fff", borderRadius: 16, padding: "40px 20px", textAlign: "center" }}>
-          <div style={{ fontSize: 32, marginBottom: 10 }}>📋</div>
-          <p style={{ color: "#64748B", fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-            {busqueda || hayFiltrosAvanzadosActivos
-              ? "No se encontraron análisis con esta búsqueda."
-              : "Aquí verás tus análisis anteriores en cuanto proceses tu primer comprobante."}
-          </p>
-        </div>
-      )}
-
-      {/* Nivel 1: lista cronológica, agrupada por día, protagonista = Estado SPEI (Motor 1) */}
-      {grupos.map(([dia, itemsDelDia]) => (
-        <div key={dia} style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, paddingLeft: 4 }}>
-            {dia}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {itemsDelDia.map(item => {
-              const spei = getSemaforoSpei(item.estado_operacion);
-              return (
-                <div key={item.id} onClick={() => router.push(`/historial/${item.id}`)}
-                  style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
-                  <span style={{ fontSize: 18, flexShrink: 0 }}>{spei.icono}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: spei.color }}>
-                      {spei.etiqueta}
-                    </div>
-                    <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>
-                      {item.banco_detectado || item.archivo_nombre || "Comprobante"}
-                      {item.veces_visto > 1 ? ` · Reutilizado ${item.veces_visto} veces` : ""}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    {item.monto_detectado !== null && (
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1E293B" }}>{formatearMonto(item.monto_detectado)}</div>
-                    )}
-                    <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>{tiempoRelativo(item.fecha)}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-
-      {/* Cargar más */}
-      {!cargando && items.length > 0 && items.length < total && (
-        <button onClick={() => cargarAnalisis(offset + LIMIT, false)}
-          style={{ width: "100%", marginTop: 6, padding: 14, borderRadius: 12, background: "#fff", border: "1.5px solid #E2E8F0", color: "#334155", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-          Cargar más ({items.length} de {total})
-        </button>
-      )}
-
-      {cargando && (
-        <div style={{ textAlign: "center", padding: 20, color: "#94A3B8", fontSize: 12 }}>Cargando...</div>
-      )}
+      </div>
     </div>
   );
 }

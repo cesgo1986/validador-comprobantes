@@ -199,3 +199,34 @@ body {
     display: block !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   Item 5.4 (Etapa 5): /historial en pantalla ancha -- maestro-detalle.
+   Mobile/Tablet: 1 columna, tocar una tarjeta navega a /historial/[id]
+   (sin cambios respecto a antes de 5.4). Desktop+: 2 columnas -- lista
+   a la izquierda, detalle a la derecha, sin navegar de ruta. La
+   decisión de cuál comportamiento usar se toma en JS dentro del clic
+   (window.matchMedia), no aquí -- esta clase solo controla el layout
+   visual, no la lógica de navegación.
+   ───────────────────────────────────────────────────────────────── */
+
+.vp-historial-grid {
+  display: block;
+}
+
+.vp-historial-detalle-panel {
+  display: none;
+}
+
+@media (min-width: 1200px) {
+  .vp-historial-grid {
+    display: grid;
+    grid-template-columns: 2fr 3fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .vp-historial-detalle-panel {
+    display: block;
+  }
+}
