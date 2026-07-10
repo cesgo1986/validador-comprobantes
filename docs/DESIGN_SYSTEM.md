@@ -1,6 +1,6 @@
 # DESIGN_SYSTEM.md — Lenguaje visual de VerificaPago
 
-**Versión del documento:** 0.24.2 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.24.8 · **Última actualización:** 07/07/2026
 
 Este documento no describe "el diseño de Desktop". Describe el lenguaje visual único de VerificaPago — móvil y escritorio son dos presentaciones de ese mismo lenguaje, no dos productos distintos. Ver `DECISION_LOG.md`, ADR "no se diseña Desktop, se diseña el lenguaje visual definitivo de VerificaPago".
 
@@ -96,6 +96,78 @@ Preguntas abiertas, sin resolver, que hay que decidir explícitamente antes de c
 - **Valor concreto de espaciados** (sección 4) — pendiente de wireframes reales.
 - **Reducción de cajas** (sección 5) — hipótesis sin validar.
 - **Animación de Desktop** (sección 8) — sin diseñar.
+
+---
+
+## 10. Centro Operativo — wireframe conceptual (V1, solo Nivel A)
+
+Estructura, no código. Ver `DECISION_LOG.md` para las decisiones que originan cada bloque — este wireframe es la traducción directa de esas decisiones a pantalla, sin agregar nada nuevo.
+
+**Aclaración sobre el grid de 3 zonas (sección 3):** ese grid es para pantallas de **un solo elemento** (`/resultado`, donde "Contexto" son las evidencias de *ese* análisis). El Centro Operativo es agregado, no tiene un elemento único — aquí solo aplican 2 zonas: Navigation (sidebar) + Workspace (todo el contenido operativo). No se fuerza una tercera columna sin nada real que mostrar.
+
+**Alcance de V1:** solo Nivel A (Motor de Verdad — ver `DECISION_LOG.md`). Nivel 4 (estratégico) **no aparece en V1** — depende de datos de Nivel B (sucursales, clientes) que no existen todavía. No se muestra como sección vacía invitando a capturar datos; simplemente no existe hasta que haya algo real que mostrar ahí, mismo principio de "no inventar secciones para llenar espacio" (sección 3).
+
+```
+┌─ Navigation (sidebar) ──┬──────────────── Workspace ─────────────────────┐
+│                          │                                                 │
+│  VerificaPago            │  Martes 7 de julio de 2026                     │
+│                          │                                                 │
+│  Dashboard      ←activo  │  ┌─────────────────────────────────────────┐  │
+│  Nuevo análisis          │  │ 🟢 Puedes seguir operando normalmente     │  │
+│  Historial                │  └─────────────────────────────────────────┘  │
+│  Alertas          [3]     │      (Nivel 1 — decisión más simple, sin      │
+│  Perfil                   │       abrir nada. 🟠/🔴 si hay problema)      │
+│                          │                                                 │
+│                          │  $4,850,230 MXN                                │
+│                          │  procesados hoy                    ← hero stat │
+│                          │                                                 │
+│                          │  1,248 pagos · 99.4% liquidados · 3 críticas   │
+│                          │                        ← secundarios, Nivel 1  │
+│                          │                                                 │
+│                          │  ─────────────────────────────────────────    │
+│                          │                                                 │
+│                          │  Qué requiere atención          ← Nivel 2      │
+│                          │  (solo aparece lo que aplica — si no hay        │
+│                          │   nada pendiente, esta sección no existe)       │
+│                          │                                                 │
+│                          │  ⚠️  3 operaciones requieren revisión           │
+│                          │      inmediata                  [Revisar]      │
+│                          │                                                 │
+│                          │  🔁  2 comprobantes reutilizados hoy [Revisar] │
+│                          │                                                 │
+│                          │  ─────────────────────────────────────────    │
+│                          │                                                 │
+│                          │  Tendencias                     ← Nivel 3      │
+│                          │                                                 │
+│                          │  🏦  BBVA concentra el 41% de las              │
+│                          │      incidencias de hoy          [Analizar]    │
+│                          │                                                 │
+│                          │  📈  Hoy procesaste 18% más volumen            │
+│                          │      que el promedio de la semana              │
+│                          │      (informativo, sin botón — no requiere     │
+│                          │       acción, solo contexto positivo)          │
+│                          │                                                 │
+│                          │  🔔  Las alertas aumentaron 23%                │
+│                          │      respecto a ayer              [Ver causas] │
+│                          │                                                 │
+└──────────────────────────┴─────────────────────────────────────────────────┘
+```
+
+**Cada bloque, contra la prueba de "¿responde una pregunta o provoca una acción?":**
+
+| Bloque | Pregunta que responde | Acción que provoca |
+|---|---|---|
+| Estado 🟢/🟠/🔴 | ¿Puedo operar con normalidad? | Ninguna si es 🟢; revisar si no |
+| Hero stat + secundarios | ¿Cómo va mi operación hoy? | Ninguna directa — es el contexto que enmarca todo lo demás |
+| "3 requieren revisión" | ¿Qué necesito atender ya? | Botón "Revisar" → filtra `/alertas` |
+| "2 hashes reutilizados" | ¿Hay algo sospechoso pendiente? | Botón "Revisar" → filtra por tipo |
+| "BBVA concentra 41%" | ¿Dónde está concentrado mi riesgo? | Botón "Analizar" → drill-down por banco |
+| "18% más que el promedio" | ¿Cómo voy comparado con lo normal? | Ninguna — refuerzo positivo, no todo tiene que tener botón |
+| "Alertas +23% vs. ayer" | ¿Está empeorando algo? | Botón "Ver causas" → alertas del día, agrupadas |
+
+**Lo que deliberadamente NO está en este wireframe:** gráficas, tablas, filtros avanzados, exportación. Eso es real y valioso, pero es la **expansión** de este mismo Workspace cuando haya más ancho/necesidad (Wide Desktop, o cuando el usuario pida "ver más" de una tendencia específica) — no el punto de entrada. El punto de entrada responde "¿qué hago ahora?" en menos de 30 segundos, no invita a explorar.
+
+**Pendiente, todavía sin resolver:** los destinos exactos de cada botón (¿navegan a `/alertas` con un filtro preaplicado? ¿abren un panel lateral sin navegar?) — es la siguiente decisión antes de que esto se convierta en código, y probablemente dependa de cómo termine el layout de `/historial` en 5.4.
 
 ---
 

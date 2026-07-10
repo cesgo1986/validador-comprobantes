@@ -1,8 +1,16 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.24.7 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.24.8 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.24.8] — 2026-07 — Wireframe conceptual del Centro Operativo (V1, solo Nivel A) — DESIGN_SYSTEM.md sección 10
+
+### Documentado (estructura, sin código)
+- `DESIGN_SYSTEM.md`: nueva sección 10 — wireframe conceptual completo del Centro Operativo V1. Estado 🟢/🟠/🔴, hero stat (monto procesado), secundarios, "qué requiere atención" (Nivel 2, solo aparece lo que aplica), "tendencias" (Nivel 3, con la corrección de factibilidad de la sesión anterior). Cada bloque verificado contra el principio "responde una pregunta o provoca una acción". Nivel 4 (estratégico) explícitamente ausente en V1 — depende de datos de Nivel B que no existen todavía, no se muestra como sección vacía. Aclaración: el grid de 3 zonas de la sección 3 no aplica aquí (es para pantallas de un solo elemento) — el Centro Operativo usa solo Navigation + Workspace.
+- `ROADMAP.md`: 5.5 actualizada con la referencia al wireframe. Pendiente real que queda: destinos exactos de los botones de acción, depende de 5.4.
 
 ---
 
