@@ -1,8 +1,31 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.25.0 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.25.2 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.25.2] — 2026-07 — 5.4 cerrado: maestro-detalle en /historial desplegado
+
+### Desplegado en producción
+- Verificado: móvil sin cambios (navega a `/historial/[id]` como siempre), selección múltiple funcionando en Desktop (el panel derecho se actualiza al tocar distintas tarjetas sin recargar ni cambiar la URL), "Ver validaciones completas" funcionando desde el panel inline.
+
+### Cerrado
+- `ROADMAP.md`: ítem **5.4** pasa a ✅. Con esto, Etapa 5 tiene 4 de 5 ítems cerrados — solo queda 5.5, congelada para código (ver ADR en `DECISION_LOG.md`).
+
+---
+
+## [0.25.1] — 2026-07 — Etapa 5, 5.4: maestro-detalle en /historial — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `app/components/historial/HistorialDetalleContenido.tsx` (nuevo): cuerpo visual del detalle histórico, extraído de `historial/[id]/page.tsx` para reutilizarse ahí (Mobile/Tablet) y en la columna derecha del maestro-detalle de `/historial` (Desktop+).
+- `app/historial/[id]/page.tsx`: reescrito, mucho más corto — solo orquesta el fetch, el JSX vive en el componente compartido.
+- `app/historial/page.tsx`: agrega estado de selección (`idSeleccionado`, `detalleSeleccionado`) y columna derecha con el detalle. Primera vez en Etapa 5 que se detecta el ancho de pantalla en JS (`window.matchMedia`, dentro del clic, no durante el render) — navegar de ruta vs. seleccionar inline es una decisión de comportamiento, no de estilo, así que no podía resolverse solo con CSS como en 5.1-5.3.
+- `app/globals.css`: nuevas clases `.vp-historial-grid` (1 columna en Mobile/Tablet, `2fr 3fr` en Desktop+) y `.vp-historial-detalle-panel` (oculta la columna de detalle por completo en Mobile/Tablet, para no agregar contenido visible nuevo ahí).
+
+### Documentado
+- `ARQUITECTURA.md`, `ROADMAP.md`: actualizados.
 
 ---
 
