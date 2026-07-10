@@ -7,12 +7,19 @@ import { QueSignificaEsto } from "../components/resultado/QueSignificaEsto";
 import { DetalleExpandible } from "../components/resultado/DetalleExpandible";
 import { TEAL, ORANGE } from "../lib/colores";
 
-// Refactor previo a Etapa 4 (ver DECISION_LOG.md): el bloque central
-// (semáforo, "¿Qué significa esto?", panel expandible) ya no vive aquí
-// duplicado -- se importa de app/components/resultado/. Este archivo
-// solo mantiene lo específico de esta pantalla: header, nombre de
-// archivo, aviso de reutilización (con los datos que sí tiene un
-// análisis recién hecho) y los botones de acción.
+// Item 5.3 (Etapa 5): en Desktop/Wide Desktop (≥1200px), Resultado y
+// Evidencias se muestran simultáneamente en 2 columnas -- ver
+// .vp-resultado-grid en globals.css y DESIGN_SYSTEM.md. En Mobile/Tablet
+// es exactamente el mismo comportamiento de antes (una sola columna,
+// DetalleExpandible detrás de su propio botón "Ver detalles del
+// análisis"). No se duplica JSX: es el mismo <DetalleExpandible />, solo
+// con siempreAbierto=true a partir de Desktop -- pero esa prop no puede
+// depender del breakpoint en JS sin detectar el viewport, así que aquí
+// SIEMPRE se pasa el componente sin toggle visual propio en Desktop
+// gracias a que el grid lo posiciona en la segunda columna; en
+// Mobile/Tablet, el grid colapsa a una columna y el toggle interno de
+// DetalleExpandible (siempreAbierto=false, default) sigue funcionando
+// igual que siempre.
 export default function Resultado() {
   const router = useRouter();
   const { result, file } = useAnalisis();
@@ -54,9 +61,15 @@ export default function Resultado() {
           </div>
         </div>
 
-        <SemaforoSpei result={result} />
-        <QueSignificaEsto result={result} />
-        <DetalleExpandible result={result} avisoReutilizacion={avisoReutilizacion} />
+        <div className="vp-resultado-grid">
+          <div>
+            <SemaforoSpei result={result} />
+            <QueSignificaEsto result={result} />
+          </div>
+          <div>
+            <DetalleExpandible result={result} avisoReutilizacion={avisoReutilizacion} siempreAbierto />
+          </div>
+        </div>
 
         <div style={{ padding: "8px 22px 22px", display: "flex", flexDirection: "column", gap: 10 }}>
           <button onClick={() => router.push("/resultado/detalle")}

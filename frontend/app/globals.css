@@ -41,7 +41,7 @@ body {
 
 :root {
   --vp-container-width: 480px; /* Mobile, < 768px */
-  --vp-sidebar-width: 280px;   /* Etapa 5, ítem 5.3 -- BottomNav como sidebar en Desktop+ */
+  --vp-sidebar-width: 280px;   /* Etapa 5, ítem 5.3 -- NavigationShell como sidebar en Desktop+ */
   --vp-desktop-breakpoint: 1200px; /* referencia para JS -- no usable dentro de @media */
 }
 
@@ -63,19 +63,19 @@ body {
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   Item 5.3 (Etapa 5): BottomNav como barra fija abajo (Mobile/Tablet)
-   o como barra lateral fija a la izquierda (Desktop+, ≥1200px). El
-   cambio de eje/posición vive aquí -- BottomNav.tsx mantiene inline
-   solo lo que NO cambia con el breakpoint (colores, iconos, badge).
-   Estas propiedades no pueden quedarse inline en el componente porque
-   un estilo inline siempre gana sobre una regla de @media, sin
-   importar la especificidad de la clase.
-   ───────────────────────────────────────────────────────────────── */
+   Item 5.3 (Etapa 5): NavigationShell como barra fija abajo
+   (Mobile/Tablet) o como barra lateral fija a la izquierda (Desktop+,
+   ≥1200px). El cambio de eje/posición vive aquí -- NavigationShell.tsx
+   mantiene inline solo lo que NO cambia con el breakpoint (colores,
+   iconos, badge). Estas propiedades no pueden quedarse inline en el
+   componente porque un estilo inline siempre gana sobre una regla de
+   @media, sin importar la especificidad de la clase.
 
-.vp-content-area {
-  /* Mobile/Tablet: BottomNav es una barra horizontal abajo, no ocupa
-     espacio lateral -- el contenido no necesita margen. */
-}
+   .vp-content-area no tiene reglas en Mobile/Tablet a propósito --
+   NavigationShell es una barra horizontal abajo ahí, no ocupa espacio
+   lateral, así que el contenido no necesita margen. Solo se activa en
+   el @media de Desktop+ más abajo.
+   ───────────────────────────────────────────────────────────────── */
 
 .vp-page-padding {
   padding-bottom: 90px; /* espacio para la barra inferior, Mobile/Tablet */
@@ -158,5 +158,44 @@ body {
   .vp-nav-plus-wrapper {
     margin-top: 0;
     margin-bottom: 8px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Item 5.3 (Etapa 5): /resultado en pantalla ancha -- Resultado y
+   Evidencias visibles simultáneamente (2 columnas), en vez de
+   Evidencias detrás del botón "Ver detalles del análisis". En
+   Mobile/Tablet es una sola columna -- los 2 elementos hijos (columna
+   izquierda y derecha) se apilan en el mismo orden del DOM, visualmente
+   idéntico a como se veía antes de este cambio (mismo padre, sin fondo
+   propio por columna, sin cambio visual).
+   ───────────────────────────────────────────────────────────────── */
+
+.vp-resultado-grid {
+  display: block;
+}
+
+@media (min-width: 1200px) {
+  .vp-resultado-grid {
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    align-items: start;
+  }
+}
+
+/* item 5.3: fuerza visible el contenido de DetalleExpandible en
+   Desktop+, sin depender de JS para saber el ancho de pantalla. Por
+   debajo de 1200px estas reglas no existen -- el toggle de
+   DetalleExpandible funciona exactamente igual que si esta clase nunca
+   se hubiera aplicado. El !important es necesario porque el contenido
+   usa un estilo inline (display: none/block controlado por el estado
+   de React) -- una regla de clase normal no podría ganarle a eso, pero
+   con !important sí. */
+@media (min-width: 1200px) {
+  .vp-detalle-forzar-desktop .vp-detalle-toggle-btn {
+    display: none;
+  }
+  .vp-detalle-forzar-desktop .vp-detalle-contenido {
+    display: block !important;
   }
 }
