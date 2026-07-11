@@ -1,3 +1,4 @@
+
 # API.md — Documentación de endpoints
 
 **Versión del documento:** 0.26.1 · **Última actualización:** 07/07/2026
