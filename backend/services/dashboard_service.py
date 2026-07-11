@@ -102,15 +102,30 @@ def obtener_resumen_ejecutivo(empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
 def obtener_centro_operativo(empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
     """
     Item 5.5 (Etapa 5): bundle completo para el Centro Operativo -- una
-    sola llamada en vez de que el frontend orqueste 7 peticiones.
-    Compone AggregationService, no calcula nada nuevo por su cuenta.
-    Estructura calcada del wireframe conceptual (DESIGN_SYSTEM.md,
-    sección 10) -- Nivel A (Motor de Verdad) únicamente, sin Nivel 4/
-    estratégico (depende de datos de Nivel B que no existen todavía).
+    sola llamada en vez de que el frontend orqueste peticiones
+    distintas. Compone AggregationService y alerta_service, no calcula
+    nada nuevo por su cuenta. Estructura calcada del wireframe
+    conceptual (DESIGN_SYSTEM.md, sección 10) -- Nivel A (Motor de
+    Verdad) únicamente, sin Nivel 4/estratégico (depende de datos de
+    Nivel B que no existen todavía).
+
+    FIX (2026-07, encontrado en revisión de arquitectura): originalmente
+    Mobile y Desktop llamaban a 2 endpoints distintos
+    (/resumen-ejecutivo y /centro-operativo), duplicando tráfico y
+    creando 2 fuentes de verdad para datos que en esencia son el mismo
+    dominio -- mismo error que la arquitectura ya evita con los
+    motores (un solo motor, múltiples presentaciones). Se fusiona:
+    `resumen_compacto` reproduce exactamente el shape de la respuesta
+    vieja de /resumen-ejecutivo, calculado aquí mismo, para que Mobile
+    consuma este único endpoint sin cambiar su lógica de render.
+    /resumen-ejecutivo se conserva desplegado (no se elimina la ruta
+    pública sin saber si algo más la usa) pero ningún frontend lo
+    consume ya -- candidato a retirar en una limpieza futura.
     """
     hoy = datetime.date.today().isoformat()
 
     monto = aggregation_service.calcular_monto_total_procesado(empresa_id, fecha_desde=hoy, fecha_hasta=hoy)
+    stats = aggregation_service.calcular_stats_generales(empresa_id, fecha_desde=hoy, fecha_hasta=hoy)
     riesgo = aggregation_service.calcular_riesgo_por_periodo(empresa_id, fecha_desde=hoy, fecha_hasta=hoy)
     alertas_agregadas = aggregation_service.calcular_alertas_agregadas(empresa_id)
     hashes_reutilizados = aggregation_service.calcular_top_hashes_reutilizados(empresa_id, min_veces=2, limit=5)
@@ -121,11 +136,13 @@ def obtener_centro_operativo(empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
     banco_incidencia = aggregation_service.calcular_banco_mayor_incidencia(empresa_id)
     comparacion_volumen = aggregation_service.calcular_comparacion_volumen(empresa_id)
     comparacion_alertas = aggregation_service.calcular_comparacion_alertas(empresa_id)
+    conteo_alertas = alerta_service.contar_alertas(empresa_id)
 
     total_estado = sum(e["total"] for e in riesgo["por_estado_operacion"])
     confirmadas = sum(e["total"] for e in riesgo["por_estado_operacion"] if e["estado_operacion"] in ("liquidada", "acreditada"))
     pct_liquidados = round((confirmadas / total_estado) * 100, 1) if total_estado > 0 else None
 
+    riesgo_alto = sum(r["total"] for r in riesgo["por_riesgo"] if r["riesgo"] in ("ALTO", "CRITICO"))
     alertas_criticas = sum(s["total"] for s in alertas_agregadas["por_severidad"] if s["severidad"] in ("CRITICA", "ALTA"))
 
     # Nivel 1 (DESIGN_SYSTEM.md sección 10): 🔴 si hay CRITICA activa,
@@ -156,6 +173,15 @@ def obtener_centro_operativo(empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
             "banco_mayor_incidencia": banco_incidencia,
             "comparacion_volumen": comparacion_volumen,
             "comparacion_alertas": comparacion_alertas,
+        },
+        # Mismo shape exacto que la respuesta vieja de /resumen-ejecutivo
+        # -- Mobile lo consume tal cual, sin cambiar su lógica de render.
+        "resumen_compacto": {
+            "analisis_hoy": stats["analisis_hoy"],
+            "alertas_nuevas": conteo_alertas["total_nuevas"],
+            "alertas_notificables": conteo_alertas["notificables"],
+            "riesgo_alto": riesgo_alto,
+            "pct_confirmadas": pct_liquidados,
         },
     }
 
