@@ -341,6 +341,16 @@ def calcular_banco_mayor_incidencia(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_
     alertas en el periodo -- no se muestra el widget si no hay nada que
     decir (principio de diseño en DECISION_LOG.md).
 
+    FIX (2026-07, encontrado en producción): el filtro de fecha se
+    aplica sobre Alerta.created_at (cuándo se generó la alerta), NO
+    sobre Analisis.fecha (cuándo ocurrió la transferencia que la
+    originó). Una alerta crítica sin revisar de hace 2 días sigue
+    siendo riesgo actual para un director -- filtrarla porque la
+    transferencia que la originó no fue "hoy" contradice el propósito
+    del widget. Con el filtro original (sobre Analisis.fecha), un día
+    sin análisis nuevos hacía que este widget desapareciera aunque
+    hubiera alertas activas de días anteriores sin revisar.
+
     Nota (verificado contra models/alerta.py): `analisis_origen` es
     nullable -- una alerta puede originarse de una correlación entre
     varios análisis, no de uno solo. Si ninguna alerta activa tiene ese
@@ -359,7 +369,16 @@ def calcular_banco_mayor_incidencia(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_
         if db is None:
             return None
 
-        filtros_fecha = _filtro_rango_fechas(fecha_desde, fecha_hasta)
+        # Filtro sobre Alerta.created_at -- ver nota del FIX arriba, no
+        # reutiliza _filtro_rango_fechas() porque esa función filtra
+        # sobre Analisis.fecha, una columna distinta.
+        filtros_fecha_alerta = []
+        fd = _parsear_fecha(fecha_desde)
+        fh = _parsear_fecha(fecha_hasta)
+        if fd:
+            filtros_fecha_alerta.append(Alerta.created_at >= fd)
+        if fh:
+            filtros_fecha_alerta.append(Alerta.created_at < (fh + datetime.timedelta(days=1)))
 
         total_alertas = db.execute(
             select(func.count(Alerta.id))
@@ -372,7 +391,7 @@ def calcular_banco_mayor_incidencia(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_
                 Analisis.empresa_id == empresa_id,
                 Analisis.deleted_at.is_(None),
                 Analisis.banco_detectado.is_not(None),
-                *filtros_fecha,
+                *filtros_fecha_alerta,
             )
         ).scalar() or 0
 
@@ -390,7 +409,7 @@ def calcular_banco_mayor_incidencia(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_
                 Analisis.empresa_id == empresa_id,
                 Analisis.deleted_at.is_(None),
                 Analisis.banco_detectado.is_not(None),
-                *filtros_fecha,
+                *filtros_fecha_alerta,
             )
             .group_by(Analisis.banco_detectado)
             .order_by(desc(func.count(Alerta.id)))

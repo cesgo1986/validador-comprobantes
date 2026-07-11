@@ -114,7 +114,11 @@ def obtener_centro_operativo(empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
     riesgo = aggregation_service.calcular_riesgo_por_periodo(empresa_id, fecha_desde=hoy, fecha_hasta=hoy)
     alertas_agregadas = aggregation_service.calcular_alertas_agregadas(empresa_id)
     hashes_reutilizados = aggregation_service.calcular_top_hashes_reutilizados(empresa_id, min_veces=2, limit=5)
-    banco_incidencia = aggregation_service.calcular_banco_mayor_incidencia(empresa_id, fecha_desde=hoy, fecha_hasta=hoy)
+    # Sin filtro de fecha deliberadamente (fix 2026-07): una alerta
+    # crítica sin revisar de hace 2 días sigue siendo riesgo actual --
+    # filtrarla porque no es "de hoy" escondería riesgo real acumulado
+    # en un día tranquilo sin análisis nuevos. Ver aggregation_service.py.
+    banco_incidencia = aggregation_service.calcular_banco_mayor_incidencia(empresa_id)
     comparacion_volumen = aggregation_service.calcular_comparacion_volumen(empresa_id)
     comparacion_alertas = aggregation_service.calcular_comparacion_alertas(empresa_id)
 
