@@ -1,6 +1,7 @@
 import json
 import csv
 import io
+import logging
 from fastapi.responses import StreamingResponse
 import base64
 import datetime
@@ -8,7 +9,7 @@ import re
 import os
 import time
 import httpx
-from fastapi import FastAPI, UploadFile, File, Form, APIRouter, HTTPException, Query
+from fastapi import FastAPI, UploadFile, File, Form, APIRouter, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 import anthropic
 from dotenv import load_dotenv
@@ -28,17 +29,66 @@ from scoring_v3 import (
     NivelEvidencia, evidencia_mas_alta, SEMAFORO_SPEI,
     extraer_estado_de_xml, calcular_integridad_comprobante, INTEGRIDAD_CONFIG,
 )
-
+ 
 load_dotenv()
-
+ 
+# ─────────────────────────────────────────────────────────────────────────────
+# Item 6.1 (Etapa 6, Hardening): logging estructurado.
+# Primer paso -- reemplaza los print(...) de ESTE archivo. Otros archivos
+# (services/*.py, alert_engine/*.py) todavía usan print() -- se convierten
+# en un paso posterior de 6.1, no en este mismo cambio, para no mezclar un
+# cambio grande de un solo archivo con una migración completa del proyecto.
+# ─────────────────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+logger = logging.getLogger("verificapago")
+ 
 app = FastAPI()
-
+ 
+# ─────────────────────────────────────────────────────────────────────────────
+# Item 6.1 (Etapa 6, Hardening): CORS restringido.
+# Antes: allow_origins=["*"] -- cualquier dominio podía llamar a la API.
+# Ahora: se lee de la variable de entorno ALLOWED_ORIGINS (coma-separada),
+# mismo patrón que ya usa CLAUDE_MODEL más abajo -- no se introduce un
+# módulo de configuración nuevo (pydantic-settings) para esto, sería una
+# pieza de arquitectura no pedida.
+#
+# IMPORTANTE: hay que configurar ALLOWED_ORIGINS en el panel de Render
+# antes de este deploy, o CORS bloqueará TODO, incluyendo el frontend real:
+#
+#     ALLOWED_ORIGINS=https://validador-comprobantes.vercel.app,http://localhost:3000
+#
+# No se autorizan previews automáticos de Vercel por defecto (superficie
+# de ataque innecesaria) -- si hace falta probar uno puntual, se agrega
+# temporalmente a esa misma variable, sin comodines.
+# ─────────────────────────────────────────────────────────────────────────────
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+if not ALLOWED_ORIGINS:
+    logger.warning("ALLOWED_ORIGINS no está configurada -- CORS bloqueará todas las peticiones de navegador.")
+ 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+ 
+ 
+# ─────────────────────────────────────────────────────────────────────────────
+# Item 6.1 (Etapa 6, Hardening): headers de seguridad.
+# Middleware simple, sin dependencia nueva -- se agrega a toda respuesta.
+# ─────────────────────────────────────────────────────────────────────────────
+@app.middleware("http")
+async def agregar_headers_seguridad(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+    return response
+ 
 
 # Crea las tablas (hashes_documentos, analisis) si no existen y si
 # DATABASE_URL está configurada. Si no está configurada, init_db()
@@ -48,7 +98,7 @@ app.add_middleware(
 try:
     init_db()
 except Exception as e:
-    print("Aviso: no fue posible inicializar la base de datos:", e)
+    logger.warning("No fue posible inicializar la base de datos: %s", e)
 
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
@@ -1009,7 +1059,7 @@ async def analizar(
                 "error": str(e),
             }
         except Exception as e:
-            print("Aviso: error al procesar XML del CEP:", e)
+            logger.warning("Error al procesar XML del CEP: %s", e)
             result["cep_xml"] = {
                 "xml_proporcionado": xml_cep is not None,
                 "origen": origen_xml,
@@ -1070,7 +1120,7 @@ async def analizar(
         if audit_id:
             result["audit_id"] = audit_id
     except Exception as e:
-        print("Aviso: no fue posible guardar auditoria:", e)
+        logger.error("No fue posible guardar auditoria: %s", e)
 
     # ── Alert Engine: evaluar reglas de deteccion (item 3.3, Etapa 3) ────────
     # Ver DECISION_LOG.md, ADR "las alertas son eventos persistentes...".
@@ -1090,24 +1140,8 @@ async def analizar(
         }
         alert_engine.evaluar(contexto_alertas)
     except Exception as e:
-        print("Aviso: el Alert Engine fallo sin afectar el analisis:", e)
+        logger.warning("El Alert Engine fallo sin afectar el analisis: %s", e)
 
-    metrics_service.registrar_exito("analizar", duracion_ms=(time.time() - t_inicio_analizar) * 1000)
-    return result
-    try:
-        contexto_alertas = {
-            "empresa_id": DEFAULT_EMPRESA_ID,
-            "analisis_id": result.get("audit_id"),
-            "hash_sha256": hash_info.get("hash_documento"),
-            "veces_visto": hash_info.get("veces_visto"),
-            "clabe_detectada": clabe_detectada_general,
-            "clave_rastreo": campos_planos.get("clave_rastreo") or None,
-            "banco_detectado": campos_planos.get("banco_origen") or banco_hint or None,
-            "monto_detectado": monto_detectado_general if monto_detectado_general > 0 else None,
-        }
-        alert_engine.evaluar(contexto_alertas)
-    except Exception as e:
-        print("Aviso: el Alert Engine fallo sin afectar el analisis:", e)
 
     metrics_service.registrar_exito("analizar", duracion_ms=(time.time() - t_inicio_analizar) * 1000)
     return result
