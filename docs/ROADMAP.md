@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.28.0 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.2 · **Última actualización:** 07/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -329,14 +329,16 @@ Se extrajo `app/components/historial/HistorialDetalleContenido.tsx` (nuevo) — 
 
 Todo lo que mejora la seguridad sin cambiar el comportamiento del producto. Sin dependencias entre sí, se puede desplegar en cualquier momento.
 
-- CORS restringido — hoy `allow_origins=["*"]` en `main.py`; restringir a los dominios reales antes de producción con empresas externas
-- Headers de seguridad (HSTS, X-Frame-Options, CSP, etc.)
-- Logging estructurado — hoy los errores se registran con `print(...)`, migrar a `logging` estándar + agregación de logs
-- Confirmar política de backups de Supabase — no verificado explícitamente hasta ahora
-- Verificar eliminación de imágenes (ver nota arriba)
-- Auditoría de variables de entorno y secretos (nada hardcodeado, gestión correcta)
-- **Rate limiting por IP** — no requiere identidad, solo la dirección de origen
-- **Registro de eventos de seguridad sin identidad** (intentos de login fallidos, rate limiting activado, errores 500) — distinto de la auditoría de acciones de 6.3, esto no requiere saber "quién", solo "qué pasó"
+- ✅ **CORS restringido** (desplegado y verificado en producción) — `ALLOWED_ORIGINS` configurada en Render, comprobante analizado con éxito desde `https://validador-comprobantes.vercel.app` sin errores de CORS. Sin previews automáticos de Vercel por defecto (decisión explícita, ver `DECISION_LOG.md` si se retoma esta discusión).
+- ✅ **Headers de seguridad** (desplegado) — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Strict-Transport-Security`.
+- 🟡 **Logging estructurado** (desplegado, parcial): `main.py` migrado a `logging` estándar. Otros archivos (`services/*.py`, `alert_engine/*.py`) todavía usan `print()` — pendiente como siguiente paso de 6.1.
+- Confirmar política de backups de Supabase — no verificado explícitamente hasta ahora (requiere que César revise el panel de Supabase, no es tarea de código)
+- ✅ **Verificar eliminación de imágenes** — confirmado contra el código real de `/analizar` (no solo la decisión de diseño de Etapa 2): no hay `open()`, `tempfile`, ni escritura a disco del archivo en ningún punto; `UploadFile` usa `SpooledTemporaryFile` que Starlette limpia automáticamente
+- Auditoría de variables de entorno y secretos (nada hardcodeado, gestión correcta) — pendiente, requiere revisión manual de `.env`/`.gitignore`
+- **Rate limiting por IP** — no requiere identidad, solo la dirección de origen — pendiente
+- **Registro de eventos de seguridad sin identidad** (intentos de login fallidos, rate limiting activado, errores 500) — distinto de la auditoría de acciones de 6.3, esto no requiere saber "quién", solo "qué pasó" — pendiente
+
+**Limpieza encontrada al revisar `main.py` completo:** bloque de código duplicado e inalcanzable al final de `/analizar` (el mismo `try/except` del Alert Engine repetido después de un `return`) — eliminado como parte de este cambio, sin efecto en el comportamiento (Python nunca llegaba a ejecutarlo).
 
 ### 6.2 — Identity Layer
 

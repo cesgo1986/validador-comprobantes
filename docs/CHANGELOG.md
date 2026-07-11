@@ -1,8 +1,36 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.28.0 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.2 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.28.2] — 2026-07 — CORS, headers de seguridad y logging (main.py) desplegados y verificados
+
+### Desplegado y verificado en producción
+- CORS restringido probado con un análisis real desde `https://validador-comprobantes.vercel.app` — sin errores de bloqueo. Headers de seguridad presentes en las respuestas.
+
+### Cerrado
+- `ROADMAP.md`: CORS y headers de seguridad de 6.1 pasan a ✅. Logging estructurado sigue 🟡 (parcial — solo `main.py`).
+
+---
+
+## [0.28.1] — 2026-07 — Etapa 6, 6.1: CORS restringido + headers de seguridad + logging estructurado — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `main.py`: CORS ya no usa `allow_origins=["*"]` — lee `ALLOWED_ORIGINS` desde variable de entorno (coma-separada), mismo patrón que `CLAUDE_MODEL`. **Requiere configurar la variable en Render antes del deploy.**
+- `main.py`: middleware de headers de seguridad (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Strict-Transport-Security`).
+- `main.py`: logging estructurado — `logging` estándar configurado, los 4 `print(...)` de este archivo migrados a `logger`. Otros archivos del proyecto todavía usan `print()` — pendiente como siguiente paso, no incluido en este cambio.
+
+### Corregido (encontrado al revisar main.py completo)
+- Bloque de código duplicado e inalcanzable al final de `/analizar` (el mismo `try/except` del Alert Engine repetido después de un `return`) — eliminado, sin efecto en el comportamiento.
+
+### Verificado (sin cambio de código, confirmado contra el código real)
+- Eliminación de imágenes: confirmado que `/analizar` no persiste el archivo en disco en ningún punto — no solo por la decisión de diseño de Etapa 2, sino leyendo el código real de principio a fin.
+
+### Documentado
+- `ROADMAP.md`: 6.1 actualizado con el progreso concreto.
 
 ---
 
