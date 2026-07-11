@@ -6,28 +6,12 @@ estado del sistema. Ver DECISION_LOG.md, ADR "ningún dashboard consulta
 la base de datos o los motores directamente": el flujo obligatorio es
 Dashboard → DashboardService → AggregationService → Motores/DB.
 
-Las funciones que ya existían en dashboard_service.py y eran, en
-esencia, agregaciones (obtener_stats, tendencia_diaria,
-distribucion_scores_por_banco, top_hashes_reutilizados) se movieron
-aquí sin cambiar su lógica -- dashboard_service.py ahora las expone
-como wrappers delgados que llaman a este servicio.
-
-FIX (2026-07): se encontró un bug real al agregar resumen-ejecutivo
-(item 4.2) -- comparar Analisis.fecha (TIMESTAMP) contra un string
-plano ('2026-07-05') hace que SQLAlchemy tipe el parámetro como VARCHAR
-en vez de fecha, y Postgres rechaza la comparación
-(UndefinedFunction: operator does not exist: timestamp >= character
-varying). Este mismo patrón ya existía en
-dashboard_service._construir_filtros_analisis() desde el ítem 2.1
-(filtro de fecha del Historial) -- probablemente nunca se disparó de
-forma visible porque nadie forzó ese filtro con valores reales lo
-suficiente. _parsear_fecha() corrige esto en ambos archivos.
-
-También se corrige un segundo bug, más sutil, en la misma revisión:
-`fecha_hasta` comparado con `<=` excluye registros del mismo día
-después de la medianoche (comparación de timestamp contra fecha pura a
-las 00:00:00). Se corrige usando "antes del día siguiente" para
-incluir el día completo.
+Item 5.5 (Etapa 5, Centro Operativo): 3 agregaciones nuevas al final de
+este archivo -- calcular_banco_mayor_incidencia, calcular_comparacion_volumen,
+calcular_comparacion_alertas. Ninguna requiere dato nuevo -- todas son
+cálculos sobre relaciones/columnas que ya existen (Alerta.analisis_origen,
+Alerta.created_at, Analisis.fecha). Ver DECISION_LOG.md, corrección de
+factibilidad hecha antes de escribir este código.
 
 Gaps conocidos, deliberadamente NO resueltos en este corte (ver
 DECISION_LOG.md):
@@ -50,8 +34,7 @@ def _parsear_fecha(valor: str | None) -> datetime.date | None:
     Convierte un string de fecha ('2026-07-05') a un objeto date de
     Python antes de compararlo contra Analisis.fecha. Si el string no
     es parseable, devuelve None -- se ignora el filtro en vez de romper
-    la consulta completa por un dato malformado (degradación con
-    gracia, mismo criterio que el resto del sistema).
+    la consulta completa por un dato malformado.
     """
     if not valor:
         return None
@@ -72,14 +55,12 @@ def _filtro_rango_fechas(fecha_desde: str | None, fecha_hasta: str | None) -> li
     if fd:
         condiciones.append(Analisis.fecha >= fd)
     if fh:
-        # "< día siguiente" en vez de "<= fh" -- incluye todo el día,
-        # no solo el instante 00:00:00 de fh.
         condiciones.append(Analisis.fecha < (fh + datetime.timedelta(days=1)))
     return condiciones
 
 
 # ─────────────────────────────────────────────────────────────────
-# Movidas desde dashboard_service.py, con el fix de fechas aplicado.
+# Movidas desde dashboard_service.py (item 4.1), con el fix de fechas.
 # ─────────────────────────────────────────────────────────────────
 
 def calcular_stats_generales(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_desde: str | None = None, fecha_hasta: str | None = None) -> dict:
@@ -246,9 +227,7 @@ def calcular_top_hashes_reutilizados(empresa_id: str = DEFAULT_EMPRESA_ID, min_v
 
 
 # ─────────────────────────────────────────────────────────────────
-# Nuevas -- item 4.1, Etapa 4. Con el fix de fechas aplicado desde el
-# principio (a diferencia de las funciones movidas arriba, que
-# heredaban el bug original).
+# Item 4.1, Etapa 4. Con el fix de fechas aplicado desde el principio.
 # ─────────────────────────────────────────────────────────────────
 
 def calcular_monto_total_procesado(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_desde: str | None = None, fecha_hasta: str | None = None) -> dict:
@@ -295,9 +274,8 @@ def calcular_banco_mas_frecuente(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_des
 def calcular_riesgo_por_periodo(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_desde: str | None = None, fecha_hasta: str | None = None) -> dict:
     """
     Distribución por riesgo documental (Motor 2) Y por estado_operacion
-    (Motor 1) en el periodo -- responde tanto "¿cuánto salió riesgoso?"
-    como "¿qué % terminó liquidado/rechazado/etc.?", sin mezclar los dos
-    motores en un solo número (ver MOTOR_DECISIONES.md).
+    (Motor 1) en el periodo -- sin mezclar los dos motores en un solo
+    número (ver MOTOR_DECISIONES.md).
     """
     with get_db_session() as db:
         if db is None:
@@ -321,11 +299,9 @@ def calcular_riesgo_por_periodo(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_desd
 
 def calcular_alertas_agregadas(empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
     """
-    Conteo de alertas por severidad y por tipo (solo estado NUEVA) --
-    responde "¿cuántas alertas críticas activas tengo?" para el
-    dashboard. Distinto del conteo puntual de alerta_service.contar_alertas()
-    (usado para el badge de BottomNav) -- esta función es la versión
-    completa, desagregada por severidad y tipo.
+    Conteo de alertas por severidad y por tipo (solo estado NUEVA).
+    Distinto del conteo puntual de alerta_service.contar_alertas()
+    (usado para el badge de NavigationShell).
     """
     with get_db_session() as db:
         if db is None:
@@ -345,4 +321,172 @@ def calcular_alertas_agregadas(empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
             "por_severidad": [{"severidad": s, "total": c} for s, c in por_severidad_rows],
             "por_tipo": [{"tipo_alerta": t, "total": c} for t, c in por_tipo_rows],
             "activas": activas,
+        }
+
+
+# ─────────────────────────────────────────────────────────────────
+# Item 5.5, Etapa 5 (Centro Operativo). 3 agregaciones nuevas
+# identificadas durante la sesión de definición -- ninguna requiere
+# dato nuevo, todas usan relaciones/columnas que ya existen. Ver
+# DECISION_LOG.md, corrección de factibilidad.
+# ─────────────────────────────────────────────────────────────────
+
+def calcular_banco_mayor_incidencia(empresa_id: str = DEFAULT_EMPRESA_ID, fecha_desde: str | None = None, fecha_hasta: str | None = None) -> dict | None:
+    """
+    Banco cuyos análisis originaron más alertas activas (NUEVA) en el
+    periodo -- responde "¿dónde está concentrado mi riesgo?" (Nivel 3
+    del Centro Operativo, DESIGN_SYSTEM.md sección 10). Cruza
+    Alerta.analisis_origen con Analisis.banco_detectado -- no requiere
+    dato nuevo, solo la relación que ya existe. Devuelve None si no hay
+    alertas en el periodo -- no se muestra el widget si no hay nada que
+    decir (principio de diseño en DECISION_LOG.md).
+
+    Nota (verificado contra models/alerta.py): `analisis_origen` es
+    nullable -- una alerta puede originarse de una correlación entre
+    varios análisis, no de uno solo. Si ninguna alerta activa tiene ese
+    campo lleno, esta función devuelve None con gracia (el JOIN
+    simplemente no encuentra nada) -- eso no es un bug de esta query,
+    puede ser señal de que las reglas del Alert Engine no están
+    llenando `analisis_origen` en la práctica.
+
+    El total del denominador (para el porcentaje) usa exactamente la
+    misma población que el desglose por banco (alertas con análisis de
+    origen Y banco_detectado no nulos) -- si usaran poblaciones
+    distintas, los porcentajes de los distintos bancos no sumarían
+    100% entre sí de forma consistente.
+    """
+    with get_db_session() as db:
+        if db is None:
+            return None
+
+        filtros_fecha = _filtro_rango_fechas(fecha_desde, fecha_hasta)
+
+        total_alertas = db.execute(
+            select(func.count(Alerta.id))
+            .select_from(Alerta)
+            .join(Analisis, Analisis.id == Alerta.analisis_origen)
+            .where(
+                Alerta.empresa_id == empresa_id,
+                Alerta.deleted_at.is_(None),
+                Alerta.estado == "NUEVA",
+                Analisis.empresa_id == empresa_id,
+                Analisis.deleted_at.is_(None),
+                Analisis.banco_detectado.is_not(None),
+                *filtros_fecha,
+            )
+        ).scalar() or 0
+
+        if total_alertas == 0:
+            return None
+
+        fila = db.execute(
+            select(Analisis.banco_detectado, func.count(Alerta.id))
+            .select_from(Alerta)
+            .join(Analisis, Analisis.id == Alerta.analisis_origen)
+            .where(
+                Alerta.empresa_id == empresa_id,
+                Alerta.deleted_at.is_(None),
+                Alerta.estado == "NUEVA",
+                Analisis.empresa_id == empresa_id,
+                Analisis.deleted_at.is_(None),
+                Analisis.banco_detectado.is_not(None),
+                *filtros_fecha,
+            )
+            .group_by(Analisis.banco_detectado)
+            .order_by(desc(func.count(Alerta.id)))
+            .limit(1)
+        ).first()
+
+        if fila is None:
+            return None
+
+        banco, conteo = fila
+        return {
+            "banco": banco,
+            "alertas": conteo,
+            "porcentaje_del_total": round((conteo / total_alertas) * 100, 1),
+        }
+
+
+def calcular_comparacion_volumen(empresa_id: str = DEFAULT_EMPRESA_ID, dias_promedio: int = 7) -> dict:
+    """
+    Compara el volumen de análisis de hoy contra el promedio de los
+    `dias_promedio` días anteriores -- responde "¿cómo voy comparado
+    con lo normal?" (Nivel 3). `variacion_pct` es None si no hay
+    historial suficiente (empresa nueva) -- se omite en vez de mostrar
+    una comparación contra cero sin sentido de negocio.
+    """
+    with get_db_session() as db:
+        if db is None:
+            return {"hoy": 0, "promedio": None, "variacion_pct": None}
+
+        hoy = datetime.date.today()
+        hoy_conteo = db.execute(
+            select(func.count(Analisis.id)).where(
+                Analisis.empresa_id == empresa_id,
+                Analisis.deleted_at.is_(None),
+                func.date(Analisis.fecha) == hoy,
+            )
+        ).scalar() or 0
+
+        desde = hoy - datetime.timedelta(days=dias_promedio)
+        rows = db.execute(
+            select(func.date(Analisis.fecha), func.count(Analisis.id))
+            .where(
+                Analisis.empresa_id == empresa_id,
+                Analisis.deleted_at.is_(None),
+                Analisis.fecha >= desde,
+                Analisis.fecha < hoy,
+            )
+            .group_by(func.date(Analisis.fecha))
+        ).all()
+
+        if not rows:
+            return {"hoy": hoy_conteo, "promedio": None, "variacion_pct": None}
+
+        promedio = sum(c for _, c in rows) / len(rows)
+        variacion = round(((hoy_conteo - promedio) / promedio) * 100, 1) if promedio > 0 else None
+
+        return {
+            "hoy": hoy_conteo,
+            "promedio": round(promedio, 1),
+            "variacion_pct": variacion,
+        }
+
+
+def calcular_comparacion_alertas(empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
+    """
+    Compara alertas nuevas de hoy contra ayer -- responde "¿está
+    empeorando algo?" (Nivel 3). `variacion_pct` es None si ayer no
+    hubo alertas (división entre cero no tiene sentido de negocio).
+    """
+    with get_db_session() as db:
+        if db is None:
+            return {"hoy": 0, "ayer": 0, "variacion_pct": None}
+
+        hoy = datetime.date.today()
+        ayer = hoy - datetime.timedelta(days=1)
+
+        hoy_conteo = db.execute(
+            select(func.count(Alerta.id)).where(
+                Alerta.empresa_id == empresa_id,
+                Alerta.deleted_at.is_(None),
+                func.date(Alerta.created_at) == hoy,
+            )
+        ).scalar() or 0
+
+        ayer_conteo = db.execute(
+            select(func.count(Alerta.id)).where(
+                Alerta.empresa_id == empresa_id,
+                Alerta.deleted_at.is_(None),
+                func.date(Alerta.created_at) == ayer,
+            )
+        ).scalar() or 0
+
+        variacion = round(((hoy_conteo - ayer_conteo) / ayer_conteo) * 100, 1) if ayer_conteo > 0 else None
+
+        return {
+            "hoy": hoy_conteo,
+            "ayer": ayer_conteo,
+            "variacion_pct": variacion,
         }

@@ -1397,6 +1397,14 @@ def dashboard_resumen_ejecutivo(empresa_id: str = Query(default=DEFAULT_EMPRESA_
     """
     return dashboard_service.obtener_resumen_ejecutivo(empresa_id=empresa_id)
 
+@dashboard_router.get("/centro-operativo")
+def dashboard_centro_operativo():
+    """
+    Item 5.5 (Etapa 5): bundle completo para el Centro Operativo
+    (Desktop). Ver DESIGN_SYSTEM.md sección 10 para la estructura
+    visual que consume esta respuesta.
+    """
+    return dashboard_service.obtener_centro_operativo()
 
 app.include_router(dashboard_router)
 

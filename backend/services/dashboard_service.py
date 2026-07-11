@@ -99,6 +99,63 @@ def obtener_resumen_ejecutivo(empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
     }
 
 
+def obtener_centro_operativo(empresa_id: str = DEFAULT_EMPRESA_ID) -> dict:
+    """
+    Item 5.5 (Etapa 5): bundle completo para el Centro Operativo -- una
+    sola llamada en vez de que el frontend orqueste 7 peticiones.
+    Compone AggregationService, no calcula nada nuevo por su cuenta.
+    Estructura calcada del wireframe conceptual (DESIGN_SYSTEM.md,
+    sección 10) -- Nivel A (Motor de Verdad) únicamente, sin Nivel 4/
+    estratégico (depende de datos de Nivel B que no existen todavía).
+    """
+    hoy = datetime.date.today().isoformat()
+
+    monto = aggregation_service.calcular_monto_total_procesado(empresa_id, fecha_desde=hoy, fecha_hasta=hoy)
+    riesgo = aggregation_service.calcular_riesgo_por_periodo(empresa_id, fecha_desde=hoy, fecha_hasta=hoy)
+    alertas_agregadas = aggregation_service.calcular_alertas_agregadas(empresa_id)
+    hashes_reutilizados = aggregation_service.calcular_top_hashes_reutilizados(empresa_id, min_veces=2, limit=5)
+    banco_incidencia = aggregation_service.calcular_banco_mayor_incidencia(empresa_id, fecha_desde=hoy, fecha_hasta=hoy)
+    comparacion_volumen = aggregation_service.calcular_comparacion_volumen(empresa_id)
+    comparacion_alertas = aggregation_service.calcular_comparacion_alertas(empresa_id)
+
+    total_estado = sum(e["total"] for e in riesgo["por_estado_operacion"])
+    confirmadas = sum(e["total"] for e in riesgo["por_estado_operacion"] if e["estado_operacion"] in ("liquidada", "acreditada"))
+    pct_liquidados = round((confirmadas / total_estado) * 100, 1) if total_estado > 0 else None
+
+    alertas_criticas = sum(s["total"] for s in alertas_agregadas["por_severidad"] if s["severidad"] in ("CRITICA", "ALTA"))
+
+    # Nivel 1 (DESIGN_SYSTEM.md sección 10): 🔴 si hay CRITICA activa,
+    # 🟠 si hay ALTA (sin CRITICA), 🟢 si no hay ninguna de las dos.
+    severidades_activas = {s["severidad"] for s in alertas_agregadas["por_severidad"] if s["total"] > 0}
+    if "CRITICA" in severidades_activas:
+        estado_general = "rojo"
+    elif "ALTA" in severidades_activas:
+        estado_general = "naranja"
+    else:
+        estado_general = "verde"
+
+    return {
+        "estado_operacion_general": estado_general,
+        "hero": {
+            "monto_procesado_hoy": monto["monto_total"],
+        },
+        "secundarios": {
+            "volumen_hoy": comparacion_volumen["hoy"],
+            "pct_liquidados": pct_liquidados,
+            "alertas_criticas": alertas_criticas,
+        },
+        "atencion": {
+            "alertas_criticas": alertas_criticas,
+            "hashes_reutilizados": len(hashes_reutilizados),
+        },
+        "tendencias": {
+            "banco_mayor_incidencia": banco_incidencia,
+            "comparacion_volumen": comparacion_volumen,
+            "comparacion_alertas": comparacion_alertas,
+        },
+    }
+
+
 # ─────────────────────────────────────────────────────────────────
 # Listado / detalle / exportación de análisis individuales -- sin
 # cambios de comportamiento, salvo el fix de fechas en
