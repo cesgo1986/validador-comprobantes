@@ -1,8 +1,20 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.26.4 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.27.0 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.27.0] — 2026-07 — ✅ Etapa 5 (Presentation Expansion) completa: 5.1 a 5.5
+
+### Desplegado y verificado en producción
+- `/perfil` en Desktop+: Centro Operativo completo, verificado con una sola petición de red a `/centro-operativo`. Móvil sin cambios.
+
+### Cerrado
+- `ROADMAP.md`: ítem **5.5** pasa a ✅. **Con esto, la Etapa 5 completa queda cerrada** — 5.1 (Motor de Presentación/evidencias), 5.2 (Responsive Foundation), 5.3 (`/resultado` en 2 columnas), 5.4 (`/historial` maestro-detalle), 5.5 (Centro Operativo).
+
+Sube a versión MINOR porque marca el cierre de una etapa completa del roadmap, mismo criterio que las Etapas 1-4.
 
 ---
 
