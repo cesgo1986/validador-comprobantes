@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.27.0 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.0 · **Última actualización:** 07/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -321,34 +321,83 @@ Se extrajo `app/components/historial/HistorialDetalleContenido.tsx` (nuevo) — 
 
 **Objetivo:** hacer el sistema seguro y capaz de crecer a usuarios reales. Se mueve al final de la secuencia deliberadamente — ver `DECISION_LOG.md` — porque buena parte de esta superficie cambiará de forma conforme se definan Historial, Alertas y Dashboard.
 
-**Nota (2026-07):** "eliminación automática de imágenes tras el análisis" ya está, en la práctica, satisfecho por diseño desde Etapa 2 — el sistema nunca persiste la imagen del comprobante en disco, se procesa en memoria y se descarta (ver `historial/[id]/page.tsx`, nota de privacidad). Este ítem se conserva en la lista como verificación pendiente (confirmar que ningún mecanismo interno de FastAPI/Starlette esté dejando archivos temporales sin limpiar), no como funcionalidad por construir desde cero.
+**Reorganizada en capas (2026-07)** — ver `DECISION_LOG.md`, ADR "Etapa 6 reorganizada en capas; se siembra el Identity Engine". Cada capa responde una pregunta distinta, en el orden en que hace falta responderla — ya no es una lista plana de ítems sueltos.
 
-- JWT / autenticación real (hoy no existe — `DEFAULT_EMPRESA_ID` para todos)
-- Rate limiting por IP y por cuenta
-- Eliminación automática de imágenes tras el análisis (verificación pendiente, ver nota arriba)
-- API Keys para acceso B2B
-- Auditoría de acceso (quién consultó qué y cuándo)
-- Sanitización de inputs (validación de tipos de archivo más estricta)
-- OAuth, encriptación adicional, observabilidad tipo SIEM, políticas de retención y borrado automático de logs
-- **CORS restringido** — hoy `allow_origins=["*"]` en `main.py`; restringir a los dominios reales antes de producción con empresas externas (hallazgo de la Architecture Readiness Review, ver `DECISION_LOG.md`)
-- **Logging estructurado** — hoy los errores se registran con `print(...)`, no con un logger centralizado; migrar a `logging` estándar + agregación de logs (mismo hallazgo)
-- **Cola de trabajos para consultas a Banxico** — hoy la descarga del XML/CEP es síncrona dentro de `/analizar`; a volumen alto, Banxico se vuelve el cuello de botella. Requiere cola (RabbitMQ/Redis Queue) + workers (mismo hallazgo)
-- **Cache y métricas distribuidas** — `cache_service.py` y `metrics_service.py` viven en memoria del proceso; si Render corre más de una instancia, cada una tiene su propio estado. Migrar a Redis sin cambiar la interfaz de cada servicio (mismo hallazgo)
-- **Modelo de costo unitario** — cada análisis cuesta una llamada a Claude Vision; modelar el costo antes de definir planes B2B por volumen (mismo hallazgo)
-- **Confirmar política de backups de Supabase** — no verificado explícitamente hasta ahora (mismo hallazgo)
+**Nota (2026-07):** "eliminación automática de imágenes tras el análisis" ya está, en la práctica, satisfecho por diseño desde Etapa 2 — el sistema nunca persiste la imagen del comprobante en disco, se procesa en memoria y se descarta (ver `historial/[id]/page.tsx`, nota de privacidad). Este ítem se conserva en 6.1 como verificación pendiente (confirmar que ningún mecanismo interno de FastAPI/Starlette esté dejando archivos temporales sin limpiar), no como funcionalidad por construir desde cero.
+
+### 6.1 — Hardening
+
+Todo lo que mejora la seguridad sin cambiar el comportamiento del producto. Sin dependencias entre sí, se puede desplegar en cualquier momento.
+
+- CORS restringido — hoy `allow_origins=["*"]` en `main.py`; restringir a los dominios reales antes de producción con empresas externas
+- Headers de seguridad (HSTS, X-Frame-Options, CSP, etc.)
+- Logging estructurado — hoy los errores se registran con `print(...)`, migrar a `logging` estándar + agregación de logs
+- Confirmar política de backups de Supabase — no verificado explícitamente hasta ahora
+- Verificar eliminación de imágenes (ver nota arriba)
+- Auditoría de variables de entorno y secretos (nada hardcodeado, gestión correcta)
+- **Rate limiting por IP** — no requiere identidad, solo la dirección de origen
+- **Registro de eventos de seguridad sin identidad** (intentos de login fallidos, rate limiting activado, errores 500) — distinto de la auditoría de acciones de 6.3, esto no requiere saber "quién", solo "qué pasó"
+
+### 6.2 — Identity Layer
+
+Deliberadamente nombrada "Identity Layer" y no "login" — sirve a futuro para Portal Web, API, app móvil e integraciones, no solo para un formulario de inicio de sesión. Es la capa de la que dependen casi todas las demás.
+
+- JWT con `empresa_id` y `usuario_id`
+- Invitación de usuarios
+- Recuperación de contraseña
+- Sesiones
+- Refresh tokens
+- **Identity Engine** (sembrado, ver `DECISION_LOG.md`): quinto motor transversal del sistema, junto a Motor SPEI, Motor Documental, Alert Engine y `AggregationService`. Se diseña aquí, no antes.
+
+### 6.3 — Access Control Layer
+
+Depende de 6.2 — una vez que sabemos quién eres, qué puedes hacer.
+
+- Roles y permisos, RBAC
+- **Rate limiting por cuenta** — distinto del rate limiting por IP de 6.1, este sí requiere saber a qué cuenta pertenece la petición
+- API Keys por empresa para integración B2B
+- **Auditoría de acciones real** ("qué usuario hizo qué, cuándo") — distinta del registro de eventos de seguridad de 6.1, esta sí requiere identidad
+
+### 6.4 — Data Protection
+
+Todo lo relacionado con proteger la información que entra al sistema. Independiente de 6.2/6.3, se puede hacer en paralelo.
+
+- Sanitización de inputs
+- Validación de tipos de archivo más estricta
+- **Límite de tamaño de subida y protección contra uploads maliciosos** (hallazgo de la Architecture Readiness Review, sin conectar a un ítem concreto hasta esta reorganización)
+- Antivirus (sembrado, sin fecha)
+- Encriptación donde aplique
+
+### 6.5 — Scale Layer
+
+Requiere decisiones de proveedor de infraestructura, mayor esfuerzo que las capas anteriores. Hallazgos de la Architecture Readiness Review.
+
+- **Cola de trabajos para consultas a Banxico** — hoy la descarga del XML/CEP es síncrona dentro de `/analizar`; a volumen alto, Banxico se vuelve el cuello de botella. Requiere cola (RabbitMQ/Redis Queue) + workers
+- **Cache y métricas distribuidas** — `cache_service.py` y `metrics_service.py` viven en memoria del proceso; si Render corre más de una instancia, cada una tiene su propio estado. Migrar a Redis sin cambiar la interfaz de cada servicio
+- Procesamiento asíncrono en general
+
+### 6.6 — Business Readiness
+
+Sin código — es un ejercicio de producto/finanzas, independiente de todo lo anterior, puede correr en paralelo con cualquier capa.
+
+- **Modelo de costo unitario** — cada análisis cuesta una llamada a Claude Vision; modelar el costo antes de definir planes B2B por volumen
+- Margen, pricing
+- Consumo de Claude/Banxico, proyección financiera
+
+**Diferido, sin fecha:** OAuth, observabilidad tipo SIEM, políticas de retención avanzada de logs — sin urgencia real hoy, sembrados desde la Architecture Readiness Review.
 
 ---
 
-## Etapa 7 — Multiempresa real
+## Etapa 7 — Organización Empresarial
 
-**Objetivo:** activar la arquitectura multiempresa que ya existe en el esquema de datos. Comparte superficie con Etapa 6 (autenticación) — se evalúa si conviene fusionarlas al llegar a ese punto.
+**Objetivo (redefinido 2026-07, ver `DECISION_LOG.md`):** ya no es "autenticación" — eso se fusionó en Etapa 6.2. Etapa 7 responde "¿cómo administras una empresa completa?", una pregunta distinta a "¿quién eres?" (Etapa 6), y no tiene sentido sin que 6.2 exista primero.
 
-- Autenticación por empresa (JWT con empresa_id)
-- Invitación de usuarios
-- Aislamiento de datos entre empresas (el `UNIQUE(empresa_id, hash_sha256)` ya existe)
-- Gestión de sucursales y permisos
+- Sucursales y departamentos
+- Permisos avanzados y equipos
+- Créditos y licencias
 - Facturación por créditos o por volumen
-- API Keys por empresa para integración B2B
+- Consumo y administración empresarial
+- Aislamiento de datos entre empresas (el `UNIQUE(empresa_id, hash_sha256)` ya existe en el esquema)
 
 ---
 

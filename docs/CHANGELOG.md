@@ -1,8 +1,19 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.27.0 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.0 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.28.0] — 2026-07 — 🏛️ Etapa 6 reorganizada en capas; Etapa 7 redefinida como Organización Empresarial; se siembra el Identity Engine
+
+### Documentado (sin código todavía)
+- `DECISION_LOG.md`: ADR — Etapa 6 pasa de lista plana de 13 ítems a 6 capas con dependencias explícitas (Hardening → Identity Layer → Access Control Layer → Data Protection → Scale Layer → Business Readiness). Etapa 7 se fusiona parcialmente con Etapa 6 (la autenticación que compartían pasa a 6.2) y se redefine como "Organización Empresarial" — sucursales, permisos avanzados, facturación. Se siembra el **Identity Engine** como quinto motor transversal del sistema, junto a Motor SPEI, Motor Documental, Alert Engine y `AggregationService` — nombrado ahora, diseñado en 6.2.
+- `ROADMAP.md`: Etapas 6 y 7 reescritas completas con la nueva estructura. Se conecta un hallazgo huérfano de la Architecture Readiness Review (límite de tamaño de subida / uploads maliciosos) a un ítem concreto (6.4) por primera vez.
+- Corrección propia durante la reescritura: "rate limiting" y "auditoría" se dividen cada uno en dos variantes — la que no requiere identidad (6.1) y la que sí (6.3) — evita que dos conceptos con el mismo nombre pero alcance distinto se confundan.
+
+Sube a versión MINOR porque reorganiza la arquitectura de dos etapas completas del roadmap antes de escribir la primera línea de código de autenticación — mismo criterio que la reorganización de Etapa 5 en su momento.
 
 ---
 

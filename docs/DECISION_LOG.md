@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.26.4 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.0 · **Última actualización:** 07/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -284,6 +284,27 @@ Nunca `Dashboard → SELECT ... → Base de datos` directo.
 - `app/components/perfil/CentroOperativo.tsx`: deja de hacer su propio fetch — recibe `datos` por prop.
 - `app/perfil/page.tsx`: una sola llamada, reparte `datos` a ambas presentaciones.
 - El endpoint `GET /api/v1/dashboard/resumen-ejecutivo` **se conserva desplegado** (no se elimina una ruta pública sin saber si algo más la consume) pero ningún frontend lo usa ya — candidato a retirar en una limpieza futura, no ahora.
+
+---
+
+## 2026-07 — 🏛️ ADR: Etapa 6 reorganizada en capas; Etapa 7 redefinida como Organización Empresarial; se siembra el Identity Engine
+
+**Decisión:** Etapa 6 deja de ser una lista plana de 13 ítems y se organiza en 6 capas con dependencias explícitas — cada una responde una pregunta distinta, en el orden en que hace falta responderla:
+
+- **6.1 — Hardening:** CORS restringido, headers de seguridad, logging estructurado, confirmar backups de Supabase, verificar eliminación de imágenes, variables de entorno, **rate limiting por IP** (no requiere identidad), **registro de eventos de seguridad sin identidad** (intentos de login fallidos, rate limiting activado, errores 500 — no requiere saber "quién", por eso va aquí y no en 6.3). Objetivo: que el sistema deje de comportarse como un entorno de desarrollo.
+- **6.2 — Identity Layer:** JWT, `empresa_id`, `usuario_id`, invitaciones, recuperación de contraseña, sesiones, refresh tokens. Deliberadamente nombrada "Identity Layer" y no "login" — sirve a futuro para Portal Web, API, app móvil e integraciones, no solo para iniciar sesión en un solo lugar.
+- **6.3 — Access Control Layer:** roles, permisos, RBAC, **rate limiting por cuenta** (distinto del de 6.1, este sí requiere identidad), API Keys por empresa, **auditoría de acciones real** ("qué usuario hizo qué, cuándo" — esta sí requiere 6.2 resuelta primero). Depende de 6.2.
+- **6.4 — Data Protection:** sanitización, validación de tipos de archivo, **límite de tamaño de subida, protección contra uploads maliciosos** (hallazgo ya identificado en la Architecture Readiness Review, sin conectar a un ítem concreto hasta ahora), antivirus (futuro, sembrado sin fecha), encriptación donde aplique.
+- **6.5 — Scale Layer:** cola de trabajos para Banxico, cache y métricas distribuidas (Redis), procesamiento asíncrono. Requiere decisiones de proveedor de infraestructura, mayor esfuerzo que las capas anteriores.
+- **6.6 — Business Readiness:** modelo de costo unitario, margen, pricing, consumo de Claude/Banxico, proyección financiera. Sin código — es un ejercicio de producto/finanzas, independiente de todo lo anterior, puede correr en paralelo.
+
+**Etapa 7 se redefine** — deja de ser "autenticación" (eso ahora vive en 6.2, fusionado) y pasa a ser **Organización Empresarial**: sucursales, departamentos, permisos avanzados, equipos, créditos, licencias, facturación, consumo, administración empresarial. Etapa 6 responde "¿quién eres?"; Etapa 7 responde "¿cómo administras una empresa completa?" — son preguntas distintas, y Etapa 7 no tiene sentido sin que 6.2 exista primero.
+
+**Identity Engine (sembrado, sin construir todavía):** con la autenticación real aparece un quinto motor transversal del sistema, junto a Motor SPEI, Motor Documental, Alert Engine y `AggregationService`. Responsable de identidad, empresas, usuarios, permisos, sesiones, API Keys y auditoría — mismo criterio arquitectónico que ya se aplicó con `AggregationService`: una responsabilidad transversal grande merece un nombre y un lugar propio, no dispersarse por cada endpoint. Se nombra y se registra ahora; su diseño interno se resuelve cuando se llegue a 6.2, no antes.
+
+**Motivo:** el momento ideal para esta reorganización es antes de escribir la primera línea de autenticación — no hay deuda técnica todavía que desenredar, y evita exactamente el tipo de refactor caro que ya se resolvió con `NavigationShell` y el refactor de los componentes de Resultado (renombrar/reorganizar es barato antes de tener consumidores; caro después).
+
+**Consecuencia:** `ROADMAP.md`, Etapas 6 y 7 reescritas completas con esta estructura. `ARQUITECTURA.md` reservará una mención al Identity Engine cuando se empiece a construir en 6.2, no antes.
 
 ---
 
