@@ -1,6 +1,6 @@
 # API.md — Documentación de endpoints
 
-**Versión del documento:** 0.22.1 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.26.1 · **Última actualización:** 07/07/2026
 
 Base URL producción: `https://validador-comprobantes.onrender.com`
 Base URL local: `http://localhost:8000`
@@ -436,6 +436,54 @@ Bundle de datos para el Mobile Executive Summary (Etapa 4, ítem 4.2) — una so
 **Query params:** `empresa_id`
 
 **Respuesta:** `{ "analisis_hoy": 12, "alertas_nuevas": 3, "alertas_notificables": 1, "riesgo_alto": 2, "pct_confirmadas": 91.7 }`
+
+---
+
+## GET /api/v1/dashboard/centro-operativo
+
+Bundle completo para el Centro Operativo de escritorio (Etapa 5, ítem 5.5) — ver `DESIGN_SYSTEM.md` sección 10 para la estructura visual exacta que consume esta respuesta. Solo Nivel A (Motor de Verdad, ver `DECISION_LOG.md`) — nada de esto requiere que la empresa capture ningún dato.
+
+**Query params:** `empresa_id`
+
+**Respuesta:**
+```json
+{
+  "estado_operacion_general": "verde",
+  "hero": {
+    "monto_procesado_hoy": 4850230.0
+  },
+  "secundarios": {
+    "volumen_hoy": 1248,
+    "pct_liquidados": 99.4,
+    "alertas_criticas": 3
+  },
+  "atencion": {
+    "alertas_criticas": 3,
+    "hashes_reutilizados": 2
+  },
+  "tendencias": {
+    "banco_mayor_incidencia": {
+      "banco": "BBVA",
+      "alertas": 5,
+      "porcentaje_del_total": 41.0
+    },
+    "comparacion_volumen": {
+      "hoy": 1248,
+      "promedio": 1057.3,
+      "variacion_pct": 18.0
+    },
+    "comparacion_alertas": {
+      "hoy": 8,
+      "ayer": 6.5,
+      "variacion_pct": 23.1
+    }
+  }
+}
+```
+
+**Campos que pueden ser `null`:** `pct_liquidados` (sin análisis en el periodo), `banco_mayor_incidencia` (sin ninguna alerta activa con banco identificable — el frontend debe ocultar ese bloque, no mostrar "N/A"), `comparacion_volumen.variacion_pct` y `comparacion_alertas.variacion_pct` (sin historial suficiente para comparar, ej. empresa nueva). Ninguno de estos `null` es un error — es la ausencia honesta de un dato que no aplica todavía.
+
+**Nota sobre `banco_mayor_incidencia` (corregido 2026-07, encontrado en producción):** a diferencia del resto de campos bajo `hero` y `secundarios`, este **no se limita a "hoy"** — considera todas las alertas activas (`estado = NUEVA`) sin importar cuándo se generaron. Un día sin análisis nuevos no debe esconder riesgo real ya acumulado de días anteriores sin revisar.
 
 ---
 

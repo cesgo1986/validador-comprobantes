@@ -1,8 +1,32 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.25.2 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.26.1 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.26.1] — 2026-07 — Fix: banco_mayor_incidencia escondía riesgo activo en días sin análisis nuevos
+
+### Corregido (encontrado en producción, primera prueba del endpoint)
+- `services/aggregation_service.py`, `calcular_banco_mayor_incidencia()`: filtraba por `Analisis.fecha` (cuándo ocurrió la transferencia que originó la alerta) en vez de `Alerta.created_at` (cuándo se generó la alerta) — con 11 alertas críticas activas pero 0 análisis del día, el endpoint regresaba `banco_mayor_incidencia: null` a pesar de haber riesgo real sin revisar.
+- `services/dashboard_service.py`, `obtener_centro_operativo()`: se quitó por completo el filtro de fecha en la llamada a esta función — una alerta crítica sin revisar de hace 2 días sigue siendo riesgo actual, no debe esconderse en un día tranquilo sin análisis nuevos.
+- `API.md`: documentado que este campo, a diferencia del resto del bundle, no se limita a "hoy".
+
+---
+
+## [0.26.0] — 2026-07 — Etapa 5, 5.5 descongelada: backend del Centro Operativo — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `services/aggregation_service.py`: 3 agregaciones nuevas — `calcular_banco_mayor_incidencia` (cruza `Alerta.analisis_origen` con `Analisis.banco_detectado`, sin dato nuevo), `calcular_comparacion_volumen` (hoy vs. promedio de los últimos 7 días), `calcular_comparacion_alertas` (hoy vs. ayer). Todas devuelven `None`/omiten el campo cuando no hay suficiente historial o no aplica — nunca fuerzan un número sin sentido.
+- `services/dashboard_service.py`: `obtener_centro_operativo()` — bundle completo, calcado del wireframe conceptual de `DESIGN_SYSTEM.md` sección 10. Solo Nivel A (Motor de Verdad).
+- `main.py`: endpoint nuevo `GET /api/v1/dashboard/centro-operativo`.
+
+### Documentado
+- `API.md`: nueva sección con la respuesta completa documentada, incluyendo qué campos pueden ser `null` y por qué.
+- `ROADMAP.md`: 5.5 formalmente descongelada para código — progreso de backend registrado. Pendiente: la pantalla de escritorio.
+
+Sube a versión MINOR porque descongela un ítem del roadmap y agrega un endpoint nuevo completo, no un ajuste incremental.
 
 ---
 
