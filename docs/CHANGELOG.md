@@ -1,8 +1,18 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.26.1 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.26.2 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.26.2] — 2026-07 — Backend del Centro Operativo verificado en producción
+
+### Desplegado y verificado
+- `GET /api/v1/dashboard/centro-operativo` probado con datos reales — `banco_mayor_incidencia` ya trae datos correctos tras el fix (v0.26.1). Backend de 5.5 completo.
+
+### Cerrado
+- `ROADMAP.md`: sección "Backend" de 5.5 pasa a ✅. Pendiente real de 5.5: solo la pantalla de escritorio.
 
 ---
 
