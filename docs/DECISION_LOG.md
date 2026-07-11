@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.24.7 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.26.4 · **Última actualización:** 07/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -271,6 +271,22 @@ Nunca `Dashboard → SELECT ... → Base de datos` directo.
 
 ---
 
+## 2026-07 — 🏛️ ADR: una sola llamada al backend para Mobile y Desktop en `/perfil` — no dos
+
+**Decisión:** `/perfil` hace **una sola llamada** a `GET /centro-operativo`; tanto el resumen compacto de Mobile/Tablet como el Centro Operativo completo de Desktop+ consumen el mismo objeto de respuesta. CSS decide qué presentación se muestra, no dos peticiones distintas.
+
+**Motivo:** el diseño original (propuesto por Claude) hacía 2 llamadas — `/resumen-ejecutivo` para Mobile, `/centro-operativo` para Desktop — para evitar la complejidad de repartir un solo objeto entre 2 presentaciones distintas. Es el mismo error que la arquitectura ya evita deliberadamente con los motores (Motor 1/Motor 2, un solo `AggregationService`): dos fuentes de verdad para el mismo dominio de datos divergen con el tiempo, y duplican tráfico sin necesidad. Proyección concreta que hizo evidente el problema: con 200 empresas × 20 usuarios × 15 aperturas diarias, duplicar la llamada son 60,000 peticiones innecesarias al día — no es el volumen lo que rompe nada hoy, es que cada llamada duplicada se vuelve más cara conforme `AggregationService` crezca (más agregaciones, más JOINs), y que dos endpoints con lógica parecida inevitablemente divergen cuando alguien actualiza uno y olvida el otro.
+
+**Hallazgo real antes de fusionar (no se asumió que los 2 endpoints ya eran equivalentes):** `/resumen-ejecutivo` tenía 2 campos que no existían en `/centro-operativo` — `alertas_nuevas` (total, todas las severidades) y `alertas_notificables` (criterio del Motor de Prioridad de Etapa 3). Fusionar sin agregar esos campos habría cambiado silenciosamente lo que ve Mobile.
+
+**Consecuencia:**
+- `services/dashboard_service.py`, `obtener_centro_operativo()`: agrega `resumen_compacto` — mismo shape exacto que la respuesta vieja de `/resumen-ejecutivo`, calculado en la misma función.
+- `app/components/perfil/CentroOperativo.tsx`: deja de hacer su propio fetch — recibe `datos` por prop.
+- `app/perfil/page.tsx`: una sola llamada, reparte `datos` a ambas presentaciones.
+- El endpoint `GET /api/v1/dashboard/resumen-ejecutivo` **se conserva desplegado** (no se elimina una ruta pública sin saber si algo más la consume) pero ningún frontend lo usa ya — candidato a retirar en una limpieza futura, no ahora.
+
+---
+
 ## 2026-07 — 🏛️ ADR: se congela 5.5 (Dashboard Empresa Desktop) hasta definir el Centro Operativo VerificaPago
 
 **Decisión:** se congela temporalmente el desarrollo de 5.5 — no se escribe ninguna pantalla de dashboard empresarial todavía. 5.3 y 5.4 continúan sin cambios (son reutilización y redistribución de componentes que ya existen, no dependen de esta decisión). Antes de retomar 5.5, se abre una sesión de definición de producto: **"Centro Operativo VerificaPago"** — no una sesión de diseño ni de código.
@@ -300,9 +316,11 @@ De las 5 preguntas planteadas arriba, se resolvió la del KPI principal — jera
 
 **Lo único que sigue genuinamente bloqueado:** tiempo de liberación / duración del análisis — mismo gap ya documentado en el ítem 4.1 (`ROADMAP.md`): requeriría una columna `duracion_ms` en `analisis`, que se decidió no construir todavía.
 
-**Todavía sin resolver antes de retomar 5.5 con código:** qué decisiones exactas puede tomar el director sin abrir un comprobante individual (más allá del hero stat), y el diseño visual concreto (tarea de `DESIGN_SYSTEM.md` + wireframes).
+**Actualización final (2026-07) — 5.5 se descongela, Centro Operativo V1 (código listo):** con el KPI principal, la jerarquía de decisión, el modelo de 3 niveles, el principio de diseño y el wireframe conceptual ya resueltos (ver actualizaciones anteriores de esta misma entrada), se procede a construir el código. 3 funciones nuevas en `aggregation_service.py` (`calcular_banco_top_incidencias`, `calcular_comparacion_volumen`, `calcular_comparacion_alertas`), todas devuelven `None` cuando no hay suficiente historial para comparar — nunca un porcentaje falso contra cero. Se compone todo en `dashboard_service.obtener_centro_operativo()`, expuesto en `GET /api/v1/dashboard/centro-operativo`. Nivel 2 ("qué requiere atención") resultó no necesitar nada nuevo — es exactamente `calcular_alertas_agregadas()` ya construida en 4.1, solo reempaquetada.
 
-**Consecuencia:** cuando 5.5 se retome, el Nivel A (Motor de Verdad) es prácticamente construible completo con `AggregationService` más un puñado de agregaciones nuevas pequeñas (banco-por-alertas, comparación contra periodo anterior) — no requiere backend mayor ni columnas nuevas, salvo el caso ya conocido de duración. El Nivel B se diseña como formulario opcional de "enriquecer tu cuenta", sin bloquear el lanzamiento del Nivel A.
+**Corrección encontrada al construir esto:** `app/perfil/page.tsx` (ítem 4.2) mostraba "Análisis" como primer dato, no el monto — inconsistente con la decisión de KPI principal tomada *después* de construir 4.2. Se corrige en el mismo cambio, en Mobile también, no solo en Desktop.
+
+**Alcance deliberadamente limitado en V1:** los botones "Revisar" de las tarjetas de alerta navegan a `/alertas` (destino real). La tarjeta de "pagos pendientes" y las tarjetas de tendencias **no tienen botón** — no se construyó un destino real para ellas todavía (drill-down por banco, filtro por estado pendiente), y no se fingió una acción sin destino real.
 
 **Consecuencia:** `ROADMAP.md`, ítem 5.5, se marca como congelado con la razón explícita. Si de la sesión de Centro Operativo surgen reglas nuevas del Alert Engine, se siembran como ítems de una etapa funcional (no de Etapa 5) — mismo criterio ya aplicado a Batch Analysis y Workflow.
 

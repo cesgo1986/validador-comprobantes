@@ -1,7 +1,6 @@
-
 # API.md — Documentación de endpoints
 
-**Versión del documento:** 0.26.1 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.26.4 · **Última actualización:** 07/07/2026
 
 Base URL producción: `https://validador-comprobantes.onrender.com`
 Base URL local: `http://localhost:8000`
@@ -442,7 +441,7 @@ Bundle de datos para el Mobile Executive Summary (Etapa 4, ítem 4.2) — una so
 
 ## GET /api/v1/dashboard/centro-operativo
 
-Bundle completo para el Centro Operativo de escritorio (Etapa 5, ítem 5.5) — ver `DESIGN_SYSTEM.md` sección 10 para la estructura visual exacta que consume esta respuesta. Solo Nivel A (Motor de Verdad, ver `DECISION_LOG.md`) — nada de esto requiere que la empresa capture ningún dato.
+Bundle completo para `/perfil` — Centro Operativo de escritorio (Etapa 5, ítem 5.5) y resumen compacto de Mobile/Tablet (Etapa 4, ítem 4.2), en **una sola respuesta**. Ver `DECISION_LOG.md`, ADR "una sola llamada al backend para Mobile y Desktop" — antes eran 2 endpoints distintos, se fusionaron para no duplicar tráfico ni mantener 2 fuentes de verdad del mismo dominio. Ver `DESIGN_SYSTEM.md` sección 10 para la estructura visual exacta que consume el Centro Operativo. Solo Nivel A (Motor de Verdad, ver `DECISION_LOG.md`) — nada de esto requiere que la empresa capture ningún dato.
 
 **Query params:** `empresa_id`
 
@@ -478,9 +477,18 @@ Bundle completo para el Centro Operativo de escritorio (Etapa 5, ítem 5.5) — 
       "ayer": 6.5,
       "variacion_pct": 23.1
     }
+  },
+  "resumen_compacto": {
+    "analisis_hoy": 1248,
+    "alertas_nuevas": 11,
+    "alertas_notificables": 8,
+    "riesgo_alto": 2,
+    "pct_confirmadas": 99.4
   }
 }
 ```
+
+`resumen_compacto` es lo único que consume Mobile/Tablet — mismo shape exacto que la respuesta vieja de `/resumen-ejecutivo` (endpoint que se conserva desplegado pero ya no lo usa ningún frontend). `alertas_nuevas` (total, todas las severidades) y `alertas_notificables` (criterio del Motor de Prioridad, Etapa 3) son distintos de `alertas_criticas` en `secundarios`/`atencion` — no son el mismo número, no se deben confundir.
 
 **Campos que pueden ser `null`:** `pct_liquidados` (sin análisis en el periodo), `banco_mayor_incidencia` (sin ninguna alerta activa con banco identificable — el frontend debe ocultar ese bloque, no mostrar "N/A"), `comparacion_volumen.variacion_pct` y `comparacion_alertas.variacion_pct` (sin historial suficiente para comparar, ej. empresa nueva). Ninguno de estos `null` es un error — es la ausencia honesta de un dato que no aplica todavía.
 

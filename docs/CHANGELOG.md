@@ -1,8 +1,35 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.26.2 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.26.4 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.26.4] — 2026-07 — Corrección de arquitectura: una sola llamada al backend para Mobile y Desktop en /perfil
+
+### Corregido (encontrado en revisión de arquitectura, antes de desplegar)
+- `services/dashboard_service.py`, `obtener_centro_operativo()`: agrega `resumen_compacto` (mismo shape exacto que la respuesta vieja de `/resumen-ejecutivo`) — Mobile y Desktop ahora consumen el mismo objeto de un solo endpoint, en vez de 2 llamadas a 2 endpoints distintos.
+- `app/components/perfil/CentroOperativo.tsx`: deja de hacer su propio fetch — recibe `datos` por prop, puramente presentacional.
+- `app/perfil/page.tsx`: una sola llamada a `/centro-operativo`, repartida a ambas presentaciones.
+- `DECISION_LOG.md`: ADR — mismo principio de "una sola fuente de verdad" que ya se aplica a los motores, ahora también a los endpoints de agregación. Proyección concreta que motivó la corrección: 200 empresas × 20 usuarios × 15 aperturas diarias con 2 llamadas = 60,000 peticiones diarias innecesarias.
+- `API.md`: documentado el campo `resumen_compacto` y la distinción entre `alertas_nuevas`/`alertas_notificables` (resumen_compacto) vs. `alertas_criticas` (secundarios/atencion) — no son el mismo número.
+- `/resumen-ejecutivo` se conserva desplegado (no se elimina una ruta pública sin saber si algo más la consume) pero ningún frontend lo usa ya.
+
+---
+
+## [0.26.3] — 2026-07 — Etapa 5, 5.5: pantalla del Centro Operativo — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `app/components/perfil/CentroOperativo.tsx` (nuevo): estructura calcada del wireframe de `DESIGN_SYSTEM.md` sección 10 — estado 🟢/🟠/🔴, hero stat (monto procesado hoy), secundarios (pagos, % liquidados, alertas críticas), "qué requiere atención" y "tendencias" (ningún bloque aparece si no hay nada real que decir, mismo principio de diseño de `DECISION_LOG.md`). Consume `GET /centro-operativo`.
+- `app/perfil/page.tsx`: carga ambos bloques (resumen compacto de 4.2 + Centro Operativo) simultáneamente; CSS (no JS) decide cuál mostrar.
+- `app/globals.css`: nuevas utilidades genéricas `.vp-mobile-only`/`.vp-desktop-only` — primer uso donde 2 bloques de contenido genuinamente distintos (no solo reposicionados) coexisten en el DOM.
+
+### Corregido antes de compartir el código
+- Un error de sintaxis real en el borrador inicial de `perfil/page.tsx` — comentarios de Python (`#`) mezclados con los de JavaScript (`//`) en el mismo bloque, que habría roto la compilación. Corregido antes de entregar el código.
+
+### Documentado
+- `ARQUITECTURA.md`, `ROADMAP.md`: actualizados. Nota: no se marca 5.5 ni Etapa 5 como completas todavía — falta aplicar, desplegar y verificar.
 
 ---
 
