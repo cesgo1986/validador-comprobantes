@@ -1,6 +1,7 @@
+
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.28.7 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.8 · **Última actualización:** 07/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -335,7 +336,7 @@ Todo lo que mejora la seguridad sin cambiar el comportamiento del producto. Sin 
 - 🔴 **Confirmar política de backups de Supabase — CONFIRMADO: cero backups.** Proyecto en plan Free, sin retención ninguna, y con auto-pausado tras 7 días de inactividad. Ver `DECISION_LOG.md`, decisión pendiente "Supabase en plan Free" — resolverlo cuesta $25 USD/mes (plan Pro), decisión pendiente de César, no bloqueante para seguir con el resto de 6.1
 - ✅ **Verificar eliminación de imágenes** — confirmado contra el código real de `/analizar` (no solo la decisión de diseño de Etapa 2): no hay `open()`, `tempfile`, ni escritura a disco del archivo en ningún punto; `UploadFile` usa `SpooledTemporaryFile` que Starlette limpia automáticamente
 - ✅ **Auditoría de variables de entorno y secretos — verificado.** `.env` nunca apareció en el historial de Git (`git log --all --full-history -- .env` sin resultados). Búsqueda de claves reales en todo el historial (`git log --all -p | findstr ANTHROPIC_API_KEY`) solo encontró referencias al *nombre* de la variable (`os.getenv(...)`, una línea de documentación indicando que vive en Render) — ninguna clave real expuesta.
-- ✅ **Rate limiting por IP** (código listo, 2026-07, pendiente de aplicar y desplegar) — `slowapi`, `10/minute` en `/analizar` (endpoint costoso), `60/minute` por defecto en el resto de la API. Umbrales sembrados como hipótesis inicial, ver `LABORATORIO.md`.
+- ✅ **Rate limiting por IP** (desplegado y validado, 2026-07) — `slowapi`, `10/minute` en `/analizar`, `60/minute` por defecto en el resto de la API. Validación: se confirmó que el decorador está activo (el traceback de un error real de Anthropic pasaba por `slowapi/extension.py, async_wrapper`), y que el ritmo natural de análisis secuenciales (35-40s cada uno) nunca acumula 2 peticiones en la misma ventana de 60s — comportamiento correcto para uso legítimo, el límite existe para bloquear ráfagas paralelas de abuso, no uso normal uno a la vez.
 - ✅ **Registro de eventos de seguridad sin identidad** (código listo, con fix) — rate limit excedido (IP + ruta) y errores 500 (ruta + método), vía `logger`. **Fix encontrado en producción (2026-07):** la primera versión del middleware de errores 500 solo revisaba `response.status_code >= 500` — pero cuando una excepción no se maneja dentro del endpoint (ej. `anthropic.BadRequestError` sin crédito disponible), `call_next()` lanza la excepción en vez de regresar una respuesta, y esa línea nunca se ejecutaba. Corregido con `try/except` para capturar ambos casos (respuestas 500 explícitas y excepciones no manejadas), relanzando la excepción para no cambiar el comportamiento hacia el usuario.
 
 **Limpieza encontrada al revisar `main.py` completo:** bloque de código duplicado e inalcanzable al final de `/analizar` (el mismo `try/except` del Alert Engine repetido después de un `return`) — eliminado como parte de este cambio, sin efecto en el comportamiento (Python nunca llegaba a ejecutarlo).

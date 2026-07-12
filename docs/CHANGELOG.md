@@ -1,8 +1,18 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.28.7 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.8 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.28.8] — 2026-07 — Rate limiting por IP validado y cerrado
+
+### Desplegado y verificado en producción
+- Confirmado que el decorador de `slowapi` está activo (rastro en el traceback de un error real de Anthropic). Confirmado que el ritmo natural de análisis secuenciales (35-40s cada uno) nunca dispara el límite en uso normal — comportamiento correcto, no un bug. Límite regresado a `10/minute`, log de diagnóstico temporal retirado.
+
+### Cerrado
+- `ROADMAP.md`: rate limiting por IP pasa a ✅.
 
 ---
 
