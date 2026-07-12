@@ -1,6 +1,6 @@
 # LABORATORIO.md — Investigaciones y hallazgos experimentales
 
-**Versión del documento:** 0.23.2 · **Última actualización:** 05/07/2026
+**Versión del documento:** 0.28.6 · **Última actualización:** 07/07/2026
 
 Registro de experimentos, investigaciones técnicas, benchmarks e ideas descartadas de VerificaPago. **No es un registro de decisiones** — es el espacio para todo lo que se investigó, se probó o se descartó, tenga o no tenga una decisión oficial asociada todavía.
 
@@ -62,6 +62,17 @@ Durante las sesiones de trabajo, estas investigaciones se marcan con `🧪 #LAB-
 - Antes de 5.3, se agrega un contenedor de ancho máximo compartido entre contenido y navegación (corrige el hallazgo inicial).
 - Los 4 rangos y sus anchos de contenedor quedan fijos para toda la Etapa 5, salvo ajuste documentado aquí mismo.
 - La conversión de `BottomNav` a barra lateral en Desktop/Wide Desktop queda decidida — se implementa en 5.3 (primer ítem que necesita el layout de escritorio).
+
+---
+
+### 2026-07 — Umbrales de rate limiting por IP (item 6.1, Etapa 6)
+
+Mismo criterio que los umbrales del Alert Engine (ver entrada de abajo): valores iniciales razonados, no medidos contra tráfico real todavía, sujetos a ajuste.
+
+- **`/analizar`: 10 peticiones/minuto por IP.** Es el endpoint costoso (Claude Vision + consultas a Banxico) — el límite es más estricto que el resto de la API. Pensado para permitir uso legítimo intenso (alguien procesando varios comprobantes seguidos) sin abrir la puerta a loops automatizados de abuso.
+- **Resto de la API: 60 peticiones/minuto por IP** (límite por defecto de `slowapi`) — los endpoints de `/api/v1/dashboard/*` son lecturas baratas, no necesitan el mismo nivel de restricción.
+
+**Qué observar antes de ajustar:** si usuarios legítimos empiezan a golpear el límite de `/analizar` en operación normal (no abuso), subir el número. Si se detecta abuso real por debajo del límite actual, bajarlo. Sin datos de producción todavía para calibrar con precisión.
 
 ---
 

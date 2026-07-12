@@ -1,8 +1,18 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.28.5 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.6 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.28.6] — 2026-07 — Fix: middleware de errores 500 no capturaba excepciones no manejadas
+
+### Corregido (encontrado en producción, primer incidente real tras desplegar 6.1)
+- `main.py`, `registrar_errores_500`: solo revisaba `response.status_code >= 500`, pero cuando una excepción no se maneja dentro del endpoint (caso real: `anthropic.BadRequestError` por falta de crédito en la cuenta), `call_next()` lanza la excepción en vez de regresar una respuesta — esa línea nunca se ejecutaba. Corregido con `try/except`, capturando y registrando también las excepciones no manejadas antes de relanzarlas (sin cambiar el comportamiento hacia el usuario).
+
+### Nota
+- El incidente que expuso este hueco no fue un bug de nuestro código — fue saldo insuficiente en la cuenta de Anthropic (agotado por las pruebas de rate limiting de esta misma sesión). Se documenta aquí porque, al investigarlo, se encontró el gap real en el middleware.
 
 ---
 

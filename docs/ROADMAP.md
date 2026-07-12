@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.28.5 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.6 · **Última actualización:** 07/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -336,7 +336,7 @@ Todo lo que mejora la seguridad sin cambiar el comportamiento del producto. Sin 
 - ✅ **Verificar eliminación de imágenes** — confirmado contra el código real de `/analizar` (no solo la decisión de diseño de Etapa 2): no hay `open()`, `tempfile`, ni escritura a disco del archivo en ningún punto; `UploadFile` usa `SpooledTemporaryFile` que Starlette limpia automáticamente
 - ✅ **Auditoría de variables de entorno y secretos — verificado.** `.env` nunca apareció en el historial de Git (`git log --all --full-history -- .env` sin resultados). Búsqueda de claves reales en todo el historial (`git log --all -p | findstr ANTHROPIC_API_KEY`) solo encontró referencias al *nombre* de la variable (`os.getenv(...)`, una línea de documentación indicando que vive en Render) — ninguna clave real expuesta.
 - ✅ **Rate limiting por IP** (código listo, 2026-07, pendiente de aplicar y desplegar) — `slowapi`, `10/minute` en `/analizar` (endpoint costoso), `60/minute` por defecto en el resto de la API. Umbrales sembrados como hipótesis inicial, ver `LABORATORIO.md`.
-- ✅ **Registro de eventos de seguridad sin identidad** (código listo) — rate limit excedido (IP + ruta) y errores 500 (ruta + método), vía `logger`. Middleware que solo observa la respuesta ya generada, sin alterar el manejo de excepciones existente — deliberadamente más simple que un `exception_handler` global, para no interferir con los `HTTPException` que el código ya lanza a propósito (ej. el 404 de `/analisis/{id}`).
+- ✅ **Registro de eventos de seguridad sin identidad** (código listo, con fix) — rate limit excedido (IP + ruta) y errores 500 (ruta + método), vía `logger`. **Fix encontrado en producción (2026-07):** la primera versión del middleware de errores 500 solo revisaba `response.status_code >= 500` — pero cuando una excepción no se maneja dentro del endpoint (ej. `anthropic.BadRequestError` sin crédito disponible), `call_next()` lanza la excepción en vez de regresar una respuesta, y esa línea nunca se ejecutaba. Corregido con `try/except` para capturar ambos casos (respuestas 500 explícitas y excepciones no manejadas), relanzando la excepción para no cambiar el comportamiento hacia el usuario.
 
 **Limpieza encontrada al revisar `main.py` completo:** bloque de código duplicado e inalcanzable al final de `/analizar` (el mismo `try/except` del Alert Engine repetido después de un `return`) — eliminado como parte de este cambio, sin efecto en el comportamiento (Python nunca llegaba a ejecutarlo).
 
