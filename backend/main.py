@@ -608,7 +608,7 @@ async def verify_cep(clave_rastreo: str, referencia: str, fecha: str, monto: flo
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.post("/analizar")
-@limiter.limit("3/minute")
+@limiter.limit("2/minute")
 async def analizar(
     request: Request,
     file: UploadFile = File(...),
