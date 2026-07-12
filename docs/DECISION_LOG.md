@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.28.4 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.29.0 · **Última actualización:** 07/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -268,6 +268,25 @@ Nunca `Dashboard → SELECT ... → Base de datos` directo.
 - Toda funcionalidad de Etapa 4 (Dashboard Empresa) en adelante debe justificar, antes de escribir código, en qué motor existente se apoya — no puede calcular su propia versión de "estado", "integridad" o "alerta".
 - La integración de Alertas al Modelo de Decisión Explicable (hallazgo #2) queda como decisión pendiente explícita — se revisará cuando Dashboard Empresa o Alertas evolucionen lo suficiente para necesitarla, no se fuerza ahora.
 - A partir de esta versión, actualizar el encabezado "Versión del documento" de cada archivo de `/docs` que se modifique es parte del flujo de trabajo, no un paso opcional.
+
+---
+
+## 2026-07 — 🏛️ ADR: Supabase Auth como proveedor de identidad; FastAPI nunca emite JWT propios
+
+**Decisión:** la autenticación de VerificaPago usa **Supabase Auth**, no un sistema construido a mano. FastAPI **nunca emite ni firma JWT propios** — solo valida los que Supabase ya emitió (verificando su firma con el secreto/clave pública de Supabase), extrae el `id` del usuario autenticado, y lo cruza contra la tabla `usuarios` (perfil de aplicación: `empresa_id`, `rol`, nombre) para saber qué puede hacer dentro de VerificaPago.
+
+**Motivo del hallazgo, no solo de preferencia:** al revisar `models/usuario.py` (ya existente desde una sesión anterior), se confirmó que la tabla **no tiene columna `password_hash`** — prueba de que el diseño original ya delegaba el manejo de contraseñas a Supabase Auth, no a un sistema propio. Construir JWT + hash de contraseñas + refresh tokens desde cero habría duplicado algo que Supabase ya da, probado y mantenido por ellos — además de aumentar innecesariamente la superficie de ataque del proyecto (login, logout, refresh, recuperación, expiraciones, sesiones: todo eso pasa a ser responsabilidad de Supabase, no de VerificaPago).
+
+**Principio arquitectónico permanente, adoptado a partir de esta decisión:** *todo lo relacionado con identidad (quién eres) vive fuera del dominio de negocio — en Supabase Auth. Todo lo relacionado con operación (qué puedes hacer dentro de VerificaPago) vive dentro del dominio de negocio — en la tabla `usuarios` y lo que se construya sobre ella.* Esta separación evita acoplamientos y protege contra tener que rediseñar el sistema si algún día cambia el proveedor de autenticación.
+
+**Corrección necesaria al modelo existente (migración pendiente, no aplicada todavía):** `usuarios.id` tiene `default=uuid.uuid4` — genera su propio UUID de forma independiente, sin ninguna columna que lo enlace con el usuario real de Supabase Auth. Se agrega `supabase_auth_id` como columna separada (no se usa el `id` de Supabase como PK interno) — mismo criterio que "nunca dejar que el identificador de un sistema externo sea la llave primaria de negocio", para que un cambio futuro de proveedor de autenticación no rompa el esquema interno.
+
+**Correo transaccional (recuperación de contraseña, verificación de correo, invitaciones):** Resend como proveedor SMTP, **configurado dentro de Supabase Auth** (opción nativa de Supabase para esto) — no se construye envío de correos propio. Motivo adicional encontrado en la misma investigación: el plan gratuito de Supabase limita el envío de correos propios a 2/hora, insuficiente en cuanto haya más de un par de registros/recuperaciones el mismo día.
+
+**Consecuencia:**
+- `models/usuario.py` requiere una migración de Alembic agregando `supabase_auth_id`.
+- `sucursales` (jerarquía Empresa → Sucursales → Usuarios → Roles → Permisos) se siembra como consideración para Etapa 7 ("Organización Empresarial") — no se agrega columna ni tabla ahora, sería construir antes de tener la necesidad real.
+- Pendiente antes de escribir más código: confirmar si Supabase Auth ya está activado en el proyecto, o si hay que habilitarlo desde cero.
 
 ---
 

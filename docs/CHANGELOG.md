@@ -1,8 +1,19 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.28.9 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.29.0 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.29.0] — 2026-07 — 🏛️ ADR: Supabase Auth como proveedor de identidad para 6.2 (Identity Layer)
+
+### Documentado (sin código todavía, salvo migración pendiente identificada)
+- `DECISION_LOG.md`: ADR — Supabase Auth como proveedor de identidad, FastAPI nunca emite JWT propios. Hallazgo real (no solo preferencia): `models/usuario.py` no tiene `password_hash`, confirmando que el diseño original ya delegaba autenticación a Supabase. Principio arquitectónico adoptado: identidad fuera del dominio de negocio, operación dentro. Resend como SMTP configurado dentro de Supabase Auth (no se construye envío de correos propio) — motivo adicional: el plan Free de Supabase limita correos propios a 2/hora.
+- Corrección necesaria al modelo existente, identificada: `usuarios.id` genera su propio UUID independiente, sin columna que lo enlace a Supabase Auth — se agrega `supabase_auth_id` separado (migración pendiente, no aplicada en esta entrada).
+- `sucursales` (Empresa → Sucursales → Usuarios → Roles → Permisos) sembrado para Etapa 7, sin tocar el esquema ahora.
+
+Sube a versión MINOR porque define el proveedor de identidad de todo el proyecto — decisión de arquitectura permanente, no un ajuste incremental.
 
 ---
 
