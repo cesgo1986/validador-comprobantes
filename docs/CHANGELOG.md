@@ -1,8 +1,22 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.29.1 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.29.2 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.29.2] — 2026-07 — Etapa 6, 6.2.2/6.2.3: migración supabase_auth_id — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `alembic/versions/c2f4a91b7d3e_agregar_supabase_auth_id.py` (nueva): agrega `supabase_auth_id` a `usuarios` — nullable por ahora, índice único. Encadenada después de `40c88ed37e49` (confirmado como la más reciente al revisar `alembic/versions/` completo).
+- `models/usuario.py`: columna `supabase_auth_id` agregada al modelo, coincidiendo con la migración. `ESTADOS_USUARIO_VALIDOS` agregado (`active`, `invited`, `suspended`, `deleted`) — documenta el set completo de valores de la columna `status` que ya existía desde la migración inicial.
+
+### Confirmado antes de escribir la migración
+- `usuarios` ya existía en la base de datos real desde `ade15461db9e` (migración inicial) — se confirmó revisando el archivo completo antes de asumir si era `CREATE TABLE` o `ALTER TABLE`.
+
+### Pausado (decisión de César, no bloqueante)
+- 6.2.1 (Resend SMTP) en pausa — requiere dominio propio, que se comprará antes de retomar. No bloquea 6.2.2-6.2.5.
 
 ---
 
