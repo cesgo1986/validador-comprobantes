@@ -1,8 +1,27 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.28.2 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.4 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.28.4] — 2026-07 — Verificado: sin secretos expuestos en el historial de Git
+
+### Verificado (sin código, revisión manual confirmada)
+- `.env` nunca apareció en el historial de Git (`git log --all --full-history -- .env` sin resultados).
+- Ninguna clave real de Anthropic expuesta en el historial — solo referencias al nombre de la variable (`os.getenv("ANTHROPIC_API_KEY")`, documentación indicando que vive en Render Environment), nunca el valor.
+- `ROADMAP.md`: ítem de auditoría de variables de entorno (6.1) pasa a ✅.
+
+---
+
+## [0.28.3] — 2026-07 — Hallazgo confirmado: Supabase sin backups (plan Free) — decisión pendiente
+
+### Documentado (verificación, no código)
+- `DECISION_LOG.md`: decisión pendiente — el proyecto está en plan Free de Supabase, confirmado en el panel: **cero backups**, no solo "sin verificar" como decía la Architecture Readiness Review. Hallazgo adicional: auto-pausado del proyecto tras 7 días de inactividad. Costo real de resolverlo, verificado julio 2026: plan Pro, $25 USD/mes, incluye backups diarios de 7 días sin costo extra. Aclarado: actualizar el plan no es retroactivo — no repara una pérdida ya ocurrida mientras se estaba en Free.
+- `ROADMAP.md`: 6.1 actualizado con el hallazgo confirmado.
+
+Sin código en esta entrada — es una decisión de negocio pendiente, no una tarea de ingeniería.
 
 ---
 

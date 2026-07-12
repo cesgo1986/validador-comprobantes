@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.28.0 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.4 · **Última actualización:** 07/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -268,6 +268,20 @@ Nunca `Dashboard → SELECT ... → Base de datos` directo.
 - Toda funcionalidad de Etapa 4 (Dashboard Empresa) en adelante debe justificar, antes de escribir código, en qué motor existente se apoya — no puede calcular su propia versión de "estado", "integridad" o "alerta".
 - La integración de Alertas al Modelo de Decisión Explicable (hallazgo #2) queda como decisión pendiente explícita — se revisará cuando Dashboard Empresa o Alertas evolucionen lo suficiente para necesitarla, no se fuerza ahora.
 - A partir de esta versión, actualizar el encabezado "Versión del documento" de cada archivo de `/docs` que se modifique es parte del flujo de trabajo, no un paso opcional.
+
+---
+
+## 2026-07 — 🏛️ Decisión pendiente: Supabase en plan Free — cero backups, confirmado (no solo sospechado)
+
+**Hallazgo (2026-07, confirmado directamente en el panel de Supabase, no por inferencia):** el proyecto está en el plan **Free** de Supabase. A diferencia de lo que se documentó en la Architecture Readiness Review ("Supabase probablemente tiene backups automáticos por defecto, pero no está confirmado"), ahora está confirmado que **no hay ningún backup** — el plan Free no incluye ni siquiera los 7 días básicos de retención. Si la base de datos se pierde o se corrompe hoy, no hay nada que restaurar.
+
+**Hallazgo adicional, no anticipado:** el plan Free también pausa el proyecto automáticamente tras 7 días sin actividad en la API — riesgo distinto al de backups, mismo origen (plan Free).
+
+**Costo real de resolverlo (verificado, no de memoria — julio 2026):** plan Pro de Supabase, **$25 USD/mes**, incluye backups diarios automáticos con 7 días de retención sin costo adicional, y elimina el riesgo de auto-pausado. Point-in-Time Recovery (restaurar a un segundo exacto) es un add-on aparte de +$100 USD/mes sobre Pro — no se recomienda todavía, es desproporcionado para el volumen actual.
+
+**Punto importante sobre el orden de los hechos:** actualizar a Pro **no es retroactivo** — protege los datos que existan desde el momento de la actualización en adelante, no repara una pérdida que ya haya ocurrido mientras el proyecto estaba en Free. Cada día sin actualizar es un día sin red de seguridad real, no un riesgo que se pueda "arreglar después" si algo sale mal antes.
+
+**Decisión:** pendiente — César evalúa cuándo actualizar a Pro. No es una decisión que tomé yo; solo se registran los números reales para que la decisión se tome con información completa cuando se retome.
 
 ---
 
