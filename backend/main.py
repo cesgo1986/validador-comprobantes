@@ -617,6 +617,7 @@ async def analizar(
     fecha_pasada_confirmada: str = Form("false"),
     xml_cep: UploadFile | None = File(None),
 ):
+    logger.info("DEBUG rate limit -- IP detectada: %s", get_remote_address(request))  # <- LÍNEA NUEVA, temporal
     contenido = await file.read()
     t_inicio_analizar = time.time()
     b64 = base64.b64encode(contenido).decode()
