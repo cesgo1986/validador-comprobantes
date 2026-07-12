@@ -110,7 +110,11 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 # ─────────────────────────────────────────────────────────────────────────────
 @app.middleware("http")
 async def registrar_errores_500(request: Request, call_next):
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.error("Excepcion no manejada en %s %s", request.method, request.url.path, exc_info=True)
+        raise
     if response.status_code >= 500:
         logger.error("Error 500 en %s %s", request.method, request.url.path)
     return response
