@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.28.6 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.7 · **Última actualización:** 07/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -377,6 +377,7 @@ Requiere decisiones de proveedor de infraestructura, mayor esfuerzo que las capa
 - **Cola de trabajos para consultas a Banxico** — hoy la descarga del XML/CEP es síncrona dentro de `/analizar`; a volumen alto, Banxico se vuelve el cuello de botella. Requiere cola (RabbitMQ/Redis Queue) + workers
 - **Cache y métricas distribuidas** — `cache_service.py` y `metrics_service.py` viven en memoria del proceso; si Render corre más de una instancia, cada una tiene su propio estado. Migrar a Redis sin cambiar la interfaz de cada servicio
 - Procesamiento asíncrono en general
+- **Cachear el juicio forense de Claude por hash exacto** (2026-07, sembrado desde `PRODUCT_VISION.md`) — `hash_service.py` ya detecta cuándo un archivo es exactamente el mismo (`documento_reutilizado`), pero hoy `/analizar` llama a Claude de nuevo de todas formas. Cachear solo campos extraídos + score de riesgo visual cuando el hash coincide — **nunca cachear el Estado SPEI**, siempre volver a consultar CEP/XML en Banxico sin importar si el archivo ya se vio, porque ese estado puede cambiar entre una subida y otra aunque el archivo sea idéntico. No requiere infraestructura nueva (Redis/cola), es un cambio de lógica dentro de `/analizar` — más simple que el resto de esta capa, construible antes
 
 ### 6.6 — Business Readiness
 

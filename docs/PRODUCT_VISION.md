@@ -1,6 +1,6 @@
 # PRODUCT_VISION.md — Visión estratégica de VerificaPago
 
-**Versión del documento:** 0.24.5 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.7 · **Última actualización:** 07/07/2026
 
 *Documento de producto, no técnico. Define qué es VerificaPago, hacia dónde va y qué no será nunca.*
 
@@ -186,6 +186,17 @@ Empresas que necesitan integrar la verificación en sus propios sistemas. ERP, W
 **2026-07 — Motor de Operaciones (hipótesis):** surgió de una discusión sobre conciliación — hoy VerificaPago siempre llega *después* del pago (transferencia → comprobante → validación). La hipótesis es que exista una identidad de operación que viva *antes* del pago también: una empresa genera una solicitud de cobro con un identificador (ej. `VP-H7A2QX`), el cliente lo incluye en el concepto de su transferencia (campo que VerificaPago ya extrae, tanto por OCR como del XML oficial de Banxico), y el sistema concilia automáticamente en vez de que la empresa tenga que adivinar a quién corresponde cada depósito. El estado de una operación evolucionaría: Esperada → Pagada → Validada → Conciliada → Liberada → Auditada.
 
 **2026-07 — Niveles de confianza progresivos (hipótesis, ligada a la anterior):** en vez de un modelo de "identidad validada" (que implicaría KYC — INE, biometría, listas negras, regulación AML, un costo de cumplimiento que no encaja en el producto actual), la hipótesis es construir confianza por **comportamiento observado**, no por identidad verificada: cliente habitual, cuenta habitual, banco habitual, montos habituales. Tres niveles posibles sin comprometer ninguno: (0) hoy — validación de comprobante individual; (1) empresa registrada genera solicitudes de cobro con token; (2) el sistema reconoce relaciones recurrentes cliente↔cuenta↔empresa sin necesitar saber quién es la persona.
+
+**2026-07 — OCR desacoplado de Claude (hipótesis):** hoy Claude Vision hace dos trabajos distintos en una sola llamada — extraer campos (OCR) y razonar sobre manipulación/fraude (juicio forense). Solo el segundo requiere IA de verdad; el primero es un problema resuelto por motores de OCR existentes (PaddleOCR, Google Vision OCR, AWS Textract, etc.) a una fracción del costo. La hipótesis: introducir una interfaz `OCRProvider` (`extract(imagen) -> campos_estructurados`), con `ClaudeOCR` como implementación actual y un proveedor barato como alternativa — el resto del sistema (Motor SPEI, Alert Engine) no se entera del cambio, porque ya consume `campos_extraidos` sin importar quién los generó. Claude pasaría de ser "el motor" a ser "el experto al que se consulta cuando los demás motores no llegan a una conclusión suficientemente confiable" (cuando hay incertidumbre, faltan campos críticos, o los otros motores detectan inconsistencia) — no en el 100% de los análisis.
+
+**Plan de validación, en 3 fases — ninguna comprometida todavía:**
+1. Construir la capa `OCRProvider` con un motor existente, sin tocar el flujo de producción.
+2. Correr OCR + Claude en paralelo durante semanas, comparando qué tanto coinciden — esto da el dato real que hoy no existe: qué % de casos el OCR barato resuelve solo, y en cuáles Claude sigue siendo necesario.
+3. Solo si la Fase 2 confirma que la coincidencia es suficientemente alta, cambiar el flujo de producción para que Claude intervenga solo cuando el OCR tenga baja confianza o el resto de los motores detecte inconsistencia.
+
+**Por qué no se construye ahora:** el problema que resuelve (costo a escala) todavía no ha ocurrido — el proyecto no tiene volumen de producción real que lo urja. Comprometer la Fase 3 sin los datos de la Fase 2 repetiría el mismo error que ya se evitó con la conciliación por token: diseñar antes de confirmar que el dato base (qué tan bien lee un OCR barato comprobantes de ~30 bancos mexicanos distintos) es confiable.
+
+**Optimización relacionada, sí construible ahora, sin esperar a la capa OCR — ver `ROADMAP.md` próximo ítem de 6.1 o etapa aparte:** cachear el juicio forense de Claude (campos extraídos, score de riesgo visual) cuando el hash del archivo coincide exacto (`hash_service.py` ya detecta esto, hoy sin aprovecharse) — pero **siempre volver a consultar CEP/XML en Banxico** sin importar si el archivo ya se vio, porque el Estado SPEI puede cambiar entre una subida y otra aunque el archivo sea idéntico. Cachear la respuesta completa sin este matiz arriesgaría mostrar un estado desactualizado — justo lo opuesto a la propuesta de valor del producto.
 
 **Riesgo regulatorio identificado, sin resolver:** correlacionar identidad de cliente + cuenta bancaria + comportamiento **a través de múltiples empresas distintas** ya es procesamiento de datos personales financieros bajo la LFPDPPP (Ley Federal de Protección de Datos Personales en Posesión de los Particulares), incluso sin hacer KYC. Cualquier diseño real de esto necesita opinión legal explícita antes de construirse — no es un supuesto que el equipo de producto pueda resolver por su cuenta.
 

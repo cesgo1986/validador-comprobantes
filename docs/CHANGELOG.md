@@ -1,8 +1,17 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.28.6 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.7 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.28.7] — 2026-07 — OCR desacoplado de Claude sembrado como hipótesis; cacheo de juicio forense sembrado en 6.5
+
+### Documentado (sin código, sin roadmap comprometido)
+- `PRODUCT_VISION.md`: nueva hipótesis — interfaz `OCRProvider` para desacoplar la extracción de campos (OCR, problema resuelto) del juicio forense (única parte que necesita IA). Plan de validación en 3 fases, ninguna comprometida — Fase 1 (construir capa), Fase 2 (comparar OCR barato vs. Claude semanas, dato real que hoy no existe), Fase 3 (cambiar producción, solo si Fase 2 lo confirma). No se construye ahora: sin volumen de producción real que lo urja, y sin repetir el error de diseñar antes de validar el dato base.
+- `ROADMAP.md`, 6.5: cacheo del juicio forense de Claude por hash exacto — construible ya, sin infraestructura nueva, distinto de la capa OCR (no requiere cambiar de proveedor). Regla de seguridad explícita: nunca cachear el Estado SPEI, siempre volver a consultar Banxico aunque el archivo sea idéntico — ese estado puede cambiar entre subidas.
+- Corrección propia durante la edición: se perdió temporalmente el párrafo de "riesgo regulatorio LFPDPPP" al insertar la nueva hipótesis — detectado y restaurado antes de cerrar la sesión.
 
 ---
 
