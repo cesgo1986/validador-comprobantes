@@ -1,7 +1,6 @@
-
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.28.8 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.9 · **Última actualización:** 07/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -326,13 +325,15 @@ Se extrajo `app/components/historial/HistorialDetalleContenido.tsx` (nuevo) — 
 
 **Nota (2026-07):** "eliminación automática de imágenes tras el análisis" ya está, en la práctica, satisfecho por diseño desde Etapa 2 — el sistema nunca persiste la imagen del comprobante en disco, se procesa en memoria y se descarta (ver `historial/[id]/page.tsx`, nota de privacidad). Este ítem se conserva en 6.1 como verificación pendiente (confirmar que ningún mecanismo interno de FastAPI/Starlette esté dejando archivos temporales sin limpiar), no como funcionalidad por construir desde cero.
 
-### 6.1 — Hardening
+### 6.1 — Hardening ✅ (completa, salvo backups de Supabase — decisión de negocio pendiente, no de código)
 
 Todo lo que mejora la seguridad sin cambiar el comportamiento del producto. Sin dependencias entre sí, se puede desplegar en cualquier momento.
 
 - ✅ **CORS restringido** (desplegado y verificado en producción) — `ALLOWED_ORIGINS` configurada en Render, comprobante analizado con éxito desde `https://validador-comprobantes.vercel.app` sin errores de CORS. Sin previews automáticos de Vercel por defecto (decisión explícita, ver `DECISION_LOG.md` si se retoma esta discusión).
 - ✅ **Headers de seguridad** (desplegado) — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Strict-Transport-Security`.
-- 🟡 **Logging estructurado** (desplegado, parcial): `main.py` migrado a `logging` estándar. Otros archivos (`services/*.py`, `alert_engine/*.py`) todavía usan `print()` — pendiente como siguiente paso de 6.1.
+- ✅ **Logging estructurado — completo.** `main.py` migrado desde el primer paso. `services/*.py` ya estaba limpio (sin `print()`, confirmado con `findstr`). `alert_engine/engine.py` tenía los últimos 2 `print()` del proyecto — migrados a `logger`.
+
+**Con esto, 6.1 (Hardening) queda completa.**
 - 🔴 **Confirmar política de backups de Supabase — CONFIRMADO: cero backups.** Proyecto en plan Free, sin retención ninguna, y con auto-pausado tras 7 días de inactividad. Ver `DECISION_LOG.md`, decisión pendiente "Supabase en plan Free" — resolverlo cuesta $25 USD/mes (plan Pro), decisión pendiente de César, no bloqueante para seguir con el resto de 6.1
 - ✅ **Verificar eliminación de imágenes** — confirmado contra el código real de `/analizar` (no solo la decisión de diseño de Etapa 2): no hay `open()`, `tempfile`, ni escritura a disco del archivo en ningún punto; `UploadFile` usa `SpooledTemporaryFile` que Starlette limpia automáticamente
 - ✅ **Auditoría de variables de entorno y secretos — verificado.** `.env` nunca apareció en el historial de Git (`git log --all --full-history -- .env` sin resultados). Búsqueda de claves reales en todo el historial (`git log --all -p | findstr ANTHROPIC_API_KEY`) solo encontró referencias al *nombre* de la variable (`os.getenv(...)`, una línea de documentación indicando que vive en Render) — ninguna clave real expuesta.

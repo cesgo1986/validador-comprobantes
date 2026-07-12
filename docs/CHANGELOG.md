@@ -1,8 +1,20 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.28.8 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.9 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.28.9] — 2026-07 — ✅ 6.1 (Hardening) completa
+
+### Desplegado y verificado en producción
+- `alert_engine/engine.py`: últimos 2 `print()` del proyecto migrados a `logger`. `services/*.py` ya estaba limpio.
+
+### Cerrado
+- `ROADMAP.md`: 6.1 pasa a ✅ completa — todos los ítems de código resueltos. Único pendiente: backups de Supabase, decisión de negocio ya registrada (se paga al salir a público), no bloquea el resto de Etapa 6.
+
+Con esto, la primera capa de Etapa 6 queda cerrada. Sigue 6.2 — Identity Layer.
 
 ---
 
