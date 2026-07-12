@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.28.9 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.29.1 · **Última actualización:** 07/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -342,16 +342,34 @@ Todo lo que mejora la seguridad sin cambiar el comportamiento del producto. Sin 
 
 **Limpieza encontrada al revisar `main.py` completo:** bloque de código duplicado e inalcanzable al final de `/analizar` (el mismo `try/except` del Alert Engine repetido después de un `return`) — eliminado como parte de este cambio, sin efecto en el comportamiento (Python nunca llegaba a ejecutarlo).
 
-### 6.2 — Identity Layer
+### 6.2 — Identity Layer (en curso, 2026-07)
 
 Deliberadamente nombrada "Identity Layer" y no "login" — sirve a futuro para Portal Web, API, app móvil e integraciones, no solo para un formulario de inicio de sesión. Es la capa de la que dependen casi todas las demás.
 
-- JWT con `empresa_id` y `usuario_id`
-- Invitación de usuarios
-- Recuperación de contraseña
-- Sesiones
-- Refresh tokens
-- **Identity Engine** (sembrado, ver `DECISION_LOG.md`): quinto motor transversal del sistema, junto a Motor SPEI, Motor Documental, Alert Engine y `AggregationService`. Se diseña aquí, no antes.
+**Decisión de proveedor (ver `DECISION_LOG.md`):** Supabase Auth, no JWT construido a mano — confirmado por hallazgo real (`Usuario` no tiene `password_hash`, el diseño original ya delegaba autenticación a Supabase). FastAPI nunca emite JWT propios, solo valida los de Supabase. Resend como SMTP dentro de Supabase Auth (no se construye envío de correos propio).
+
+**Secuencia concreta, con correcciones hechas antes de empezar (ver `DECISION_LOG.md` para el detalle de cada corrección):**
+
+| Paso | Qué | Estado |
+|---|---|---|
+| 6.2.1 | Configurar Resend como SMTP en Supabase | ⏳ |
+| 6.2.2 | Migración: agregar `supabase_auth_id` a `usuarios` (separado del `id` interno — nunca el identificador de un sistema externo como PK de negocio) | ⏳ |
+| 6.2.3 | Definir constantes de `estado` válido para `Empresa`/`Usuario` — **las columnas `status` ya existen en ambos modelos**, no se crean de nuevo | ⏳ |
+| 6.2.4 | Dependencia de FastAPI que valida el JWT de Supabase y resuelve `empresa_id`/`rol` | ⏳ |
+| 6.2.5 | Usuario de prueba manual (botón "Add user" de Supabase) → validar todo el flujo → eliminarlo. No es el flujo oficial, solo una prueba técnica de ~30 minutos | ⏳ |
+| 6.2.6 | Activar "Invite user" nativo de Supabase para invitar a una empresa existente — ya viene con plantilla de correo, no se construye desde cero | ⏳ |
+| 6.2.7 | Migrar endpoints existentes, uno por uno, de `DEFAULT_EMPRESA_ID` a la identidad real | ⏳ |
+| 6.2.8 (último, no antes) | Retirar `DEFAULT_EMPRESA_ID` por completo — solo cuando 6.2.7 esté 100% terminado; lo usan `/analizar` y los 15+ endpoints de `/api/v1/dashboard/*`, quitarlo antes dejaría la app rota a medias | ⏳ |
+
+**Correcciones hechas antes de empezar (propuestas descartadas o reubicadas, no por desacuerdo de estilo sino por inconsistencia real con lo que ya existe):**
+- Roles: se mantienen los que ya existen en código (`owner`, `admin`, `analyst`, `viewer`, ver `models/usuario.py`) — no se adopta un segundo set de nombres en español que crearía dos convenciones incompatibles.
+- Auto-registro público con creación automática de empresa: sembrado para cuando exista una estrategia real de adquisición de clientes (ligado a 6.6, Business Readiness) — no es parte de 6.2. Hoy no existe ningún flujo real de creación de empresas más allá de la de prueba.
+- Tabla de auditoría (`audit_log`): ya tiene hogar asignado en **6.3 (Access Control Layer)** — depende de que 6.2 exista primero, moverla a 6.2 rompería la separación de capas ya registrada.
+- `slug` en `Empresa`: sembrado, no agregado ahora — no hay necesidad funcional todavía (sin URLs públicas por empresa, sin subdominios).
+
+**Identity Engine** (sembrado, ver `DECISION_LOG.md`): quinto motor transversal del sistema, junto a Motor SPEI, Motor Documental, Alert Engine y `AggregationService`. Se diseña conforme avanza esta secuencia, no de golpe al principio.
+
+**Principio adoptado a partir de este punto:** ninguna funcionalidad nueva se desarrolla usando `DEFAULT_EMPRESA_ID` — toda operación nueva se construye ya bajo un usuario autenticado, asociada explícitamente a una empresa real.
 
 ### 6.3 — Access Control Layer
 

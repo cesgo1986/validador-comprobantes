@@ -1,8 +1,17 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.29.0 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.29.1 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.29.1] — 2026-07 — Secuencia concreta de 6.2 (Identity Layer), con correcciones antes de empezar
+
+### Documentado (sin código todavía, salvo el primer paso)
+- `ROADMAP.md`: 6.2 reescrita con secuencia de 8 pasos (6.2.1 a 6.2.8), `DEFAULT_EMPRESA_ID` se retira solo al final, no a mitad de camino.
+- Correcciones hechas antes de empezar: roles se mantienen como ya existen en código (`owner`/`admin`/`analyst`/`viewer`, no un segundo set en español); auto-registro público con creación de empresa se siembra para 6.6 (no hay estrategia de adquisición todavía); `audit_log` se mantiene en 6.3 (depende de 6.2, no se adelanta); `slug` en `Empresa` sembrado sin agregar.
+- Principio adoptado: ninguna funcionalidad nueva se construye con `DEFAULT_EMPRESA_ID` a partir de ahora.
 
 ---
 
