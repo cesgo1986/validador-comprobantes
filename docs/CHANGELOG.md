@@ -1,8 +1,22 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.28.4 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.28.5 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.28.5] — 2026-07 — Etapa 6, 6.1: rate limiting por IP + registro de eventos de seguridad — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `requirements.txt`: `slowapi==0.1.9`.
+- `main.py`: `Limiter` configurado con `default_limits=["60/minute"]`; `/analizar` decorado con `10/minute` (endpoint costoso — Claude Vision + Banxico). Requirió agregar el parámetro `request: Request` a la firma de `/analizar`, que no lo tenía.
+- `main.py`: middleware que registra errores 500 (ruta + método) vía `logger` — solo observa la respuesta ya generada, no altera el manejo de excepciones existente.
+- `main.py`: handler de `RateLimitExceeded` que registra IP + ruta cuando se dispara el límite, antes de devolver la respuesta estándar de `slowapi`.
+- `LABORATORIO.md`: umbrales de rate limiting sembrados como hipótesis inicial (10/min en `/analizar`, 60/min en el resto) — mismo criterio que los umbrales del Alert Engine, sujetos a ajuste sin datos de producción todavía.
+
+### Documentado
+- `ROADMAP.md`: 6.1 actualizado.
 
 ---
 
