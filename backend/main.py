@@ -11,6 +11,9 @@ import time
 import httpx
 from fastapi import FastAPI, UploadFile, File, Form, APIRouter, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import anthropic
 from dotenv import load_dotenv
 from iat import calculate_iat, fuse_scores, iat_anomalias_to_validaciones
@@ -50,19 +53,10 @@ app = FastAPI()
 # ─────────────────────────────────────────────────────────────────────────────
 # Item 6.1 (Etapa 6, Hardening): CORS restringido.
 # Antes: allow_origins=["*"] -- cualquier dominio podía llamar a la API.
-# Ahora: se lee de la variable de entorno ALLOWED_ORIGINS (coma-separada),
-# mismo patrón que ya usa CLAUDE_MODEL más abajo -- no se introduce un
-# módulo de configuración nuevo (pydantic-settings) para esto, sería una
-# pieza de arquitectura no pedida.
+# Ahora: se lee de la variable de entorno ALLOWED_ORIGINS (coma-separada).
 #
-# IMPORTANTE: hay que configurar ALLOWED_ORIGINS en el panel de Render
-# antes de este deploy, o CORS bloqueará TODO, incluyendo el frontend real:
-#
+# IMPORTANTE: ALLOWED_ORIGINS ya debe estar configurada en Render:
 #     ALLOWED_ORIGINS=https://validador-comprobantes.vercel.app,http://localhost:3000
-#
-# No se autorizan previews automáticos de Vercel por defecto (superficie
-# de ataque innecesaria) -- si hace falta probar uno puntual, se agrega
-# temporalmente a esa misma variable, sin comodines.
 # ─────────────────────────────────────────────────────────────────────────────
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 if not ALLOWED_ORIGINS:
@@ -77,8 +71,7 @@ app.add_middleware(
  
  
 # ─────────────────────────────────────────────────────────────────────────────
-# Item 6.1 (Etapa 6, Hardening): headers de seguridad.
-# Middleware simple, sin dependencia nueva -- se agrega a toda respuesta.
+# Item 6.1: headers de seguridad.
 # ─────────────────────────────────────────────────────────────────────────────
 @app.middleware("http")
 async def agregar_headers_seguridad(request: Request, call_next):
@@ -87,6 +80,39 @@ async def agregar_headers_seguridad(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+    return response
+ 
+ 
+# ─────────────────────────────────────────────────────────────────────────────
+# Item 6.1: rate limiting por IP.
+# No requiere identidad -- limita por dirección de origen, no por cuenta
+# (eso es 6.3, cuando exista Identity Layer). /analizar tiene un límite
+# más estricto (se decora aparte, más abajo en el archivo) porque es el
+# endpoint costoso (Claude Vision + Banxico).
+# ─────────────────────────────────────────────────────────────────────────────
+limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+app.state.limiter = limiter
+ 
+ 
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    # Registro de eventos de seguridad sin identidad (item 6.1): no
+    # sabemos "quién" hasta que exista Identity Layer (6.2), pero sí
+    # podemos registrar "qué pasó" -- IP y ruta que dispararon el límite.
+    logger.warning("Rate limit excedido: IP=%s ruta=%s", get_remote_address(request), request.url.path)
+    return await _rate_limit_exceeded_handler(request, exc)
+ 
+ 
+# ─────────────────────────────────────────────────────────────────────────────
+# Item 6.1: registro de eventos de seguridad -- errores 500.
+# Middleware que solo OBSERVA la respuesta ya generada, no altera el
+# manejo de excepciones existente.
+# ─────────────────────────────────────────────────────────────────────────────
+@app.middleware("http")
+async def registrar_errores_500(request: Request, call_next):
+    response = await call_next(request)
+    if response.status_code >= 500:
+        logger.error("Error 500 en %s %s", request.method, request.url.path)
     return response
  
 
@@ -578,7 +604,9 @@ async def verify_cep(clave_rastreo: str, referencia: str, fecha: str, monto: flo
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.post("/analizar")
+@limiter.limit("10/minute")
 async def analizar(
+    request: Request,
     file: UploadFile = File(...),
     banco_hint: str = Form(""),
     clabe_hint: str = Form(""),
