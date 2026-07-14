@@ -30,7 +30,33 @@ engine = create_engine(
     max_overflow=10,
 ) if DATABASE_URL else None
 
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False) if engine else None
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False) if engine else None
+ 
+# ─────────────────────────────────────────────────────────────────
+# Por qué este cambio es seguro (item 6.2.5, Etapa 6):
+#
+# Por defecto, SQLAlchemy marca todos los atributos de un objeto como
+# "expirados" justo despues de hacer commit() -- la siguiente vez que
+# se lee cualquier atributo, intenta releerlo de la base de datos. Eso
+# es exactamente lo que pasa dentro de get_db_session(): "yield db;
+# db.commit()" -- y despues la sesion se cierra ("db.close()"). Si
+# algo intenta leer un atributo del objeto DESPUES de que la sesion ya
+# se cerro, SQLAlchemy no puede releerlo -> DetachedInstanceError.
+#
+# Hasta hoy esto nunca habia pasado porque todo el codigo existente
+# (aggregation_service.py, dashboard_service.py, etc.) siempre termina
+# su trabajo DENTRO del bloque "with get_db_session() as db:" y
+# devuelve diccionarios simples, nunca objetos de SQLAlchemy, hacia
+# afuera. identity_service.py es la primera pieza que devuelve un
+# objeto (Usuario) para usarse fuera de ese bloque -- por eso el bug
+# aparece justo ahora, no antes.
+#
+# expire_on_commit=False evita que los atributos se marquen como
+# expirados al hacer commit -- siguen teniendo el valor que ya se leyo
+# de la base de datos, aunque la sesion ya este cerrada. No cambia
+# ningun comportamiento de lo que ya existe (nada mas devuelve objetos
+# ORM hacia afuera de la sesion hoy), solo habilita el patron nuevo que
+# necesita identity_service.py.
 
 
 @contextmanager
