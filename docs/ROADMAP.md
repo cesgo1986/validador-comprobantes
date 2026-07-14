@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.29.5 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.29.8 · **Última actualización:** 14/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -355,10 +355,10 @@ Deliberadamente nombrada "Identity Layer" y no "login" — sirve a futuro para P
 | 6.2.1 | Configurar Resend como SMTP en Supabase | ⏸️ En pausa — César comprará dominio propio antes de retomarlo (necesario para 6.2.6, no bloquea el resto) |
 | 6.2.2 | Migración: agregar `supabase_auth_id` a `usuarios` (separado del `id` interno — nunca el identificador de un sistema externo como PK de negocio) | ✅ Desplegado y verificado — columna confirmada en Supabase Table Editor |
 | 6.2.3 | Definir constantes de `estado` válido para `Empresa`/`Usuario` — **las columnas `status` ya existen en ambos modelos**, no se crean de nuevo | ✅ Desplegado — `ESTADOS_USUARIO_VALIDOS` agregado a `models/usuario.py` (`active`, `invited`, `suspended`, `deleted`) |
-| 6.2.4a | Confirmado: llave activa de Supabase = ES256 (ECC P-256), ver `DECISION_LOG.md`. Instalar `PyJWT` + `cryptography` | ⏳ |
-| 6.2.4b | Crear un usuario real en Supabase Auth, hacer login desde el frontend, inspeccionar el JWT real emitido (algoritmo, `iss`, `aud`, `sub`) — **antes** de escribir la dependencia de validación, no al revés. Corrección de orden hecha antes de empezar, ver `DECISION_LOG.md` | ⏳ |
-| 6.2.4c | Escribir la dependencia de FastAPI que valida el JWT contra JWKS, extrae `sub`, busca el usuario local por `supabase_auth_id`, y expone `empresa_id`/`rol` | ⏳ |
-| 6.2.5 | Usuario de prueba manual (botón "Add user" de Supabase) → validar todo el flujo → eliminarlo. No es el flujo oficial, solo una prueba técnica de ~30 minutos | ⏳ |
+| 6.2.4a | Confirmado: llave activa de Supabase = ES256 (ECC P-256), ver `DECISION_LOG.md`. Instalar `PyJWT` + `cryptography` | ✅ Código listo, pendiente de aplicar y desplegar |
+| 6.2.4b | Crear un usuario real en Supabase Auth, hacer login desde el frontend, inspeccionar el JWT real emitido (algoritmo, `iss`, `aud`, `sub`) — **antes** de escribir la dependencia de validación, no al revés. Corrección de orden hecha antes de empezar (ver `DECISION_LOG.md`) | ✅ Hecho — JWT real inspeccionado vía herramienta de prueba independiente (`prueba_login_supabase.html`, no forma parte del proyecto). Confirmado: `alg: ES256`, `iss` y `aud: "authenticated"`, `sub` = UUID de Supabase Auth |
+| 6.2.4c | Escribir la dependencia de FastAPI que valida el JWT contra JWKS, extrae `sub`, busca el usuario local por `supabase_auth_id`, y expone `empresa_id`/`rol` | ✅ Código listo, pendiente de aplicar y desplegar — `services/identity_service.py` (nuevo), primera pieza real del Identity Engine sembrado |
+| 6.2.5 | Usuario de prueba manual (botón "Add user" de Supabase) → validar todo el flujo → eliminarlo. No es el flujo oficial, solo una prueba técnica de ~30 minutos | ✅ Completo — validado de punta a punta con un usuario real (login → JWT ES256 → JWKS → `usuarios` → `empresa_id`/`rol`). 2 bugs reales encontrados y corregidos (ver `DECISION_LOG.md`). El usuario de prueba **no se elimina todavía** — se conserva mientras 6.2.6 (invitaciones) siga en pausa por el dominio, es la única forma de seguir probando |
 | 6.2.6 | Activar "Invite user" nativo de Supabase para invitar a una empresa existente — ya viene con plantilla de correo, no se construye desde cero | ⏳ |
 | 6.2.7 | Migrar endpoints existentes, uno por uno, de `DEFAULT_EMPRESA_ID` a la identidad real | ⏳ |
 | 6.2.8 (último, no antes) | Retirar `DEFAULT_EMPRESA_ID` por completo — solo cuando 6.2.7 esté 100% terminado; lo usan `/analizar` y los 15+ endpoints de `/api/v1/dashboard/*`, quitarlo antes dejaría la app rota a medias | ⏳ |

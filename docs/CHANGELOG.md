@@ -1,8 +1,46 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.29.5 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.29.8 · **Última actualización:** 14/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.29.8] — 2026-07 — ✅ 6.2.5 completo: identidad validada de punta a punta con usuario real
+
+### Desplegado y verificado en producción
+- `GET /whoami` (endpoint temporal) confirmó la cadena completa: login real → JWT firmado ES256 → validación contra JWKS de Supabase → búsqueda en `usuarios` → `empresa_id`/`rol` resueltos. Respuesta real: `{"usuario_id":"...","empresa_id":"00000000-0000-0000-0000-000000000001","email":"cesgo86@gmail.com","rol":"owner","status":"active"}`.
+
+### Limpieza (código temporal retirado)
+- `services/identity_service.py`: logs de diagnóstico temporales retirados, versión final limpia.
+- `main.py`: endpoint `/whoami` retirado — cumplió su propósito de prueba, no es de producción.
+
+### Cerrado
+- `ROADMAP.md`: 6.2.5 pasa a ✅. El usuario de prueba se conserva (no se elimina todavía) mientras 6.2.6 siga en pausa por el dominio — es la única forma de seguir probando el flujo de identidad mientras tanto.
+
+---
+
+## [0.29.7] — 2026-07 — Dos bugs reales encontrados y corregidos en la prueba técnica de 6.2.5
+
+### Corregido
+- `services/database.py`: `SessionLocal` no tenía `expire_on_commit=False` — causaba `DetachedInstanceError` al leer atributos de un objeto ORM (`Usuario`) devuelto fuera de `get_db_session()`. Nunca había aparecido porque todo el código existente regresa diccionarios, no objetos ORM, desde dentro del bloque `with`. Corregido — cambio seguro, no afecta código existente.
+
+### Hallazgo operativo (documentado, no es un bug de nuestro código)
+- El SQL Editor de Supabase no persistía un `INSERT` manual en `usuarios` — visible solo dentro de esa misma pestaña, invisible para cualquier otra conexión, incluso con `COMMIT` explícito. Se descartaron metódicamente 5 hipótesis (BD distinta, branching, réplica, triggers, tabla temporal) antes de resolverlo insertando la misma fila vía Table Editor, que sí persistió correctamente. Causa raíz exacta no confirmada — hallazgo práctico registrado en `DECISION_LOG.md` para no repetir el mismo diagnóstico largo si vuelve a pasar.
+
+---
+
+## [0.29.6] — 2026-07 — Etapa 6, 6.2.4: dependencia de validación de JWT (Identity Engine) — código listo, pendiente de deploy
+
+### Confirmado antes de escribir código (item 6.2.4b)
+- JWT real de Supabase inspeccionado vía herramienta de prueba independiente (no forma parte del proyecto, se descarta después de usarla): `alg: ES256`, `kid` coincide con la llave activa vista en el panel, `iss`/`aud: "authenticated"` confirmados, `sub` = UUID del usuario en Supabase Auth.
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `requirements.txt`: `PyJWT[crypto]==2.10.1`.
+- `services/identity_service.py` (nuevo): primera pieza real del Identity Engine — `obtener_usuario_actual()`, dependencia de FastAPI que valida el JWT contra el JWKS de Supabase (`PyJWKClient`, cachea las llaves públicas), extrae `sub`, busca el usuario local por `supabase_auth_id`, valida que esté `active`, y devuelve el registro completo (`empresa_id`, `rol` incluidos). Requiere la variable de entorno `SUPABASE_URL` en Render.
+
+### Documentado
+- `ARQUITECTURA.md`, `ROADMAP.md`: actualizados.
 
 ---
 
