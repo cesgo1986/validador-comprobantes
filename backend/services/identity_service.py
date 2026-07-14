@@ -1,11 +1,11 @@
 """
 services/identity_service.py — Identity Engine (item 6.2, Etapa 6).
 
-[docstring sin cambios respecto a la version anterior -- ver esa
-version para el detalle completo. Este archivo agrega LOGS TEMPORALES
-de diagnostico (item 6.2.5) porque la conversion a uuid.UUID no
-resolvio el problema esperado -- antes de adivinar una segunda causa,
-se necesita ver exactamente que esta pasando dentro de la consulta.]
+[Version con diagnostico adicional -- la conversion a uuid.UUID no
+resolvio el problema, y el conteo de usuarios sigue en 0 aunque
+Supabase SQL Editor muestre la fila. Se agrega diagnostico para
+comparar EXACTAMENTE que base de datos/esquema/usuario ve el backend,
+contra lo que ve el SQL Editor -- en vez de seguir adivinando.]
 """
 import os
 import uuid
@@ -13,8 +13,9 @@ import logging
 import jwt
 from jwt import PyJWKClient
 from fastapi import Header, HTTPException
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from models.usuario import Usuario
+from models.empresa import Empresa
 from database import get_db_session
 
 logger = logging.getLogger("verificapago")
@@ -56,26 +57,19 @@ def obtener_usuario_actual(authorization: str | None = Header(default=None)) -> 
     except (ValueError, AttributeError):
         raise HTTPException(status_code=401, detail="El token contiene un identificador de usuario inválido.")
 
-    # DEBUG temporal (item 6.2.5) -- se quita en cuanto se resuelva.
-    logger.info("DEBUG identity -- sub del JWT: %r (tipo %s)", sub, type(sub))
-    logger.info("DEBUG identity -- supabase_auth_id convertido: %r (tipo %s)", supabase_auth_id, type(supabase_auth_id))
-
     with get_db_session() as db:
         if db is None:
-            logger.error("DEBUG identity -- get_db_session() devolvió None (sin conexión a la base de datos)")
             raise HTTPException(status_code=503, detail="Base de datos no disponible.")
 
-        # DEBUG temporal: cuántas filas totales hay en usuarios, y
-        # cuáles son sus valores de supabase_auth_id -- para ver si el
-        # backend está leyendo la misma base de datos donde se insertó
-        # la fila manualmente.
-        total_usuarios = db.execute(select(func.count(Usuario.id))).scalar()
-        logger.info("DEBUG identity -- total de filas en usuarios (sin filtrar): %s", total_usuarios)
+        # DEBUG temporal -- diagnostico de conexion real (item 6.2.5).
+        diag = db.execute(text("SELECT current_database(), current_schema(), current_user")).first()
+        logger.info("DEBUG identity -- current_database=%s current_schema=%s current_user=%s", diag[0], diag[1], diag[2])
 
-        todos = db.execute(select(Usuario.id, Usuario.supabase_auth_id, Usuario.email, Usuario.deleted_at)).all()
-        for fila in todos:
-            logger.info("DEBUG identity -- fila existente: id=%s supabase_auth_id=%r email=%s deleted_at=%s",
-                        fila.id, fila.supabase_auth_id, fila.email, fila.deleted_at)
+        total_empresas = db.execute(select(func.count(Empresa.id))).scalar()
+        logger.info("DEBUG identity -- total de filas en empresas (referencia conocida): %s", total_empresas)
+
+        total_usuarios = db.execute(select(func.count(Usuario.id))).scalar()
+        logger.info("DEBUG identity -- total de filas en usuarios: %s", total_usuarios)
 
         usuario = db.execute(
             select(Usuario).where(
