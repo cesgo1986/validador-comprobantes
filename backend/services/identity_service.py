@@ -1,73 +1,32 @@
 """
 services/identity_service.py — Identity Engine (item 6.2, Etapa 6).
 
-Ver DECISION_LOG.md, ADR "Supabase Auth como proveedor de identidad".
-Este archivo es la primera pieza real del Identity Engine sembrado
-junto a Motor SPEI, Motor Documental, Alert Engine y AggregationService
--- responsable de resolver "quién eres" a partir de un JWT, sin emitir
-ni firmar tokens propios en ningún caso.
-
-Flujo: JWT recibido -> se valida su firma contra la llave pública de
-Supabase (JWKS) -> se extrae `sub` (el ID de usuario de Supabase Auth)
--> se busca ese ID en la tabla `usuarios` (perfil de aplicación) ->
-se devuelve el registro con empresa_id/rol ya resueltos.
-
-Confirmado con un JWT real emitido por el proyecto (item 6.2.4b, ver
-ROADMAP.md) antes de escribir este archivo -- no se adivinó el
-algoritmo ni la forma del token:
-  - alg: ES256 (llave asimétrica activa del proyecto)
-  - iss: https://<project-ref>.supabase.co/auth/v1
-  - aud: "authenticated"
-  - sub: UUID del usuario en Supabase Auth (-> usuarios.supabase_auth_id)
-
-FIX (2026-07, encontrado en la prueba de 6.2.5): `payload.get("sub")`
-devuelve un string de Python -- pero `Usuario.supabase_auth_id` es una
-columna UUID. Comparar el string directo contra la columna en la
-consulta no encontraba el usuario aunque el valor fuera idéntico a
-simple vista (mismo patrón de bug que ya se encontró con las fechas en
-aggregation_service.py: tipos distintos sin conversion explicita no
-coinciden en la comparacion). Se corrige convirtiendo `sub` a un objeto
-uuid.UUID real antes de usarlo en la consulta.
+[docstring sin cambios respecto a la version anterior -- ver esa
+version para el detalle completo. Este archivo agrega LOGS TEMPORALES
+de diagnostico (item 6.2.5) porque la conversion a uuid.UUID no
+resolvio el problema esperado -- antes de adivinar una segunda causa,
+se necesita ver exactamente que esta pasando dentro de la consulta.]
 """
 import os
 import uuid
+import logging
 import jwt
 from jwt import PyJWKClient
 from fastapi import Header, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, func
 from models.usuario import Usuario
 from database import get_db_session
 
-# Requiere la variable de entorno SUPABASE_URL configurada en Render
-# (ej. https://ujejypvcvuijcyocuzcw.supabase.co) -- mismo patrón que
-# ALLOWED_ORIGINS y CLAUDE_MODEL, configuracion por variable de
-# entorno, no hardcodeada.
+logger = logging.getLogger("verificapago")
+
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_JWKS_URL = f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
 SUPABASE_ISSUER = f"{SUPABASE_URL}/auth/v1"
 
-# PyJWKClient descarga y cachea las llaves publicas de Supabase --
-# no hace una peticion de red en cada request, solo cuando el cache
-# expira o aparece un `kid` que no reconoce (ej. tras una rotacion de
-# llaves). Se crea una sola vez, a nivel de modulo.
 _jwks_client = PyJWKClient(SUPABASE_JWKS_URL) if SUPABASE_URL else None
 
 
 def obtener_usuario_actual(authorization: str | None = Header(default=None)) -> Usuario:
-    """
-    Dependencia de FastAPI (ver ROADMAP.md item 6.2.4c) -- se usa como
-    `usuario: Usuario = Depends(obtener_usuario_actual)` en cualquier
-    endpoint que requiera autenticación. Reemplaza gradualmente
-    DEFAULT_EMPRESA_ID, endpoint por endpoint (item 6.2.7) -- no se
-    aplica a todos los endpoints de golpe.
-
-    Nota sobre el objeto Usuario devuelto: se lee dentro de una sesión
-    de base de datos que se cierra al terminar esta función. Es seguro
-    usar sus atributos simples (usuario.empresa_id, usuario.rol,
-    usuario.id) despues de que la funcion regresa, pero NO acceder a
-    relaciones no cargadas (usuario.empresa) sin abrir una sesion nueva
-    -- SQLAlchemy no puede hacer lazy-loading de un objeto "detached".
-    """
     if _jwks_client is None:
         raise HTTPException(status_code=503, detail="Autenticación no configurada (falta SUPABASE_URL).")
 
@@ -92,16 +51,31 @@ def obtener_usuario_actual(authorization: str | None = Header(default=None)) -> 
     if not sub:
         raise HTTPException(status_code=401, detail="El token no contiene un identificador de usuario.")
 
-    # FIX: convertir el string del JWT a un uuid.UUID real antes de
-    # comparar contra la columna UUID -- ver nota del FIX arriba.
     try:
         supabase_auth_id = uuid.UUID(sub)
     except (ValueError, AttributeError):
         raise HTTPException(status_code=401, detail="El token contiene un identificador de usuario inválido.")
 
+    # DEBUG temporal (item 6.2.5) -- se quita en cuanto se resuelva.
+    logger.info("DEBUG identity -- sub del JWT: %r (tipo %s)", sub, type(sub))
+    logger.info("DEBUG identity -- supabase_auth_id convertido: %r (tipo %s)", supabase_auth_id, type(supabase_auth_id))
+
     with get_db_session() as db:
         if db is None:
+            logger.error("DEBUG identity -- get_db_session() devolvió None (sin conexión a la base de datos)")
             raise HTTPException(status_code=503, detail="Base de datos no disponible.")
+
+        # DEBUG temporal: cuántas filas totales hay en usuarios, y
+        # cuáles son sus valores de supabase_auth_id -- para ver si el
+        # backend está leyendo la misma base de datos donde se insertó
+        # la fila manualmente.
+        total_usuarios = db.execute(select(func.count(Usuario.id))).scalar()
+        logger.info("DEBUG identity -- total de filas en usuarios (sin filtrar): %s", total_usuarios)
+
+        todos = db.execute(select(Usuario.id, Usuario.supabase_auth_id, Usuario.email, Usuario.deleted_at)).all()
+        for fila in todos:
+            logger.info("DEBUG identity -- fila existente: id=%s supabase_auth_id=%r email=%s deleted_at=%s",
+                        fila.id, fila.supabase_auth_id, fila.email, fila.deleted_at)
 
         usuario = db.execute(
             select(Usuario).where(
