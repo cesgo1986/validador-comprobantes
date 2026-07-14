@@ -1,8 +1,18 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.29.2 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.29.3 · **Última actualización:** 07/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.29.3] — 2026-07 — Migración supabase_auth_id desplegada y verificada
+
+### Desplegado y verificado en producción
+- Columna `supabase_auth_id` confirmada en `usuarios` vía Supabase Table Editor. El log de Render no mostró el detalle esperado de Alembic, pero se confirmó directo en la fuente en vez de asumir por el log.
+
+### Cerrado
+- `ROADMAP.md`: 6.2.2 y 6.2.3 pasan a ✅.
 
 ---
 
