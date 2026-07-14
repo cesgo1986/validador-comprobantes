@@ -89,6 +89,7 @@ backend/
 │   ├── cache_service.py         ← Cache genérico en memoria (get/set/delete + TTL), reutilizable por cualquier servicio
 │   ├── metrics_service.py       ← Métricas genéricas en memoria por namespace de servicio, reutilizable por cualquier servicio
 │   ├── alerta_service.py        ← Persistencia de alertas (crear/listar/cambiar estado) — sin las reglas de detección, ver alert_engine/
+│   ├── identity_service.py      ← Identity Engine (Etapa 6, ítem 6.2) — dependencia de FastAPI que valida el JWT de Supabase, resuelve empresa_id/rol. Nunca emite ni firma tokens, solo valida los de Supabase
 │   └── aggregation_service.py   ← Única pieza autorizada a construir queries agregadas (Etapa 4, ítem 4.1); dashboard_service.py la consume, no la reemplaza
 ├── alert_engine/                ← (planeado, ítem 3.3 — Etapa 3, aún no creado) reglas de detección, cada una un archivo independiente
 └── alembic/
