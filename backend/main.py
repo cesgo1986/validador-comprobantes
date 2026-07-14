@@ -9,6 +9,8 @@ import re
 import os
 import time
 import httpx
+from services.identity_service import obtener_usuario_actual
+from fastapi import Depends
 from fastapi import FastAPI, UploadFile, File, Form, APIRouter, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -1177,6 +1179,22 @@ async def analizar(
 
     metrics_service.registrar_exito("analizar", duracion_ms=(time.time() - t_inicio_analizar) * 1000)
     return result
+
+@app.get("/whoami")
+def whoami(usuario = Depends(obtener_usuario_actual)):
+    """
+    Endpoint TEMPORAL -- item 6.2.5 (Etapa 6). Solo para confirmar que
+    la dependencia de identidad funciona de punta a punta (JWT válido
+    -> usuario resuelto -> empresa_id/rol expuestos). Se elimina
+    después de confirmar que funciona, no es un endpoint de producción.
+    """
+    return {
+        "usuario_id": str(usuario.id),
+        "empresa_id": str(usuario.empresa_id),
+        "email": usuario.email,
+        "rol": usuario.rol,
+        "status": usuario.status,
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
