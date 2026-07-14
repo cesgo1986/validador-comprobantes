@@ -19,8 +19,18 @@ algoritmo ni la forma del token:
   - iss: https://<project-ref>.supabase.co/auth/v1
   - aud: "authenticated"
   - sub: UUID del usuario en Supabase Auth (-> usuarios.supabase_auth_id)
+
+FIX (2026-07, encontrado en la prueba de 6.2.5): `payload.get("sub")`
+devuelve un string de Python -- pero `Usuario.supabase_auth_id` es una
+columna UUID. Comparar el string directo contra la columna en la
+consulta no encontraba el usuario aunque el valor fuera idéntico a
+simple vista (mismo patrón de bug que ya se encontró con las fechas en
+aggregation_service.py: tipos distintos sin conversion explicita no
+coinciden en la comparacion). Se corrige convirtiendo `sub` a un objeto
+uuid.UUID real antes de usarlo en la consulta.
 """
 import os
+import uuid
 import jwt
 from jwt import PyJWKClient
 from fastapi import Header, HTTPException
@@ -78,9 +88,16 @@ def obtener_usuario_actual(authorization: str | None = Header(default=None)) -> 
     except jwt.PyJWTError as e:
         raise HTTPException(status_code=401, detail=f"Token inválido o expirado: {e}")
 
-    supabase_auth_id = payload.get("sub")
-    if not supabase_auth_id:
+    sub = payload.get("sub")
+    if not sub:
         raise HTTPException(status_code=401, detail="El token no contiene un identificador de usuario.")
+
+    # FIX: convertir el string del JWT a un uuid.UUID real antes de
+    # comparar contra la columna UUID -- ver nota del FIX arriba.
+    try:
+        supabase_auth_id = uuid.UUID(sub)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=401, detail="El token contiene un identificador de usuario inválido.")
 
     with get_db_session() as db:
         if db is None:
