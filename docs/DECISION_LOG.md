@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.29.0 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.29.5 · **Última actualización:** 14/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -287,6 +287,12 @@ Nunca `Dashboard → SELECT ... → Base de datos` directo.
 - `models/usuario.py` requiere una migración de Alembic agregando `supabase_auth_id`.
 - `sucursales` (jerarquía Empresa → Sucursales → Usuarios → Roles → Permisos) se siembra como consideración para Etapa 7 ("Organización Empresarial") — no se agrega columna ni tabla ahora, sería construir antes de tener la necesidad real.
 - Pendiente antes de escribir más código: confirmar si Supabase Auth ya está activado en el proyecto, o si hay que habilitarlo desde cero.
+
+---
+
+**Actualización (2026-07, misma sesión) — corrección de orden antes de escribir la dependencia de validación:** no se construye la dependencia de FastAPI a partir de cómo "debería verse" un JWT de Supabase — primero se activa Auth, se crea un usuario real, se hace login desde el frontend, y se inspecciona el JWT real emitido (algoritmo, `iss`, `aud`, `sub`). Confirmado con captura de pantalla: la llave activa del proyecto es **ES256 (ECC P-256)**, con una llave HS256 anterior todavía vigente solo para tokens ya emitidos sin expirar (rotada hace 2 meses). Mismo principio que ya se ha aplicado en toda la sesión: verificar contra lo real antes de diseñar sobre lo asumido.
+
+**Confirmado (2026-07, misma sesión):** `DATABASE_URL` usa la cadena de conexión estándar de Supabase (`postgresql://postgres:...`), es decir, el rol `postgres` — que tiene `BYPASSRLS` por defecto. Activar RLS hoy **no cambiaría nada** en el comportamiento real del backend; la aislación entre empresas sigue dependiendo enteramente del filtro `empresa_id` aplicado a mano en cada consulta. Para que RLS aporte algo real, se necesitaría crear un rol de base de datos limitado (sin `BYPASSRLS`) y migrar la conexión del backend a ese rol — es trabajo adicional real, no una casilla que se marca en el panel de Supabase. Se siembra como mejora futura de defensa en profundidad, no se compromete como entregable de Etapa 6 mientras el filtro por `empresa_id` en cada query siga siendo la única capa real de aislación.
 
 ---
 

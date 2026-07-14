@@ -1,8 +1,23 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.29.3 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.29.5 · **Última actualización:** 14/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.29.5] — 2026-07 — Confirmado: RLS no aportaría nada hoy (rol postgres tiene BYPASSRLS)
+
+### Confirmado (verificación, no código)
+- `DATABASE_URL` usa la cadena estándar de Supabase (rol `postgres`, `BYPASSRLS`). RLS se siembra como mejora futura de defensa en profundidad, no se compromete como entregable de Etapa 6 mientras el filtro por `empresa_id` en cada query siga siendo la única capa real de aislación.
+
+---
+
+## [0.29.4] — 2026-07 — Corrección de orden en 6.2: ver un JWT real antes de escribir la dependencia; RLS pendiente de verificar
+
+### Documentado (sin código todavía)
+- `DECISION_LOG.md`, `ROADMAP.md`: se corrige el orden de 6.2.4 — no se escribe la dependencia de validación de JWT hasta activar Auth, crear un usuario real, hacer login desde el frontend, e inspeccionar el JWT real emitido. Confirmado con captura de pantalla: llave activa = ES256 (ECC P-256).
+- Hallazgo importante sobre RLS: activar Row Level Security en Supabase podría no proteger nada si el backend se conecta con el rol `postgres` por defecto (tiene `BYPASSRLS`) — pendiente de verificar el rol de conexión real antes de comprometer RLS como entregable de Etapa 6.
 
 ---
 
