@@ -9,6 +9,8 @@ import re
 import os
 import time
 import httpx
+from fastapi import Depends
+from services.identity_service import obtener_contexto_empresa, ContextoEmpresa
 from fastapi import FastAPI, UploadFile, File, Form, APIRouter, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -1192,20 +1194,27 @@ async def analizar(
 # enviar el empresa_id correcto -- sin que estos endpoints cambien de forma.
 
 dashboard_router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
-
-
+ 
+# Item 6.2.7a (Etapa 6): todos los endpoints de este router usan
+# Depends(obtener_contexto_empresa) en vez de recibir empresa_id como
+# query param. TODO(6.2.8): cuando el login del frontend este
+# funcionando y DEFAULT_EMPRESA_ID se retire, cambiar cada
+# "Depends(obtener_contexto_empresa)" por "Depends(obtener_usuario_actual)"
+# -- ver DECISION_LOG.md y services/identity_service.py.
+ 
+ 
 @dashboard_router.get("/stats")
 def dashboard_stats(
-    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    contexto: ContextoEmpresa = Depends(obtener_contexto_empresa),
     fecha_desde: str | None = Query(default=None),
     fecha_hasta: str | None = Query(default=None),
 ):
-    return dashboard_service.obtener_stats(empresa_id=empresa_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta)
-
-
+    return dashboard_service.obtener_stats(empresa_id=contexto.empresa_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta)
+ 
+ 
 @dashboard_router.get("/analisis")
 def dashboard_listar_analisis(
-    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    contexto: ContextoEmpresa = Depends(obtener_contexto_empresa),
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0),
     riesgo: str | None = Query(default=None),
@@ -1217,25 +1226,26 @@ def dashboard_listar_analisis(
     q: str | None = Query(default=None, description="Búsqueda unificada: banco, clave de rastreo, referencia, CLABE o monto"),
 ):
     return dashboard_service.listar_analisis(
-        empresa_id=empresa_id, limit=limit, offset=offset, riesgo=riesgo,
+        empresa_id=contexto.empresa_id, limit=limit, offset=offset, riesgo=riesgo,
         estado_operacion=estado_operacion, hash_sha256=hash_sha256,
         banco=banco, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta, q=q,
     )
-
-
+ 
+ 
 @dashboard_router.get("/analisis/{analisis_id}")
 def dashboard_detalle_analisis(
     analisis_id: str,
-    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    contexto: ContextoEmpresa = Depends(obtener_contexto_empresa),
 ):
-    detalle = dashboard_service.obtener_analisis_detalle(analisis_id=analisis_id, empresa_id=empresa_id)
+    detalle = dashboard_service.obtener_analisis_detalle(analisis_id=analisis_id, empresa_id=contexto.empresa_id)
     if detalle is None:
         raise HTTPException(status_code=404, detail="Analisis no encontrado")
     return detalle
-
+ 
+ 
 @dashboard_router.get("/analisis/exportar")
 def dashboard_exportar_analisis(
-    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    contexto: ContextoEmpresa = Depends(obtener_contexto_empresa),
     riesgo: str | None = Query(default=None),
     estado_operacion: str | None = Query(default=None),
     hash_sha256: str | None = Query(default=None),
@@ -1257,7 +1267,7 @@ def dashboard_exportar_analisis(
     la app.
     """
     items = dashboard_service.exportar_analisis(
-        empresa_id=empresa_id, riesgo=riesgo, estado_operacion=estado_operacion,
+        empresa_id=contexto.empresa_id, riesgo=riesgo, estado_operacion=estado_operacion,
         hash_sha256=hash_sha256, banco=banco, fecha_desde=fecha_desde,
         fecha_hasta=fecha_hasta, q=q,
     )
@@ -1295,48 +1305,45 @@ def dashboard_exportar_analisis(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=historial_verificapago_{fecha_archivo}.csv"},
     )
-
+ 
+ 
 @dashboard_router.get("/hashes")
 def dashboard_top_hashes(
-    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    contexto: ContextoEmpresa = Depends(obtener_contexto_empresa),
     min_veces: int = Query(default=2),
     limit: int = Query(default=20, le=100),
 ):
-    return dashboard_service.top_hashes_reutilizados(empresa_id=empresa_id, min_veces=min_veces, limit=limit)
-
-
+    return dashboard_service.top_hashes_reutilizados(empresa_id=contexto.empresa_id, min_veces=min_veces, limit=limit)
+ 
+ 
 @dashboard_router.get("/tendencia")
 def dashboard_tendencia(
-    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    contexto: ContextoEmpresa = Depends(obtener_contexto_empresa),
     dias: int = Query(default=30, le=365),
 ):
-    return dashboard_service.tendencia_diaria(empresa_id=empresa_id, dias=dias)
-
-
+    return dashboard_service.tendencia_diaria(empresa_id=contexto.empresa_id, dias=dias)
+ 
+ 
 @dashboard_router.get("/metricas/xml")
 def dashboard_metricas_xml():
     """
     Métricas de la descarga automática del XML del CEP (item 1.6,
-    Observabilidad, parcial): consultas, éxitos/fallos, cache hits/miss,
-    reintentos, timeouts, duración. En memoria del proceso, no
-    distribuidas ni persistentes -- ver metrics_service.py. Ruta anidada
-    bajo /metricas/ a propósito: /metricas/ocr, /metricas/claude,
-    /metricas/usuarios, etc. seguirán la misma estructura a futuro.
+    Observabilidad, parcial). No lleva empresa_id -- metrics_service es
+    en memoria del proceso, no separado por empresa (ver ROADMAP.md,
+    6.5 Scale Layer, para cuando esto se distribuya).
     """
     return metrics_service.obtener_metricas("xml")
-
-
+ 
+ 
 @dashboard_router.get("/metricas/cep")
 def dashboard_metricas_cep():
     """
     Métricas del scraping HTML del CEP (item 1.6) -- distinto de
-    /metricas/xml, que mide la descarga del XML oficial. Este mide
-    verify_cep(): tasa de éxito, eventos (cep_existe, cep_parcial,
-    cep_no_existe, cep_timeout, cep_error), duración.
+    /metricas/xml, que mide la descarga del XML oficial.
     """
     return metrics_service.obtener_metricas("cep")
-
-
+ 
+ 
 @dashboard_router.get("/metricas/analizar")
 def dashboard_metricas_analizar():
     """
@@ -1345,11 +1352,11 @@ def dashboard_metricas_analizar():
     de éxito, casos de documento no reconocido.
     """
     return metrics_service.obtener_metricas("analizar")
-
-
+ 
+ 
 @dashboard_router.get("/metricas/scores-por-banco")
 def dashboard_scores_por_banco(
-    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    contexto: ContextoEmpresa = Depends(obtener_contexto_empresa),
     dias: int = Query(default=30, le=365),
     min_analisis: int = Query(default=1),
 ):
@@ -1361,13 +1368,13 @@ def dashboard_scores_por_banco(
     desde el último reinicio del servidor.
     """
     return dashboard_service.distribucion_scores_por_banco(
-        empresa_id=empresa_id, dias=dias, min_analisis=min_analisis
+        empresa_id=contexto.empresa_id, dias=dias, min_analisis=min_analisis
     )
-
-
+ 
+ 
 @dashboard_router.get("/alertas")
 def dashboard_listar_alertas(
-    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    contexto: ContextoEmpresa = Depends(obtener_contexto_empresa),
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0),
     estado: str | None = Query(default=None),
@@ -1380,16 +1387,16 @@ def dashboard_listar_alertas(
     opcionales, paginación con limit/offset.
     """
     return alerta_service.listar_alertas(
-        empresa_id=empresa_id, limit=limit, offset=offset,
+        empresa_id=contexto.empresa_id, limit=limit, offset=offset,
         estado=estado, severidad=severidad, tipo_alerta=tipo_alerta,
     )
-
-
+ 
+ 
 @dashboard_router.patch("/alertas/{alerta_id}/estado")
 def dashboard_cambiar_estado_alerta(
     alerta_id: str,
     nuevo_estado: str = Query(...),
-    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    contexto: ContextoEmpresa = Depends(obtener_contexto_empresa),
 ):
     """
     Item 3.4: marca una alerta como REVISADA o DESCARTADA (o cualquier
@@ -1397,80 +1404,84 @@ def dashboard_cambiar_estado_alerta(
     alerta_service.cambiar_estado_alerta()).
     """
     actualizado = alerta_service.cambiar_estado_alerta(
-        alerta_id=alerta_id, nuevo_estado=nuevo_estado, empresa_id=empresa_id
+        alerta_id=alerta_id, nuevo_estado=nuevo_estado, empresa_id=contexto.empresa_id
     )
     if not actualizado:
         raise HTTPException(status_code=404, detail="Alerta no encontrada")
     return {"ok": True, "id": alerta_id, "estado": nuevo_estado}
-
+ 
+ 
 @dashboard_router.get("/alertas/conteo")
-def dashboard_conteo_alertas(empresa_id: str = Query(default=DEFAULT_EMPRESA_ID)):
+def dashboard_conteo_alertas(contexto: ContextoEmpresa = Depends(obtener_contexto_empresa)):
     """
-    Item 3.5: conteo de alertas para el badge inteligente de BottomNav.
+    Item 3.5: conteo de alertas para el badge inteligente de NavigationShell.
     Separa el total de alertas NUEVA del subconjunto "notificable" (Motor
     de Prioridad, ver DECISION_LOG.md) -- el badge usa `notificables`.
     """
-    return alerta_service.contar_alertas(empresa_id=empresa_id)
-
+    return alerta_service.contar_alertas(empresa_id=contexto.empresa_id)
+ 
+ 
 @dashboard_router.get("/monto-total")
 def dashboard_monto_total(
-    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    contexto: ContextoEmpresa = Depends(obtener_contexto_empresa),
     fecha_desde: str | None = Query(default=None),
     fecha_hasta: str | None = Query(default=None),
 ):
     """Item 4.1: monto total procesado en el periodo (KPI de volumen)."""
     return dashboard_service.obtener_monto_total_procesado(
-        empresa_id=empresa_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta
+        empresa_id=contexto.empresa_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta
     )
  
  
 @dashboard_router.get("/bancos-frecuentes")
 def dashboard_bancos_frecuentes(
-    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    contexto: ContextoEmpresa = Depends(obtener_contexto_empresa),
     fecha_desde: str | None = Query(default=None),
     fecha_hasta: str | None = Query(default=None),
     limit: int = Query(default=5, le=20),
 ):
     """Item 4.1: top bancos por volumen de análisis (distinto de /metricas/scores-por-banco, que es por score)."""
     return dashboard_service.obtener_banco_mas_frecuente(
-        empresa_id=empresa_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta, limit=limit
+        empresa_id=contexto.empresa_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta, limit=limit
     )
  
  
 @dashboard_router.get("/riesgo-por-periodo")
 def dashboard_riesgo_por_periodo(
-    empresa_id: str = Query(default=DEFAULT_EMPRESA_ID),
+    contexto: ContextoEmpresa = Depends(obtener_contexto_empresa),
     fecha_desde: str | None = Query(default=None),
     fecha_hasta: str | None = Query(default=None),
 ):
     """Item 4.1: distribución por riesgo documental (Motor 2) y por estado_operacion (Motor 1) en el periodo."""
     return dashboard_service.obtener_riesgo_por_periodo(
-        empresa_id=empresa_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta
+        empresa_id=contexto.empresa_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta
     )
  
  
 @dashboard_router.get("/alertas-agregadas")
-def dashboard_alertas_agregadas(empresa_id: str = Query(default=DEFAULT_EMPRESA_ID)):
+def dashboard_alertas_agregadas(contexto: ContextoEmpresa = Depends(obtener_contexto_empresa)):
     """Item 4.1: conteo de alertas NUEVA por severidad y tipo."""
-    return dashboard_service.obtener_alertas_agregadas(empresa_id=empresa_id)
+    return dashboard_service.obtener_alertas_agregadas(empresa_id=contexto.empresa_id)
  
  
 @dashboard_router.get("/resumen-ejecutivo")
-def dashboard_resumen_ejecutivo(empresa_id: str = Query(default=DEFAULT_EMPRESA_ID)):
+def dashboard_resumen_ejecutivo(contexto: ContextoEmpresa = Depends(obtener_contexto_empresa)):
     """
     Item 4.2 (Mobile Executive Summary): bundle de datos para la
     tarjeta resumen dentro de Perfil/Empresa -- una sola llamada.
     """
-    return dashboard_service.obtener_resumen_ejecutivo(empresa_id=empresa_id)
-
+    return dashboard_service.obtener_resumen_ejecutivo(empresa_id=contexto.empresa_id)
+ 
+ 
 @dashboard_router.get("/centro-operativo")
-def dashboard_centro_operativo():
+def dashboard_centro_operativo(contexto: ContextoEmpresa = Depends(obtener_contexto_empresa)):
     """
     Item 5.5 (Etapa 5): bundle completo para el Centro Operativo
     (Desktop). Ver DESIGN_SYSTEM.md sección 10 para la estructura
     visual que consume esta respuesta.
     """
-    return dashboard_service.obtener_centro_operativo()
+    return dashboard_service.obtener_centro_operativo(empresa_id=contexto.empresa_id)
+
 
 app.include_router(dashboard_router)
 
