@@ -1,8 +1,23 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.29.8 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.29.9 · **Última actualización:** 14/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.29.9] — 2026-07 — Etapa 6, 6.2.7a: migración transparente — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `services/identity_service.py`: nueva dependencia transicional `obtener_contexto_empresa()` (con TODO(6.2.8) explícito en el código), separada de `obtener_usuario_actual()` (definitiva, sin cambios). Sin `Authorization` → `DEFAULT_EMPRESA_ID`; con `Authorization` inválido → 401, nunca cae al default en silencio.
+- `main.py`: los 19 endpoints de `/api/v1/dashboard/*` migrados a `Depends(obtener_contexto_empresa)`. **`empresa_id` retirado por completo de los parámetros de query** — hallazgo de seguridad real (vulnerabilidad IDOR potencial), verificado antes de aplicar que ningún código del frontend lo usaba.
+
+### Documentado
+- `DECISION_LOG.md`: ADR completo con la fecha de caducidad explícita del fallback — 6.2.8 no puede considerarse completo mientras `obtener_contexto_empresa()` siga existiendo en el proyecto.
+- `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+### Pendiente (mismo ítem 6.2.7)
+- `/analizar` sigue usando `DEFAULT_EMPRESA_ID` directo — es estructuralmente distinto (no recibe `empresa_id` por query), se migra en un paso aparte.
 
 ---
 

@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.29.5 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.29.9 · **Última actualización:** 14/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -268,6 +268,33 @@ Nunca `Dashboard → SELECT ... → Base de datos` directo.
 - Toda funcionalidad de Etapa 4 (Dashboard Empresa) en adelante debe justificar, antes de escribir código, en qué motor existente se apoya — no puede calcular su propia versión de "estado", "integridad" o "alerta".
 - La integración de Alertas al Modelo de Decisión Explicable (hallazgo #2) queda como decisión pendiente explícita — se revisará cuando Dashboard Empresa o Alertas evolucionen lo suficiente para necesitarla, no se fuerza ahora.
 - A partir de esta versión, actualizar el encabezado "Versión del documento" de cada archivo de `/docs` que se modifique es parte del flujo de trabajo, no un paso opcional.
+
+**Actualización (2026-07, misma sesión) — 2 bugs reales encontrados durante la prueba técnica de 6.2.5, ambos corregidos y validados:**
+
+**1. Hallazgo operativo (no de código): el SQL Editor de Supabase no persistía el `INSERT` manual.** Se insertó la fila de prueba en `usuarios` varias veces vía SQL Editor — visible dentro de esa misma pestaña, pero invisible para cualquier otra conexión (una pestaña nueva del propio SQL Editor, y el backend), incluso con `COMMIT` explícito. Se descartaron metódicamente: base de datos distinta, branching, réplica de lectura, triggers, y tabla temporal — todos confirmados como "no es eso". La solución fue insertar la misma fila vía **Table Editor** (interfaz visual) en vez de SQL Editor — ahí sí persistió correctamente para todas las conexiones. Causa raíz exacta no confirmada (posible particularidad de esa sesión del SQL Editor), pero el hallazgo práctico es claro: si una escritura manual en Supabase no parece persistir, probar por un camino distinto (Table Editor) antes de asumir un problema de arquitectura.
+
+**2. Bug real de código: `DetachedInstanceError` en `/whoami`.** `services/database.py`, `SessionLocal` no tenía `expire_on_commit=False` — por defecto, SQLAlchemy expira los atributos de un objeto justo después de `commit()`, y el patrón de `get_db_session()` (`yield db; db.commit()`, después `db.close()`) hace que cualquier atributo leído *después* de salir del bloque `with` intente releerse de una sesión ya cerrada. Nunca había aparecido porque todo el código existente hasta ahora regresa diccionarios simples desde dentro del bloque `with`, nunca objetos de SQLAlchemy hacia afuera — `identity_service.py` es la primera pieza que lo hace. Corregido agregando `expire_on_commit=False` a `SessionLocal` — cambio seguro, no afecta ningún código existente.
+
+---
+
+## 2026-07 — 🏛️ ADR: dos dependencias de identidad separadas (transicional vs. definitiva); `empresa_id` retirado de los parámetros
+
+**Decisión:** `services/identity_service.py` expone **dos funciones separadas**, no una sola con un parámetro "modo transición":
+
+- `obtener_usuario_actual()` — **definitiva**, sin fallback. JWT válido → usuario. Cualquier otro caso → 401.
+- `obtener_contexto_empresa()` — **transicional**, con fecha de caducidad explícita (ver abajo). Sin `Authorization` → `DEFAULT_EMPRESA_ID` (comportamiento de hoy, sin cambios). Con `Authorization` → debe ser válido, nunca cae al default en silencio si el token es inválido.
+
+**Motivo de la separación:** una sola dependencia con lógica de fallback mezclada es fácil de olvidar — "quitar el fallback después" tiende a quedarse meses sin hacerse. Con dos funciones nombradas de forma distinta, migrar de transicional a definitiva es un cambio de una palabra por endpoint (`Depends(obtener_contexto_empresa)` → `Depends(obtener_usuario_actual)`), no una reescritura de lógica.
+
+**`empresa_id` retirado de todos los parámetros de query/body en `/api/v1/dashboard/*`** (item 6.2.7a) — hallazgo de seguridad real: antes, cualquiera podía mandar `?empresa_id=otro-uuid` sin ninguna validación (no explotable hoy porque solo existe una empresa, pero es exactamente el tipo de vulnerabilidad IDOR — Insecure Direct Object Reference — que aparece en cuanto exista una segunda empresa). Verificado antes de aplicar: ningún código del frontend manda ese parámetro hoy, así que quitarlo no rompe nada existente. Ahora `empresa_id` se obtiene **únicamente** de `contexto.empresa_id`, nunca de un parámetro que el llamante controle.
+
+**Fecha de caducidad explícita del fallback (no un comentario vago tipo "quitar después"):**
+```
+TODO(6.2.8): eliminar DEFAULT_EMPRESA_ID y obtener_contexto_empresa()
+por completo. Ningún endpoint debe funcionar sin autenticación antes
+del lanzamiento público.
+```
+Este TODO vive literalmente en el código (`services/identity_service.py`), y la condición de caducidad queda registrada aquí también: **6.2.8 no puede considerarse completo mientras `obtener_contexto_empresa()` siga existiendo en el proyecto.**
 
 ---
 

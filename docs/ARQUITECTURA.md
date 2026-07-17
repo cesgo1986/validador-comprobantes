@@ -1,6 +1,6 @@
 # ARQUITECTURA.md — Arquitectura técnica de VerificaPago
 
-**Versión del documento:** 0.24.2 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.29.9 · **Última actualización:** 14/07/2026
 
 ## Visión general
 
@@ -40,19 +40,23 @@ app/
 │   ├── detalle/page.tsx         ← Pantalla 4: validaciones colapsables
 │   └── comprobante/page.tsx     ← Pantalla 5/6: vista comprobante + OCR
 ├── historial/
-│   ├── page.tsx                 ← Lista con filtros y divulgación progresiva (Etapa 2, ítem 2.1 ✅)
-│   └── [id]/page.tsx            ← Detalle de análisis histórico (Etapa 2, ítem 2.3 ✅) — hidrata AnalisisContext, usa components/resultado/
+│   ├── page.tsx                 ← Lista con filtros y divulgación progresiva (Etapa 2, ítem 2.1 ✅); maestro-detalle en Desktop+ (Etapa 5, ítem 5.4)
+│   └── [id]/page.tsx            ← Ruta de detalle para Mobile/Tablet (Etapa 2, ítem 2.3 ✅) — hidrata AnalisisContext, ahora solo orquesta el fetch, el JSX vive en components/historial/HistorialDetalleContenido.tsx
 ├── components/
-│   ├── resultado/                ← Compartido entre /resultado y /historial/[id] (refactor previo a Etapa 4, ver DECISION_LOG.md)
+│   ├── resultado/                ← Compartido entre /resultado y /historial (refactor previo a Etapa 4, ver DECISION_LOG.md)
 │   │   ├── SemaforoSpei.tsx       ← Nivel 1: semáforo SPEI
 │   │   ├── QueSignificaEsto.tsx   ← Nivel 1: Interpretación + Impacto + Recomendación
-│   │   └── DetalleExpandible.tsx  ← Nivel 2+: integridad, evidencias, dimensiones, diagnóstico
+│   │   └── DetalleExpandible.tsx  ← Nivel 2+: integridad, evidencias, dimensiones, diagnóstico. Prop `siempreAbierto` (Etapa 5, ítem 5.3) para Desktop, sin toggle
+│   ├── historial/
+│   │   └── HistorialDetalleContenido.tsx ← Etapa 5, ítem 5.4 (nuevo): cuerpo visual del detalle histórico, compartido entre `/historial/[id]` (Mobile/Tablet) y la columna derecha del maestro-detalle de `/historial` (Desktop+)
+│   ├── perfil/
+│   │   └── CentroOperativo.tsx   ← Etapa 5, ítem 5.5 (nuevo): estructura calcada de DESIGN_SYSTEM.md sección 10, consume GET /centro-operativo, visible solo en Desktop+ vía .vp-desktop-only
 │   └── NavigationShell.tsx       ← Renombrado de BottomNav.tsx (2026-07, ver DECISION_LOG.md). Navegación responsive: barra fija abajo (Mobile/Tablet) o sidebar a la izquierda (Desktop+, ≥1200px) — ver .vp-nav en globals.css, y DESIGN_SYSTEM.md sección 7. Badge de Alertas conectado a /alertas/conteo (Etapa 3, ítem 3.5)
 ├── lib/
 │   ├── estadoSpei.ts            ← Espejo de SEMAFORO_SPEI (backend), única fuente de verdad de color/etiqueta/icono fuera de /resultado
 │   └── colores.ts               ← Paleta compartida (TEAL/GREEN/ORANGE/RED/GRAY), antes duplicada por archivo
 ├── alertas/page.tsx             ← Lista con divulgación progresiva (Etapa 3, ítem 3.4)
-├── perfil/page.tsx              ← "Perfil / Empresa": Resumen ejecutivo (Etapa 4, ítem 4.2) + placeholder de gestión de cuenta (Sprint E)
+├── perfil/page.tsx              ← "Perfil / Empresa": Resumen ejecutivo compacto (Etapa 4, ítem 4.2, Mobile/Tablet) + Centro Operativo completo (Etapa 5, ítem 5.5, Desktop+) + placeholder de gestión de cuenta (Sprint E)
 ├── context/AnalisisContext.tsx  ← Estado compartido entre pantallas
 ├── globals.css                  ← YA EXISTÍA desde el scaffold de create-next-app (trae `@import "tailwindcss"` — Tailwind está instalado pero deliberadamente no adoptado, ver DECISION_LOG.md). Design System incremental: `--vp-container-width` (contenedor responsive), `--vp-sidebar-width`, y las clases `.vp-nav`/`.vp-nav-item`/`.vp-nav-label`/`.vp-nav-plus-wrapper`/`.vp-content-area`/`.vp-page-padding` (Etapa 5, ítem 5.3 — conversión de BottomNav a sidebar)
 └── layout.tsx                   ← AnalisisProvider + BottomNav
@@ -89,7 +93,7 @@ backend/
 │   ├── cache_service.py         ← Cache genérico en memoria (get/set/delete + TTL), reutilizable por cualquier servicio
 │   ├── metrics_service.py       ← Métricas genéricas en memoria por namespace de servicio, reutilizable por cualquier servicio
 │   ├── alerta_service.py        ← Persistencia de alertas (crear/listar/cambiar estado) — sin las reglas de detección, ver alert_engine/
-│   ├── identity_service.py      ← Identity Engine (Etapa 6, ítem 6.2) — dependencia de FastAPI que valida el JWT de Supabase, resuelve empresa_id/rol. Nunca emite ni firma tokens, solo valida los de Supabase
+│   ├── identity_service.py      ← Identity Engine (Etapa 6, ítem 6.2) — 2 dependencias: `obtener_contexto_empresa()` (transicional, con fecha de caducidad, ver DECISION_LOG.md) y `obtener_usuario_actual()` (definitiva, sin fallback). Nunca emite ni firma tokens, solo valida los de Supabase
 │   └── aggregation_service.py   ← Única pieza autorizada a construir queries agregadas (Etapa 4, ítem 4.1); dashboard_service.py la consume, no la reemplaza
 ├── alert_engine/                ← (planeado, ítem 3.3 — Etapa 3, aún no creado) reglas de detección, cada una un archivo independiente
 └── alembic/

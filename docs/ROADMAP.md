@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.29.8 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.29.9 · **Última actualización:** 14/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -360,8 +360,9 @@ Deliberadamente nombrada "Identity Layer" y no "login" — sirve a futuro para P
 | 6.2.4c | Escribir la dependencia de FastAPI que valida el JWT contra JWKS, extrae `sub`, busca el usuario local por `supabase_auth_id`, y expone `empresa_id`/`rol` | ✅ Código listo, pendiente de aplicar y desplegar — `services/identity_service.py` (nuevo), primera pieza real del Identity Engine sembrado |
 | 6.2.5 | Usuario de prueba manual (botón "Add user" de Supabase) → validar todo el flujo → eliminarlo. No es el flujo oficial, solo una prueba técnica de ~30 minutos | ✅ Completo — validado de punta a punta con un usuario real (login → JWT ES256 → JWKS → `usuarios` → `empresa_id`/`rol`). 2 bugs reales encontrados y corregidos (ver `DECISION_LOG.md`). El usuario de prueba **no se elimina todavía** — se conserva mientras 6.2.6 (invitaciones) siga en pausa por el dominio, es la única forma de seguir probando |
 | 6.2.6 | Activar "Invite user" nativo de Supabase para invitar a una empresa existente — ya viene con plantilla de correo, no se construye desde cero | ⏳ |
-| 6.2.7 | Migrar endpoints existentes, uno por uno, de `DEFAULT_EMPRESA_ID` a la identidad real | ⏳ |
-| 6.2.8 (último, no antes) | Retirar `DEFAULT_EMPRESA_ID` por completo — solo cuando 6.2.7 esté 100% terminado; lo usan `/analizar` y los 15+ endpoints de `/api/v1/dashboard/*`, quitarlo antes dejaría la app rota a medias | ⏳ |
+| 6.2.7 | Migrar endpoints existentes, uno por uno, de `DEFAULT_EMPRESA_ID` a la identidad real | 🟡 En curso — ver 6.2.7a |
+| 6.2.7a | **Migración transparente** (código listo, 2026-07, pendiente de aplicar y desplegar): 2 dependencias separadas en `services/identity_service.py` — `obtener_contexto_empresa()` (transicional, con fecha de caducidad explícita, ver `DECISION_LOG.md`) y `obtener_usuario_actual()` (definitiva, sin fallback, ya existía). Los 19 endpoints de `/api/v1/dashboard/*` migrados a `Depends(obtener_contexto_empresa)`, con `empresa_id` **retirado por completo** de sus parámetros de query (hallazgo de seguridad: era una vulnerabilidad IDOR potencial, no explotable hoy con una sola empresa pero sí en cuanto exista una segunda). `/analizar` queda pendiente como paso aparte — es estructuralmente distinto, no recibe `empresa_id` por query | ✅ Código listo, pendiente de aplicar y desplegar |
+| 6.2.8 (último, no antes) | Retirar `DEFAULT_EMPRESA_ID` **y** `obtener_contexto_empresa()` por completo — solo cuando el login del frontend esté funcionando y 6.2.7 (incluyendo `/analizar`) esté 100% terminado. Ningún endpoint debe funcionar sin autenticación antes del lanzamiento público | ⏳ |
 | RLS (sembrado, no comprometido) | Row Level Security en Supabase — **confirmado (2026-07): `DATABASE_URL` usa el rol `postgres` (`BYPASSRLS`)**. Activar RLS hoy no cambiaría nada real — la aislación sigue dependiendo del filtro `empresa_id` en cada query. Requeriría crear un rol limitado y migrar la conexión del backend para aportar algo. Sembrado como mejora futura de defensa en profundidad, no comprometido como entregable de Etapa 6 | 🔵 sembrado |
 
 **Correcciones hechas antes de empezar (propuestas descartadas o reubicadas, no por desacuerdo de estilo sino por inconsistencia real con lo que ya existe):**
