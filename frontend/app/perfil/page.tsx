@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CentroOperativo, CentroOperativoData } from "../components/perfil/CentroOperativo";
+import { useAuth } from "../context/AuthContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const GREEN = "#43A047";
@@ -21,7 +23,12 @@ const RED = "#E53935";
 // campo `resumen_compacto` trae exactamente lo que Mobile necesita.
 // CSS (.vp-mobile-only / .vp-desktop-only en globals.css) decide qué
 // presentación se muestra -- sin detección de viewport en JS.
+//
+// Item 6.2.7b (Etapa 6): agrega estado de sesión (login/logout) en el
+// bloque que antes era solo un placeholder de gestión de cuenta.
 export default function Perfil() {
+  const { session, logout } = useAuth();
+  const router = useRouter();
   const [datos, setDatos] = useState<CentroOperativoData | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,11 +88,37 @@ export default function Perfil() {
           )}
         </div>
 
-        <div style={{ background: "#fff", borderRadius: 16, padding: "40px 20px", textAlign: "center" }}>
-          <div style={{ fontSize: 32, marginBottom: 10 }}>👤</div>
-          <p style={{ color: "#64748B", fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-            Aquí podrás gestionar tus datos, preferencias, seguridad y suscripción.
-          </p>
+        <div style={{ background: "#fff", borderRadius: 16, padding: "24px 20px", textAlign: "center" }}>
+          {session ? (
+            <>
+              <div style={{ fontSize: 32, marginBottom: 10 }}>👤</div>
+              <p style={{ color: "#1E293B", fontSize: 13, fontWeight: 600, margin: "0 0 4px" }}>
+                {session.user.email}
+              </p>
+              <p style={{ color: "#94A3B8", fontSize: 12, lineHeight: 1.6, margin: "0 0 16px" }}>
+                Sesión iniciada
+              </p>
+              <button
+                onClick={async () => { await logout(); router.push("/login"); }}
+                style={{ padding: "10px 20px", borderRadius: 10, background: "#F1F5F9", border: "none", color: "#334155", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                Cerrar sesión
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 32, marginBottom: 10 }}>👤</div>
+              <p style={{ color: "#64748B", fontSize: 13, lineHeight: 1.6, margin: "0 0 16px" }}>
+                Aquí podrás gestionar tus datos, preferencias, seguridad y suscripción.
+              </p>
+              <button
+                onClick={() => router.push("/login")}
+                style={{ padding: "10px 20px", borderRadius: 10, background: "#00BFA5", border: "none", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                Iniciar sesión
+              </button>
+            </>
+          )}
         </div>
       </div>
 
