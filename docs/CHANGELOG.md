@@ -1,6 +1,6 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.30.3 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.31.1 · **Última actualización:** 14/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
 
@@ -25,6 +25,42 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ### Documentado
 - `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+---
+
+## [0.31.1] — 2026-07 — Ajuste: pantalla de inicio pública, sesión exigida solo al analizar
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `app/components/RequireAuth.tsx`: `/` agregada a rutas públicas — cualquiera puede ver la pantalla de inicio y el área de carga, sin sesión.
+- `app/page.tsx`: la función `irAAnalizar()` (disparada por el botón "Analizar comprobante") verifica sesión al principio — sin sesión, redirige a `/login` en vez de proceder. Seleccionar el archivo y llenar banco/CLABE sigue funcionando igual para cualquiera; el bloqueo real está en el momento de analizar, no antes.
+
+### Motivo (decisión de César)
+- Modelo tipo "freemium" de exposición: dejar ver el producto, exigir sesión en el momento de valor real. Coincide con que el backend ya exige JWT en `/analizar` desde 6.2.8 — este cambio solo hace que el frontend reaccione visiblemente (redirigir) en vez de que la petición simplemente falle.
+
+---
+
+## [0.31.0] — 2026-07 — ✅ 6.2 completo: fallback retirado, JWT obligatorio, RequireAuth en el frontend
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `services/identity_service.py`: `obtener_contexto_empresa()` y `ContextoEmpresa` eliminados por completo — solo queda `obtener_usuario_actual()`, sin fallback.
+- `main.py`: los 19 endpoints de `/api/v1/dashboard/*` + `/analizar` migrados a `Depends(obtener_usuario_actual)`.
+- `app/components/RequireAuth.tsx` (nuevo): redirige a `/login` si no hay sesión, en vez de dejar que cada pantalla intente cargar y falle con errores sueltos.
+- `app/layout.tsx`: envuelto en `RequireAuth`.
+
+### Aclaración importante
+- `DEFAULT_EMPRESA_ID` **no se elimina del proyecto** — sigue siendo el identificador real de la única empresa existente. Lo que se elimina es la puerta trasera (peticiones sin JWT recibiendo datos de todas formas). Dos cosas distintas, no confundir.
+
+### Checklist de verificación acordado (a correr después de desplegar)
+1. Login/refresh/logout funcionan.
+2. Las 6 pantallas cargan bien autenticado.
+3. Sin sesión, cualquier ruta protegida redirige a `/login` (probar en incógnito) — sin mostrar datos.
+4. `DEFAULT_EMPRESA_ID` ya no aparece en ninguna dependencia de autenticación.
+
+### Documentado
+- `DECISION_LOG.md`: ADR cerrado — condición de caducidad cumplida. Reordenamiento de prioridades registrado (recuperación de contraseña antes que registro/invitaciones). Nota de posicionamiento: el proyecto pasa de "la app" a "la plataforma VerificaPago".
+- `ROADMAP.md`: 6.2.8 pasa a ✅ — **con esto, Etapa 6.2 (Identity Layer) queda completa**, salvo 6.2.1/6.2.6 (Resend, invitaciones), pausados esperando el dominio.
+
+Sube a versión MINOR porque cierra la Identity Layer completa — decisión de arquitectura permanente, no un ajuste incremental.
 
 ---
 
