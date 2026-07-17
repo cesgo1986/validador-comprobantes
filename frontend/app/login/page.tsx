@@ -39,13 +39,13 @@ export default function Login() {
         <div>
           <label style={{ fontSize: 12, color: "#64748B" }}>Correo</label>
           <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
-            style={{ width: "100%", padding: 12, marginTop: 4, borderRadius: 10, border: "1.5px solid #E2E8F0", fontSize: 14, boxSizing: "border-box" }} />
+            style={{ width: "100%", padding: 12, marginTop: 4, borderRadius: 10, border: "1.5px solid #E2E8F0", background: "#F8FAFC", color: "#1E293B", fontSize: 14, boxSizing: "border-box" }} />
         </div>
 
         <div>
           <label style={{ fontSize: 12, color: "#64748B" }}>Contraseña</label>
           <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
-            style={{ width: "100%", padding: 12, marginTop: 4, borderRadius: 10, border: "1.5px solid #E2E8F0", fontSize: 14, boxSizing: "border-box" }} />
+            style={{ width: "100%", padding: 12, marginTop: 4, borderRadius: 10, border: "1.5px solid #E2E8F0", background: "#F8FAFC", color: "#1E293B", fontSize: 14, boxSizing: "border-box" }} />
         </div>
 
         {error && <div style={{ color: RED, fontSize: 12 }}>{error}</div>}

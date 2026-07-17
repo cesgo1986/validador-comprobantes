@@ -96,6 +96,13 @@ function formatearMonto(monto: number | null): string {
 // hidratación de Next.js: el HTML inicial es idéntico en servidor y
 // cliente, solo el comportamiento del clic (que no afecta el render)
 // cambia según el ancho real de la ventana en ese momento.
+//
+// FIX (2026-07): los 4 inputs de esta pantalla (búsqueda, fecha desde,
+// fecha hasta, hash exacto) no tenían "color" explícito -- heredaban
+// el color de texto del body, que en modo oscuro del sistema operativo
+// queda casi blanco (ver globals.css, "prefers-color-scheme: dark").
+// Sobre el fondo blanco de estos campos, el texto quedaba casi
+// invisible. Se agrega "color: '#1E293B'" explícito a los 4.
 export default function Historial() {
   const router = useRouter();
   const { setResult } = useAnalisis();
@@ -242,7 +249,7 @@ export default function Historial() {
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
               placeholder="🔎 Banco, clave de rastreo, cuenta o monto..."
-              style={{ flex: 1, padding: "12px 14px", borderRadius: 12, border: "1.5px solid #E2E8F0", background: "#fff", fontSize: 13 }}
+              style={{ flex: 1, padding: "12px 14px", borderRadius: 12, border: "1.5px solid #E2E8F0", background: "#fff", color: "#1E293B", fontSize: 13 }}
             />
             <button onClick={() => setFiltrosAbiertos(o => !o)}
               style={{
@@ -279,18 +286,18 @@ export default function Historial() {
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Desde</label>
                   <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)}
-                    style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #E2E8F0", fontSize: 13 }} />
+                    style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #E2E8F0", background: "#fff", color: "#1E293B", fontSize: 13 }} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Hasta</label>
                   <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)}
-                    style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #E2E8F0", fontSize: 13 }} />
+                    style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #E2E8F0", background: "#fff", color: "#1E293B", fontSize: 13 }} />
                 </div>
               </div>
               <div>
                 <label style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Hash exacto (avanzado)</label>
                 <input value={hashBusqueda} onChange={e => setHashBusqueda(e.target.value)} placeholder="Búsqueda exacta"
-                  style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #E2E8F0", fontSize: 13 }} />
+                  style={{ width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #E2E8F0", background: "#fff", color: "#1E293B", fontSize: 13 }} />
               </div>
               {hayFiltrosAvanzadosActivos && (
                 <button onClick={limpiarFiltrosAvanzados}
