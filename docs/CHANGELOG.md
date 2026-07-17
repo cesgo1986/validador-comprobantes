@@ -1,6 +1,6 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.31.1 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.31.2 · **Última actualización:** 14/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
 
@@ -25,6 +25,17 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ### Documentado
 - `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+---
+
+## [0.31.2] — 2026-07 — ✅ Ajuste desplegado y verificado: pantalla de inicio pública, sesión exigida solo al analizar
+
+### Desplegado y verificado en producción
+- `RequireAuth.tsx` con `/` pública, `app/page.tsx` con la verificación de sesión en `irAAnalizar()` — confirmado que la pantalla de inicio se ve idéntica sin sesión, y que el botón "Analizar comprobante" redirige a `/login` correctamente.
+
+### Incidente real durante este cambio, y su causa
+- Un primer intento de aplicar este ajuste sobre `app/page.tsx` **rompió el diseño en producción** — la reconstrucción del archivo completo (hecha sin haber leído su contenido real línea por línea) no coincidió con la implementación real (vista previa descentrada, fondo distinto, campos de banco/CLABE ausentes). Se corrigió restaurando la copia de respaldo de César y aplicando los 3 cambios necesarios como ediciones quirúrgicas manuales sobre el archivo real, verificadas con `git diff` línea por línea antes de comitear.
+- **Lección de proceso, registrada para no repetirla:** cuando se pide un archivo completo para "reconstruirlo corregido", el resultado solo es confiable si se trabaja sobre el contenido real compartido, no sobre una reconstrucción aproximada basada en capturas de pantalla o en la memoria de la conversación — por más familiar que parezca la estructura. Ante la duda, es más seguro pedir ediciones puntuales verificables por `git diff`, como se hizo al final, que ofrecer un archivo completo regenerado.
 
 ---
 

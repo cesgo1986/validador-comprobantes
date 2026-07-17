@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.30.3 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.31.2 · **Última actualización:** 14/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -363,7 +363,7 @@ Deliberadamente nombrada "Identity Layer" y no "login" — sirve a futuro para P
 | 6.2.7 | Migrar endpoints existentes, uno por uno, de `DEFAULT_EMPRESA_ID` a la identidad real | ✅ Completo — 6.2.7a (19 endpoints de `/api/v1/dashboard/*`) más `/analizar` (código listo, pendiente de aplicar y desplegar), todos usando `Depends(obtener_contexto_empresa)` |
 | 6.2.7a | **Migración transparente** — 2 dependencias separadas en `services/identity_service.py` — `obtener_contexto_empresa()` (transicional, con fecha de caducidad explícita, ver `DECISION_LOG.md`) y `obtener_usuario_actual()` (definitiva, sin fallback, ya existía). Los 19 endpoints de `/api/v1/dashboard/*` migrados, con `empresa_id` **retirado por completo** de sus parámetros de query (hallazgo de seguridad: era una vulnerabilidad IDOR potencial, no explotable hoy con una sola empresa pero sí en cuanto exista una segunda) | ✅ Desplegado y verificado — app funcionando normal en producción |
 | 6.2.7b | **Login del frontend ✅** (2026-07) — prerequisito real de 6.2.8, no puede saltarse. `app/lib/supabaseClient.ts`, `app/context/AuthContext.tsx`, `app/lib/apiFetch.ts` (nuevos), `app/login/page.tsx` (nuevo), `app/layout.tsx` envuelto en `AuthProvider`, `app/perfil/page.tsx` con estado de sesión (login/logout). Alcance deliberado: solo login (correo/contraseña) — sin registro público (es por invitación, 6.2.6, pausado), sin recuperación de contraseña funcional todavía (depende de Resend, también pausado). **Migración de `fetch()` a `apiFetch()` completa** en los 6 lugares: `historial/page.tsx`, `historial/[id]/page.tsx`, `perfil/page.tsx`, `alertas/page.tsx`, `NavigationShell.tsx` (badge), `analizando/page.tsx` (`/analizar`). **Excepción conocida, no resuelta:** `exportarCSV()` en `historial/page.tsx` usa `window.open()`, no `fetch()` — no se le puede agregar un header `Authorization` ahí. Pendiente real para 6.2.8: reescribir la exportación para descargar vía `fetch` + blob, o que el backend acepte el token de otra forma para esa ruta específica. Bugs reales encontrados y corregidos en el camino: texto de color invisible en modo oscuro del sistema (login, historial — ver `DECISION_LOG.md`)|
-| 6.2.8 (último, no antes) | Retirar `DEFAULT_EMPRESA_ID` **y** `obtener_contexto_empresa()` por completo — solo cuando el login del frontend esté funcionando y 6.2.7 (incluyendo `/analizar`) esté 100% terminado. Ningún endpoint debe funcionar sin autenticación antes del lanzamiento público | ⏳ |
+| 6.2.8 ✅ (2026-07, cierre de 6.2) | **Fallback retirado por completo.** `obtener_contexto_empresa()` y `ContextoEmpresa` eliminados de `services/identity_service.py` — no quedan ni comentados. Los 19 endpoints de `/api/v1/dashboard/*` + `/analizar` migrados a `Depends(obtener_usuario_actual)`, sin excepción. **Matiz importante:** `DEFAULT_EMPRESA_ID` **no se elimina del proyecto** — sigue siendo el identificador real de la única empresa en la tabla `empresas`. Lo que desaparece es la puerta trasera: ninguna petición sin JWT válido recibe datos, sin importar el motivo. Protección agregada también en el **frontend**: `app/components/RequireAuth.tsx` redirige a `/login` si no hay sesión, en vez de dejar que cada pantalla intente cargar y falle con errores sueltos — envuelto en `app/layout.tsx`. **Ajuste posterior, verificado (2026-07):** `/` se agregó a las rutas públicas de `RequireAuth` — cualquiera puede ver la pantalla de inicio y elegir un archivo sin sesión; el bloqueo real está en el botón "Analizar comprobante" (`irAAnalizar()` en `app/page.tsx`), que redirige a `/login` si no hay sesión. Modelo tipo "freemium" de exposición, decisión de César. Checklist completo verificado en producción: login/refresh/logout, las 6 pantallas autenticado, redirect a `/login` sin sesión en rutas protegidas, pantalla de inicio pública funcionando idéntica a como era antes. |
 | RLS (sembrado, no comprometido) | Row Level Security en Supabase — **confirmado (2026-07): `DATABASE_URL` usa el rol `postgres` (`BYPASSRLS`)**. Activar RLS hoy no cambiaría nada real — la aislación sigue dependiendo del filtro `empresa_id` en cada query. Requeriría crear un rol limitado y migrar la conexión del backend para aportar algo. Sembrado como mejora futura de defensa en profundidad, no comprometido como entregable de Etapa 6 | 🔵 sembrado |
 
 **Correcciones hechas antes de empezar (propuestas descartadas o reubicadas, no por desacuerdo de estilo sino por inconsistencia real con lo que ya existe):**
@@ -375,6 +375,18 @@ Deliberadamente nombrada "Identity Layer" y no "login" — sirve a futuro para P
 **Identity Engine** (sembrado, ver `DECISION_LOG.md`): quinto motor transversal del sistema, junto a Motor SPEI, Motor Documental, Alert Engine y `AggregationService`. Se diseña conforme avanza esta secuencia, no de golpe al principio.
 
 **Principio adoptado a partir de este punto:** ninguna funcionalidad nueva se desarrolla usando `DEFAULT_EMPRESA_ID` — toda operación nueva se construye ya bajo un usuario autenticado, asociada explícitamente a una empresa real.
+
+**Prioridad inmediata después de 6.2.8, reordenada (2026-07, decisión de César):**
+
+```
+6.2.8 (cerrado)
+    ↓
+Recuperación de contraseña   ← primero, no después
+    ↓
+Registro / Invitaciones      ← después, y solo por invitación (B2B), no registro público abierto
+```
+
+**Motivo del reordenamiento:** con el fallback retirado, hoy existe un solo usuario real. Si ese usuario olvida su contraseña, no hay forma de recuperar acceso — ese riesgo debe cerrarse antes que cualquier otra prioridad, no después. Depende de 6.2.1 (Resend), que sigue pausado esperando el dominio — es la razón real por la que este paso, aunque sea prioritario, no se ha construido todavía. Registro público abierto sigue sin planearse — VerificaPago es B2B, el flujo esperado es que una empresa cree la cuenta y luego invite a sus usuarios, no al revés (ver `PRODUCT_VISION.md`).
 
 ### 6.3 — Access Control Layer
 
