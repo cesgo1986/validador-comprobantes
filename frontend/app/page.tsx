@@ -1,109 +1,134 @@
 "use client";
-import { useCallback, useRef, useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAnalisis } from "./context/AnalisisContext";
+import { useAuth } from "./context/AuthContext";
 
 const TEAL = "#00BFA5";
 
+// Item 6.2.8 (Etapa 6, ajuste posterior): la pantalla de inicio es
+// pública (ver RequireAuth.tsx) -- cualquiera puede ver el área de
+// carga, elegir un archivo, y llenar banco/CLABE sin sesión. El
+// bloqueo real está en irAAnalizar(): si no hay sesión, redirige a
+// /login en vez de proceder -- no antes. El backend ya exige JWT en
+// /analizar desde 6.2.8; este cambio solo hace que el frontend
+// reaccione visiblemente en vez de que la petición falle sin más.
 export default function Home() {
   const router = useRouter();
   const { file, setFile, preview, setPreview, bankHint, setBankHint, clabeInput, setClabeInput } = useAnalisis();
+  const { session } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = useCallback((f: File) => {
-    const ok = ["image/png", "image/jpeg", "image/jpg", "application/pdf"];
-    if (!ok.includes(f.type)) { setError("Formato no soportado."); return; }
-    setError(null);
+  const manejarArchivo = (f: File) => {
     setFile(f);
-    if (f.type !== "application/pdf") setPreview(URL.createObjectURL(f));
-    else setPreview(null);
-  }, [setFile, setPreview]);
+    setPreview(URL.createObjectURL(f));
+    setError(null);
+  };
 
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault(); setDragging(false);
-    const f = e.dataTransfer.files[0]; if (f) handleFile(f);
-  }, [handleFile]);
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const f = e.dataTransfer.files?.[0];
+    if (f) manejarArchivo(f);
+  };
+
+  const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) manejarArchivo(f);
+  };
 
   const irAAnalizar = () => {
-    if (!file) return;
+    if (!session) {
+      router.push("/login");
+      return;
+    }
+    if (!file) {
+      setError("Selecciona un comprobante antes de continuar.");
+      return;
+    }
     router.push("/analizando");
   };
 
   return (
-    <div style={{ padding: "0 0 24px" }}>
-      <div style={{ padding: "24px 20px 20px", textAlign: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 6 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 9, background: `${TEAL}25`, border: `2px solid ${TEAL}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🛡️</div>
-          <span style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.5px", color: "#fff" }}>Verifica<span style={{ color: TEAL }}>Pago</span></span>
+    <div style={{ padding: "16px" }}>
+      <div style={{ textAlign: "center", padding: "20px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <span style={{ fontSize: 20 }}>🛡️</span>
+          <span style={{ color: "#fff", fontWeight: 800, fontSize: 22 }}>
+            Verifica<span style={{ color: TEAL }}>Pago</span>
+          </span>
         </div>
-        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Detecta fraudes. Evita pérdidas. Toma decisiones seguras.</div>
+        <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, marginTop: 6 }}>
+          Detecta fraudes. Evita pérdidas. Toma decisiones seguras.
+        </p>
       </div>
 
-      <div style={{ padding: "0 16px" }}>
-        <div style={{ background: "rgba(255,255,255,0.07)", borderRadius: 16, padding: "14px 16px", marginBottom: 16, fontSize: 13, color: "rgba(255,255,255,0.6)", border: `1px solid ${TEAL}30` }}>
-          ℹ️ Sube el comprobante desde la app de tu banco, correo o captura. Los números ocultos (****1234) son normales.
-        </div>
+      <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 14, padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+        <span>ℹ️</span>
+        <span style={{ color: "rgba(255,255,255,0.85)", fontSize: 13 }}>
+          Sube el comprobante desde la app de tu banco, correo o captura. Los números ocultos (****1234) son normales.
+        </span>
+      </div>
 
-        <div onDrop={onDrop} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}
-          onClick={() => inputRef.current?.click()}
-          style={{ border: `2px dashed ${dragging ? TEAL : "rgba(255,255,255,0.2)"}`, borderRadius: 20, padding: "2.5rem 1.5rem", textAlign: "center", cursor: "pointer", background: dragging ? `${TEAL}15` : "rgba(255,255,255,0.05)", transition: "all 0.2s" }}>
-          <div style={{ fontSize: 44, marginBottom: 12 }}>📤</div>
-          <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: "#fff" }}>{file ? file.name : "Arrastra o toca para cargar"}</p>
-          <p style={{ margin: "6px 0 0", fontSize: 13, color: "rgba(255,255,255,0.4)" }}>PNG, JPG o PDF</p>
-          <input ref={inputRef} type="file" accept=".png,.jpg,.jpeg,.pdf" style={{ display: "none" }} onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
-        </div>
-
-        {preview && (
-          <div style={{ marginTop: 12, borderRadius: 14, overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)", maxHeight: 180, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.3)" }}>
-            <img src={preview} alt="Vista previa" style={{ maxWidth: "100%", maxHeight: 180, objectFit: "contain" }} />
-          </div>
-        )}
-
-        {file && (
+      <div
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={onDrop}
+        onClick={() => inputRef.current?.click()}
+        style={{
+          border: "2px dashed rgba(255,255,255,0.25)", borderRadius: 16, padding: "40px 20px",
+          textAlign: "center", cursor: "pointer", marginBottom: 16,
+        }}
+      >
+        <input ref={inputRef} type="file" accept="image/*,.pdf" onChange={onSelectFile} style={{ display: "none" }} />
+        <div style={{ fontSize: 40, marginBottom: 12 }}>📤</div>
+        {file ? (
+          <p style={{ color: "#fff", fontWeight: 700, fontSize: 14, margin: 0 }}>{file.name}</p>
+        ) : (
           <>
-            <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-              <div>
-                <label style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", display: "block", marginBottom: 6 }}>🏦 Banco emisor <span style={{ color: "rgba(255,255,255,0.3)" }}>(opcional)</span></label>
-                <input value={bankHint} onChange={e => setBankHint(e.target.value)} placeholder="Ej: Banco Azteca, BBVA, Santander..."
-                  style={{ width: "100%", padding: "12px 14px", fontSize: 14, borderRadius: 12, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.08)", color: "#fff", boxSizing: "border-box" }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", display: "block", marginBottom: 6 }}>
-                  🔢 CLABE, número de cuenta o tarjeta <span style={{ color: "rgba(255,255,255,0.3)" }}>(opcional)</span>
-                </label>
-                <input value={clabeInput} onChange={e => setClabeInput(e.target.value.replace(/\D/g, ""))}
-                  placeholder="CLABE, número de cuenta o tarjeta"
-                  maxLength={18}
-                  style={{ width: "100%", padding: "12px 14px", fontSize: 14, borderRadius: 12, border: `1px solid ${
-                    clabeInput.length === 0 ? "rgba(255,255,255,0.15)"
-                    : clabeInput.length === 16 || clabeInput.length === 18 ? "rgba(0,191,165,0.5)"
-                    : "rgba(255,255,255,0.2)"
-                  }`, background: "rgba(255,255,255,0.08)", color: "#fff", boxSizing: "border-box", fontFamily: "monospace", letterSpacing: "0.05em" }} />
-                {clabeInput.length > 0 && (
-                  <div style={{ fontSize: 12, marginTop: 4, color:
-                    clabeInput.length === 18 ? TEAL
-                    : clabeInput.length === 16 ? TEAL
-                    : "rgba(255,255,255,0.4)"
-                  }}>
-                    {clabeInput.length === 18 ? "✓ CLABE (18 dígitos)"
-                      : clabeInput.length === 16 ? "✓ Tarjeta (16 dígitos)"
-                      : `${clabeInput.length} dígitos`}
-                  </div>
-                )}
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 6, lineHeight: 1.5 }}>
-                  ⓘ Este dato permite realizar una validación más completa cuando esté disponible. Corrobora la operación mediante la información oficial del CEP de Banxico.
-                </div>
-              </div>
-            </div>
-            <button onClick={irAAnalizar} style={{ marginTop: 14, width: "100%", padding: 15, fontSize: 15, fontWeight: 700, borderRadius: 14, cursor: "pointer", background: TEAL, color: "#fff", border: "none" }}>
-              🔍 Analizar comprobante
-            </button>
+            <p style={{ color: "#fff", fontWeight: 700, fontSize: 15, margin: 0 }}>Arrastra o toca para cargar</p>
+            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginTop: 6 }}>PNG, JPG o PDF</p>
           </>
         )}
-        {error && <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(229,57,53,0.15)", color: "#FF6B6B", borderRadius: 12, fontSize: 14, border: "1px solid rgba(229,57,53,0.3)" }}>⚠️ {error}</div>}
       </div>
+
+      {preview && (
+        <div style={{ background: "#0D1117", borderRadius: 14, padding: 16, marginBottom: 16, textAlign: "center" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={preview} alt="Vista previa" style={{ maxWidth: "100%", maxHeight: 240, borderRadius: 8 }} />
+        </div>
+      )}
+
+      {file && (
+        <>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>🏦 Banco emisor (opcional)</label>
+            <input
+              value={bankHint}
+              onChange={(e) => setBankHint(e.target.value)}
+              placeholder="Ej: Banco Azteca, BBVA, Santander..."
+              style={{ width: "100%", marginTop: 6, padding: 12, borderRadius: 10, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 14, boxSizing: "border-box" }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>🔢 CLABE, número de cuenta o tarjeta (opcional)</label>
+            <input
+              value={clabeInput}
+              onChange={(e) => setClabeInput(e.target.value)}
+              placeholder="CLABE, número de cuenta o tarjeta"
+              style={{ width: "100%", marginTop: 6, padding: 12, borderRadius: 10, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 14, boxSizing: "border-box", fontFamily: "monospace" }}
+            />
+          </div>
+          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, marginBottom: 14 }}>
+            ℹ️ Este dato permite realizar una validación más completa cuando esté disponible. Corrobora la operación mediante la información oficial del CEP de Banxico.
+          </p>
+
+          <button onClick={irAAnalizar} style={{ marginTop: 14, width: "100%", padding: 15, fontSize: 15, fontWeight: 700, borderRadius: 14, cursor: "pointer", background: TEAL, color: "#fff", border: "none" }}>
+            🔍 Analizar comprobante
+          </button>
+        </>
+      )}
+      {error && <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(229,57,53,0.15)", color: "#FF6B6B", borderRadius: 12, fontSize: 14, border: "1px solid rgba(229,57,53,0.3)" }}>⚠️ {error}</div>}
     </div>
   );
 }
