@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import { apiFetch } from "../lib/apiFetch";
 
 const TEAL = "#00BFA5";
 const GREEN = "#43A047";
@@ -104,6 +105,9 @@ function descripcionAlerta(alerta: AlertaItem): string {
   }
 }
 
+// Item 6.2.7b (Etapa 6): las 2 llamadas de esta pantalla (listar
+// alertas, cambiar estado) migradas a apiFetch() -- agrega el JWT si
+// hay sesión, sin cambiar nada si no la hay.
 export default function Alertas() {
   const [items, setItems] = useState<AlertaItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -133,7 +137,7 @@ export default function Alertas() {
     setCargando(true);
     setError(null);
     try {
-      const resp = await fetch(`${API_URL}/api/v1/dashboard/alertas?${construirQuery(offsetActual)}`);
+      const resp = await apiFetch(`${API_URL}/api/v1/dashboard/alertas?${construirQuery(offsetActual)}`);
       if (!resp.ok) throw new Error();
       const data = await resp.json();
       setItems(prev => reemplazar ? data.items : [...prev, ...data.items]);
@@ -158,13 +162,11 @@ export default function Alertas() {
   const cambiarEstado = async (alertaId: string, nuevoEstado: string) => {
     setActualizandoId(alertaId);
     try {
-      const resp = await fetch(
+      const resp = await apiFetch(
         `${API_URL}/api/v1/dashboard/alertas/${alertaId}/estado?nuevo_estado=${nuevoEstado}`,
         { method: "PATCH" }
       );
       if (!resp.ok) throw new Error();
-      // Actualización optimista: quita la alerta de la vista si ya no
-      // coincide con el filtro de estado actual (ej. deja de ser NUEVA).
       setItems(prev => prev.filter(a => a.id !== alertaId));
       setTotal(t => Math.max(0, t - 1));
     } catch {
@@ -189,7 +191,6 @@ export default function Alertas() {
         </button>
       </div>
 
-      {/* Nivel 2: filtros avanzados, bajo demanda */}
       {filtrosAbiertos && (
         <div style={{ background: "#fff", borderRadius: 14, padding: 16, marginBottom: 14, display: "flex", flexDirection: "column", gap: 12 }}>
           <div>

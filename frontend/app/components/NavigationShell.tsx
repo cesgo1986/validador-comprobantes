@@ -1,6 +1,7 @@
 "use client";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { apiFetch } from "../lib/apiFetch";
 
 const TEAL = "#00BFA5";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -40,22 +41,15 @@ const ICONS = {
  * presentaciones según el viewport -- el resto de la app nunca sabe
  * cuál está renderizando, solo usa <NavigationShell />.
  *
- * Estado real hoy: la bifurcación es puramente CSS (.vp-nav/.vp-nav-item
- * en globals.css) -- los 5 destinos son idénticos en CONTENIDO entre
- * Mobile/Tablet (barra abajo) y Desktop/Wide Desktop (sidebar
- * izquierda), solo cambia posición/orientación. No existen
- * MobileNavigation/DesktopNavigation como subcomponentes separados
- * todavía -- se introducirían el día que el contenido (no solo la
- * posición) diverja entre presentaciones. Forzar esa separación hoy
- * duplicaría el mismo .map() sin ninguna ganancia real. Ver
- * DESIGN_SYSTEM.md, sección 7.
- *
  * El posicionamiento (barra abajo vs. sidebar) vive en las clases
  * .vp-nav, .vp-nav-item, .vp-nav-label, .vp-nav-plus-wrapper de
  * globals.css -- no puede quedarse inline aquí, porque un estilo
  * inline siempre gana sobre una regla de @media. Lo que sí sigue
  * inline es lo que no cambia con el breakpoint: colores, iconos, el
  * badge.
+ *
+ * Item 6.2.7b (Etapa 6): la llamada del badge de alertas migrada a
+ * apiFetch() -- agrega el JWT si hay sesión, sin cambiar nada si no la hay.
  */
 export default function NavigationShell() {
   const pathname = usePathname();
@@ -71,7 +65,7 @@ export default function NavigationShell() {
 
     async function cargarConteo() {
       try {
-        const resp = await fetch(`${API_URL}/api/v1/dashboard/alertas/conteo`);
+        const resp = await apiFetch(`${API_URL}/api/v1/dashboard/alertas/conteo`);
         if (!resp.ok) return;
         const data = await resp.json();
         if (activo) setAlertasBadge(data.notificables ?? 0);

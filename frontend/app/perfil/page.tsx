@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CentroOperativo, CentroOperativoData } from "../components/perfil/CentroOperativo";
 import { useAuth } from "../context/AuthContext";
+import { apiFetch } from "../lib/apiFetch";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const GREEN = "#43A047";
@@ -15,17 +16,11 @@ const RED = "#E53935";
 // Item 5.5 (Etapa 5): en Desktop+, el resumen compacto de Mobile/Tablet
 // se acompaña del Centro Operativo completo.
 //
-// FIX (2026-07, revisión de arquitectura): antes esta pantalla hacía 2
-// llamadas -- /resumen-ejecutivo para Mobile, /centro-operativo para
-// Desktop -- duplicando tráfico y creando 2 fuentes de verdad para el
-// mismo dominio de datos (mismo error que la arquitectura ya evita con
-// los motores). Ahora es una sola llamada a /centro-operativo; su
-// campo `resumen_compacto` trae exactamente lo que Mobile necesita.
-// CSS (.vp-mobile-only / .vp-desktop-only en globals.css) decide qué
-// presentación se muestra -- sin detección de viewport en JS.
+// FIX (2026-07, revisión de arquitectura): una sola llamada a
+// /centro-operativo en vez de 2 endpoints distintos -- ver DECISION_LOG.md.
 //
-// Item 6.2.7b (Etapa 6): agrega estado de sesión (login/logout) en el
-// bloque que antes era solo un placeholder de gestión de cuenta.
+// Item 6.2.7b (Etapa 6): agrega estado de sesión (login/logout), y la
+// llamada fetch() migrada a apiFetch() -- agrega el JWT si hay sesión.
 export default function Perfil() {
   const { session, logout } = useAuth();
   const router = useRouter();
@@ -36,7 +31,7 @@ export default function Perfil() {
   useEffect(() => {
     async function cargar() {
       try {
-        const resp = await fetch(`${API_URL}/api/v1/dashboard/centro-operativo`);
+        const resp = await apiFetch(`${API_URL}/api/v1/dashboard/centro-operativo`);
         if (!resp.ok) throw new Error();
         setDatos(await resp.json());
       } catch {
@@ -50,9 +45,6 @@ export default function Perfil() {
 
   return (
     <div style={{ padding: "16px" }}>
-      {/* Mobile/Tablet: resumen compacto (mismo contenido de 4.2, ahora
-          alimentado por datos.resumen_compacto en vez de su propia
-          llamada) */}
       <div className="vp-mobile-only">
         <div style={{ padding: "8px 4px 20px" }}>
           <span style={{ color: "#fff", fontWeight: 700, fontSize: 18 }}>Perfil</span>
@@ -122,7 +114,6 @@ export default function Perfil() {
         </div>
       </div>
 
-      {/* Desktop+: Centro Operativo completo (item 5.5) -- mismo `datos` */}
       <div className="vp-desktop-only">
         {cargando && <div style={{ padding: 40, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>Cargando Centro Operativo...</div>}
         {error && (

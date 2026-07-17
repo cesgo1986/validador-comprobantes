@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getSemaforoSpei } from "../lib/estadoSpei";
 import { useAnalisis } from "../context/AnalisisContext";
+import { apiFetch } from "../lib/apiFetch";
 import { HistorialDetalleContenido, AnalisisDetalle } from "../components/historial/HistorialDetalleContenido";
 
 const TEAL = "#00BFA5";
@@ -90,19 +91,17 @@ function formatearMonto(monto: number | null): string {
 // Item 5.4 (Etapa 5): en Desktop+ (≥1200px), tocar una tarjeta NO navega
 // a /historial/[id] -- selecciona el análisis y lo muestra en la
 // columna derecha (maestro-detalle), sin salir de /historial. En
-// Mobile/Tablet, navega exactamente como antes de 5.4. La decisión de
-// cuál comportamiento usar se toma DENTRO del clic (window.matchMedia),
-// nunca durante el renderizado -- así no hay riesgo de mismatch de
-// hidratación de Next.js: el HTML inicial es idéntico en servidor y
-// cliente, solo el comportamiento del clic (que no afecta el render)
-// cambia según el ancho real de la ventana en ese momento.
+// Mobile/Tablet, navega exactamente como antes de 5.4.
 //
-// FIX (2026-07): los 4 inputs de esta pantalla (búsqueda, fecha desde,
-// fecha hasta, hash exacto) no tenían "color" explícito -- heredaban
-// el color de texto del body, que en modo oscuro del sistema operativo
-// queda casi blanco (ver globals.css, "prefers-color-scheme: dark").
-// Sobre el fondo blanco de estos campos, el texto quedaba casi
-// invisible. Se agrega "color: '#1E293B'" explícito a los 4.
+// Item 6.2.7b (Etapa 6): las 3 llamadas fetch() de esta pantalla
+// (stats, listado, detalle) migradas a apiFetch() -- agrega el JWT si
+// hay sesión, sin cambiar nada si no la hay (transición, ver
+// DECISION_LOG.md). EXCEPCIÓN: exportarCSV() usa window.open(), no
+// fetch() -- no se le puede agregar un header ahí. Pendiente real para
+// 6.2.8: cuando el JWT sea obligatorio, la exportación necesitará
+// reescribirse para descargar el CSV vía fetch + blob en vez de
+// window.open(), o el backend necesitará aceptar el token de otra
+// forma (ej. como query param firmado) para esa ruta específica.
 export default function Historial() {
   const router = useRouter();
   const { setResult } = useAnalisis();
@@ -154,13 +153,15 @@ export default function Historial() {
   }, [busqueda, riesgo, fechaDesde, fechaHasta, hashBusqueda]);
 
   const exportarCSV = () => {
+    // Nota (item 6.2.7b): window.open() no puede llevar un header
+    // Authorization -- ver comentario grande arriba del componente.
     const url = `${API_URL}/api/v1/dashboard/analisis/exportar?${construirQueryExport()}`;
     window.open(url, "_blank");
   };
 
   const cargarStats = useCallback(async () => {
     try {
-      const resp = await fetch(`${API_URL}/api/v1/dashboard/stats`);
+      const resp = await apiFetch(`${API_URL}/api/v1/dashboard/stats`);
       if (!resp.ok) return;
       setStats(await resp.json());
     } catch {
@@ -172,7 +173,7 @@ export default function Historial() {
     setCargando(true);
     setError(null);
     try {
-      const resp = await fetch(`${API_URL}/api/v1/dashboard/analisis?${construirQuery(offsetActual)}`);
+      const resp = await apiFetch(`${API_URL}/api/v1/dashboard/analisis?${construirQuery(offsetActual)}`);
       if (!resp.ok) throw new Error();
       const data = await resp.json();
       setItems(prev => reemplazar ? data.items : [...prev, ...data.items]);
@@ -190,7 +191,7 @@ export default function Historial() {
     setCargandoDetalle(true);
     setErrorDetalle(null);
     try {
-      const resp = await fetch(`${API_URL}/api/v1/dashboard/analisis/${id}`);
+      const resp = await apiFetch(`${API_URL}/api/v1/dashboard/analisis/${id}`);
       if (!resp.ok) throw new Error();
       const data: AnalisisDetalle = await resp.json();
       setDetalleSeleccionado(data);
@@ -240,10 +241,8 @@ export default function Historial() {
         <span style={{ color: "#fff", fontWeight: 700, fontSize: 18 }}>Historial</span>
       </div>
 
-      {/* item 5.4: maestro-detalle -- 1 columna en Mobile/Tablet, 2 en Desktop+ */}
       <div className="vp-historial-grid">
         <div>
-          {/* Nivel 1: búsqueda unificada + entrada a filtros */}
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <input
               value={busqueda}
@@ -395,12 +394,6 @@ export default function Historial() {
           )}
         </div>
 
-        {/* Columna derecha -- oculta por completo en Mobile/Tablet vía
-            .vp-historial-detalle-panel (ver globals.css), para no
-            agregar contenido visible nuevo ahí (idSeleccionado nunca se
-            setea en Mobile/Tablet de todas formas -- seleccionarItem
-            navega en su lugar -- pero ocultarla explícitamente evita
-            depender de esa coincidencia). Solo visible en Desktop+. */}
         <div className="vp-historial-detalle-panel">
           {idSeleccionado && cargandoDetalle && (
             <div style={{ background: "#fff", borderRadius: 20, padding: 40, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>

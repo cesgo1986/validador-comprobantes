@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAnalisis } from "../../context/AnalisisContext";
+import { apiFetch } from "../../lib/apiFetch";
 import { HistorialDetalleContenido, AnalisisDetalle } from "../../components/historial/HistorialDetalleContenido";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -11,6 +12,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 // del maestro-detalle de /historial en Desktop+). Esta ruta sigue
 // existiendo para Mobile/Tablet, donde tocar una tarjeta del historial
 // navega aquí, exactamente como antes de 5.4.
+//
+// Item 6.2.7b (Etapa 6): fetch() migrado a apiFetch() -- agrega el JWT
+// si hay sesión, sin cambiar nada si no la hay.
 export default function HistorialDetalle() {
   const router = useRouter();
   const params = useParams();
@@ -25,7 +29,7 @@ export default function HistorialDetalle() {
       setCargando(true);
       setError(null);
       try {
-        const resp = await fetch(`${API_URL}/api/v1/dashboard/analisis/${params.id}`);
+        const resp = await apiFetch(`${API_URL}/api/v1/dashboard/analisis/${params.id}`);
         if (resp.status === 404) {
           setError("Este análisis no existe o fue eliminado.");
           return;

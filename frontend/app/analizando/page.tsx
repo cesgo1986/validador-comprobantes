@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAnalisis, Resultado } from "../context/AnalisisContext";
+import { apiFetch } from "../lib/apiFetch";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const TEAL = "#00BFA5";
@@ -73,7 +74,7 @@ export default function Analizando() {
     fd.append("fecha_pasada_confirmada", fechaConfirmada ? "true" : "false");
 
     try {
-      const resp = await fetch(`${API_URL}/analizar`, { method: "POST", body: fd, signal: abortRef.current.signal });
+      const resp = await apiFetch(`${API_URL}/analizar`, { method: "POST", body: fd, signal: abortRef.current.signal });
       clearTimeout(timeoutId);
       if (!resp.ok) throw new Error(`Error del servidor: ${resp.status}`);
       const parsed: Resultado = await resp.json();
