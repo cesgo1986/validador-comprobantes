@@ -618,6 +618,7 @@ async def analizar(
     clabe_hint: str = Form(""),
     fecha_pasada_confirmada: str = Form("false"),
     xml_cep: UploadFile | None = File(None),
+    contexto: ContextoEmpresa = Depends(obtener_contexto_empresa),
 ):
     contenido = await file.read()
     t_inicio_analizar = time.time()
@@ -634,7 +635,7 @@ async def analizar(
     # entre peticiones distintas.
     # empresa_id usa DEFAULT_EMPRESA_ID mientras no exista autenticación
     # multiempresa real (ver database.py).
-    hash_info = registrar_y_consultar_hash(contenido, empresa_id=DEFAULT_EMPRESA_ID)
+    hash_info = registrar_y_consultar_hash(contenido, empresa_id=contexto.empresa_id)
 
     system_prompt = build_system_prompt(fecha_hoy, fecha_legible, banco_hint, clabe_hint, fecha_confirmada)
 
@@ -1139,7 +1140,7 @@ async def analizar(
             score_final=result["score"],
             riesgo=result["riesgo"],
             resultado=result,
-            empresa_id=DEFAULT_EMPRESA_ID,
+            empresa_id=contexto.empresa_id,
             archivo_nombre=file.filename,
             archivo_tipo=media_type,
             monto_detectado=monto_detectado_general if monto_detectado_general > 0 else None,
@@ -1163,7 +1164,7 @@ async def analizar(
     # falla, el analisis principal ya se completo y se devuelve igual.
     try:
         contexto_alertas = {
-            "empresa_id": DEFAULT_EMPRESA_ID,
+            "empresa_id": contexto.empresa_id,
             "analisis_id": result.get("audit_id"),
             "hash_sha256": hash_info.get("hash_documento"),
             "veces_visto": hash_info.get("veces_visto"),
