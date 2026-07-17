@@ -1,8 +1,20 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.29.9 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.30.0 · **Última actualización:** 14/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.30.0] — 2026-07 — ✅ 6.2.7 completo: /analizar migrado, todos los endpoints usan identidad real
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `main.py`, endpoint `/analizar`: agregado `contexto: ContextoEmpresa = Depends(obtener_contexto_empresa)` a la firma. Los 3 usos internos de `DEFAULT_EMPRESA_ID` (cálculo de hash, guardar auditoría, contexto del Alert Engine) reemplazados por `contexto.empresa_id`.
+
+### Cerrado
+- `ROADMAP.md`: ítem **6.2.7** pasa a ✅ completo — todos los endpoints del backend (19 de `/api/v1/dashboard/*` más `/analizar`) usan ahora `obtener_contexto_empresa()` en vez de `DEFAULT_EMPRESA_ID` hardcodeado.
+
+Sube a versión MINOR porque cierra el último ítem de migración de identidad antes del endurecimiento final (6.2.8).
 
 ---
 
