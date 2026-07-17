@@ -1,8 +1,47 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.30.1 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.30.3 · **Última actualización:** 14/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.30.2] — 2026-07 — Etapa 6, 6.2.7b: login del frontend — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `app/lib/supabaseClient.ts` (nuevo): cliente de Supabase para el frontend.
+- `app/context/AuthContext.tsx` (nuevo): sesión de Supabase Auth (login, logout, `session` sincronizada automáticamente).
+- `app/lib/apiFetch.ts` (nuevo): envuelve `fetch()`, agrega `Authorization: Bearer <token>` si hay sesión activa.
+- `app/login/page.tsx` (nuevo): pantalla de login (correo/contraseña). Alcance deliberado: sin registro público (invitación, 6.2.6, pausado), sin recuperación funcional (Resend, pausado).
+- `app/layout.tsx`: envuelto en `AuthProvider`.
+- `app/perfil/page.tsx`: agrega estado de sesión (email + "Cerrar sesión" si hay sesión; "Iniciar sesión" si no).
+
+### Requiere antes de desplegar
+- `npm install @supabase/supabase-js` en el frontend.
+- Variables de entorno en Vercel: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+
+### Pendiente (mismo ítem 6.2.7b)
+- Migrar los `fetch()` existentes (historial, perfil, Centro Operativo, resultado, alertas, badge de `NavigationShell`) a `apiFetch()`, uno por uno.
+
+### Documentado
+- `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+---
+
+## [0.30.3] — 2026-07 — ✅ 6.2.7b completo: login del frontend desplegado, todos los fetch() migrados a apiFetch()
+
+### Desplegado y verificado en producción
+- Login funcionando de punta a punta con el usuario de prueba real.
+- Los 6 lugares con `fetch()` a la API propia migrados a `apiFetch()`: `historial/page.tsx` (3 llamadas), `historial/[id]/page.tsx`, `perfil/page.tsx`, `alertas/page.tsx` (2 llamadas), `NavigationShell.tsx` (badge), `analizando/page.tsx` (`/analizar`).
+
+### Corregido (encontrado durante las pruebas reales)
+- Texto invisible en campos de formulario (login, historial) con modo oscuro del sistema activado — causa raíz confirmada y corregida, ver `DECISION_LOG.md`.
+
+### Pendiente, conocido, no bloqueante
+- `exportarCSV()` en `historial/page.tsx` usa `window.open()`, no `fetch()` — no puede llevar el header `Authorization`. Se resuelve en 6.2.8, cuando el JWT sea obligatorio.
+
+### Cerrado
+- `ROADMAP.md`: 6.2.7b pasa a ✅ completo.
 
 ---
 

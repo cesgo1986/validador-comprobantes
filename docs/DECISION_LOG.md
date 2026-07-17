@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.29.9 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.30.3 · **Última actualización:** 14/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -274,6 +274,16 @@ Nunca `Dashboard → SELECT ... → Base de datos` directo.
 **1. Hallazgo operativo (no de código): el SQL Editor de Supabase no persistía el `INSERT` manual.** Se insertó la fila de prueba en `usuarios` varias veces vía SQL Editor — visible dentro de esa misma pestaña, pero invisible para cualquier otra conexión (una pestaña nueva del propio SQL Editor, y el backend), incluso con `COMMIT` explícito. Se descartaron metódicamente: base de datos distinta, branching, réplica de lectura, triggers, y tabla temporal — todos confirmados como "no es eso". La solución fue insertar la misma fila vía **Table Editor** (interfaz visual) en vez de SQL Editor — ahí sí persistió correctamente para todas las conexiones. Causa raíz exacta no confirmada (posible particularidad de esa sesión del SQL Editor), pero el hallazgo práctico es claro: si una escritura manual en Supabase no parece persistir, probar por un camino distinto (Table Editor) antes de asumir un problema de arquitectura.
 
 **2. Bug real de código: `DetachedInstanceError` en `/whoami`.** `services/database.py`, `SessionLocal` no tenía `expire_on_commit=False` — por defecto, SQLAlchemy expira los atributos de un objeto justo después de `commit()`, y el patrón de `get_db_session()` (`yield db; db.commit()`, después `db.close()`) hace que cualquier atributo leído *después* de salir del bloque `with` intente releerse de una sesión ya cerrada. Nunca había aparecido porque todo el código existente hasta ahora regresa diccionarios simples desde dentro del bloque `with`, nunca objetos de SQLAlchemy hacia afuera — `identity_service.py` es la primera pieza que lo hace. Corregido agregando `expire_on_commit=False` a `SessionLocal` — cambio seguro, no afecta ningún código existente.
+
+---
+
+## 2026-07 — Hallazgo: texto invisible en campos de formulario con modo oscuro del sistema activado
+
+**Causa raíz confirmada (no solo sospechada):** varios `<input>` del proyecto (login, historial: búsqueda, fecha desde/hasta, hash exacto) no definían `color` explícito — heredaban el color de texto del `body`, que `globals.css` cambia a `#ededed` (casi blanco) cuando el sistema operativo tiene activado el modo oscuro (`prefers-color-scheme: dark`). Sobre el fondo blanco de esos campos, el texto quedaba casi invisible — reportado por César en laptop y celular, ambos con modo oscuro del sistema activo.
+
+**Corrección:** se agregó `color: "#1E293B"` explícito a cada campo afectado. Se revisó `alertas/page.tsx` y la pantalla de inicio (`app/page.tsx`) — ninguno de los dos tiene el mismo problema (Alertas no usa `<input>` de texto, solo botones con color propio ya definido; la pantalla de inicio ya tenía `color: "#fff"` explícito, intencional por su fondo oscuro).
+
+**Consecuencia:** vale la pena revisar cualquier `<input>` nuevo que se agregue al proyecto para confirmar que defina `color` explícito, no solo `background` — este bug puede repetirse si se sigue el mismo patrón sin pensarlo.
 
 ---
 
