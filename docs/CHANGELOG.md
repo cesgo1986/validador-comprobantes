@@ -1,8 +1,18 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.30.0 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.30.1 · **Última actualización:** 14/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
+
+---
+
+## [0.30.1] — 2026-07 — ✅ 6.2.7 desplegado y verificado en producción
+
+### Desplegado y verificado
+- `/analizar` migrado a `contexto.empresa_id`, confirmado funcionando normal con un análisis real. Se encontró y corrigió un error de indentación (un espacio de más en `audit_id = guardar_analisis(...)`) al aplicar el fragmento — Python es estricto con espacios exactos, no solo con la profundidad visual de la sangría.
+
+### Cerrado
+- Con esto, **6.2.7 queda completo y confirmado en producción** — el backend completo (19 endpoints de `/api/v1/dashboard/*` + `/analizar`) usa `obtener_contexto_empresa()`, ninguno depende ya de `DEFAULT_EMPRESA_ID` hardcodeado directamente en su lógica.
 
 ---
 
