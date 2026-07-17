@@ -12,37 +12,24 @@ Supabase (JWKS) -> se extrae `sub` (el ID de usuario de Supabase Auth)
 -> se busca ese ID en la tabla `usuarios` (perfil de aplicación) ->
 se devuelve el registro con empresa_id/rol ya resueltos.
 
-Validado de punta a punta con un usuario real (item 6.2.5, ver
-ROADMAP.md): login real -> JWT firmado con ES256 -> validación contra
-JWKS -> búsqueda en usuarios -> empresa_id/rol resueltos correctamente.
-
-Item 6.2.7a (Etapa 6): dos dependencias, deliberadamente separadas, no
-mezcladas en una sola función con un parámetro "modo transición":
-
-  - obtener_usuario_actual()  -- DEFINITIVA. JWT obligatorio, sin
-    fallback de ningún tipo. Sin JWT o JWT inválido -> 401 siempre.
-
-  - obtener_contexto_empresa() -- TRANSICIONAL. Usa el usuario
-    autenticado si llega un JWT válido; cae a DEFAULT_EMPRESA_ID
-    ÚNICAMENTE si no llega ningún Authorization -- un token presente
-    pero inválido nunca cae al default en silencio, se rechaza con 401.
-
-TODO(6.2.8): eliminar obtener_contexto_empresa() por completo cuando el
-login del frontend esté funcionando y DEFAULT_EMPRESA_ID se retire del
-proyecto. Todo endpoint que hoy use Depends(obtener_contexto_empresa)
-debe migrar a Depends(obtener_usuario_actual) en ese momento -- ver
-ROADMAP.md item 6.2.8 y DECISION_LOG.md para el registro de esta
-decisión temporal con fecha de caducidad explícita.
+Item 6.2.8 (Etapa 6, cierre): se retira por completo la dependencia
+transicional `obtener_contexto_empresa()` y la clase `ContextoEmpresa`
+que existían en este archivo -- ya no queda ni el código ni el
+fallback a DEFAULT_EMPRESA_ID. Esto NO significa que DEFAULT_EMPRESA_ID
+se elimine del proyecto (sigue siendo el identificador real de la
+única empresa que existe hoy en la tabla `empresas`) -- lo que
+desaparece es la posibilidad de que una petición SIN JWT sea aceptada
+igual. A partir de aquí, toda la aplicación funciona exclusivamente
+bajo autenticación real -- ver DECISION_LOG.md.
 """
 import os
 import uuid
-from dataclasses import dataclass
 import jwt
 from jwt import PyJWKClient
 from fastapi import Header, HTTPException
 from sqlalchemy import select
 from models.usuario import Usuario
-from database import get_db_session, DEFAULT_EMPRESA_ID
+from database import get_db_session
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_JWKS_URL = f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
@@ -53,9 +40,11 @@ _jwks_client = PyJWKClient(SUPABASE_JWKS_URL) if SUPABASE_URL else None
 
 def obtener_usuario_actual(authorization: str | None = Header(default=None)) -> Usuario:
     """
-    Dependencia DEFINITIVA -- ver ROADMAP.md item 6.2.4c. Sin fallback:
-    JWT válido -> usuario. Cualquier otro caso -> 401. Se usa tal cual
-    a partir de 6.2.8, cuando DEFAULT_EMPRESA_ID se retire del todo.
+    Dependencia DEFINITIVA y única a partir de 6.2.8 -- ver ROADMAP.md.
+    Sin fallback de ningún tipo: JWT válido -> usuario. Cualquier otro
+    caso (sin Authorization, token inválido, token expirado, usuario
+    sin perfil, usuario suspendido) -> 401 o 403, nunca una respuesta
+    con datos.
     """
     if _jwks_client is None:
         raise HTTPException(status_code=503, detail="Autenticación no configurada (falta SUPABASE_URL).")
@@ -106,31 +95,3 @@ def obtener_usuario_actual(authorization: str | None = Header(default=None)) -> 
             raise HTTPException(status_code=403, detail=f"Usuario en estado '{usuario.status}', no puede operar.")
 
         return usuario
-
-
-@dataclass
-class ContextoEmpresa:
-    """Resultado de obtener_contexto_empresa() -- ver TODO(6.2.8) arriba."""
-    empresa_id: str
-    usuario: Usuario | None  # None mientras no exista JWT (modo transición)
-
-
-def obtener_contexto_empresa(authorization: str | None = Header(default=None)) -> ContextoEmpresa:
-    """
-    Dependencia TRANSICIONAL -- item 6.2.7a. TODO(6.2.8): eliminar esta
-    función por completo y migrar todo endpoint que la use a
-    Depends(obtener_usuario_actual) antes del lanzamiento público. Ver
-    DECISION_LOG.md para el registro de esta decisión con fecha de
-    caducidad.
-
-    - Sin Authorization -> DEFAULT_EMPRESA_ID (comportamiento de hoy,
-      sin cambios, mientras el frontend no mande JWT todavía).
-    - Con Authorization -> debe ser válido. Un token presente pero
-      inválido NUNCA cae al default en silencio -- se rechaza con 401,
-      igual que obtener_usuario_actual().
-    """
-    if not authorization:
-        return ContextoEmpresa(empresa_id=DEFAULT_EMPRESA_ID, usuario=None)
-
-    usuario = obtener_usuario_actual(authorization=authorization)
-    return ContextoEmpresa(empresa_id=str(usuario.empresa_id), usuario=usuario)
