@@ -9,6 +9,9 @@ import re
 import os
 import time
 import httpx
+from services.access_control_service import Permission, require_permission
+from services.activity_log_service import registrar_actividad
+from models.activity_log import AuditAction
 from fastapi import Depends
 from services.identity_service import obtener_usuario_actual
 from models.usuario import Usuario
@@ -619,7 +622,7 @@ async def analizar(
     clabe_hint: str = Form(""),
     fecha_pasada_confirmada: str = Form("false"),
     xml_cep: UploadFile | None = File(None),
-    usuario: Usuario = Depends(obtener_usuario_actual),
+    usuario: Usuario = Depends(require_permission(Permission.OPERATE)),
 ):
     contenido = await file.read()
     t_inicio_analizar = time.time()
@@ -1178,6 +1181,18 @@ async def analizar(
     except Exception as e:
         logger.warning("El Alert Engine fallo sin afectar el analisis: %s", e)
 
+    registrar_actividad(
+        empresa_id=str(usuario.empresa_id),
+        usuario_id=str(usuario.id),
+        accion=AuditAction.ANALYSIS_CREATED,
+        recurso_id=result.get("audit_id"),
+        metadata={"riesgo": result.get("riesgo"), "banco": campos_planos.get("banco_origen")},
+        ip=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+ 
+    metrics_service.registrar_exito("analizar", duracion_ms=(time.time() - t_inicio_analizar) * 1000)
+    re
 
     metrics_service.registrar_exito("analizar", duracion_ms=(time.time() - t_inicio_analizar) * 1000)
     return result
@@ -1244,7 +1259,8 @@ def dashboard_detalle_analisis(
  
 @dashboard_router.get("/analisis/exportar")
 def dashboard_exportar_analisis(
-    usuario: Usuario = Depends(obtener_usuario_actual),
+    request: Request,
+    usuario: Usuario = Depends(require_permission(Permission.EXPORT)),
     riesgo: str | None = Query(default=None),
     estado_operacion: str | None = Query(default=None),
     hash_sha256: str | None = Query(default=None),
@@ -1253,6 +1269,7 @@ def dashboard_exportar_analisis(
     fecha_hasta: str | None = Query(default=None),
     q: str | None = Query(default=None),
 ):
+    
     """
     Item 2.4 (ROADMAP.md, Etapa 2): exporta a CSV todos los análisis que
     coinciden con los filtros activos. Item 6.2.8: NOTA CONOCIDA -- el
@@ -1295,6 +1312,15 @@ def dashboard_exportar_analisis(
             item["veces_visto"],
         ])
  
+    registrar_actividad(
+        empresa_id=str(usuario.empresa_id),
+        usuario_id=str(usuario.id),
+        accion=AuditAction.REPORT_EXPORTED,
+        metadata={"tipo": "csv", "registros": len(items), "riesgo": riesgo, "fecha_desde": fecha_desde, "fecha_hasta": fecha_hasta},
+        ip=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+
     buffer.seek(0)
     fecha_archivo = datetime.date.today().isoformat()
     return StreamingResponse(
@@ -1366,14 +1392,26 @@ def dashboard_listar_alertas(
 @dashboard_router.patch("/alertas/{alerta_id}/estado")
 def dashboard_cambiar_estado_alerta(
     alerta_id: str,
+    request: Request,
     nuevo_estado: str = Query(...),
-    usuario: Usuario = Depends(obtener_usuario_actual),
+    usuario: Usuario = Depends(require_permission(Permission.OPERATE)),
 ):
     actualizado = alerta_service.cambiar_estado_alerta(
         alerta_id=alerta_id, nuevo_estado=nuevo_estado, empresa_id=str(usuario.empresa_id)
     )
     if not actualizado:
         raise HTTPException(status_code=404, detail="Alerta no encontrada")
+ 
+    registrar_actividad(
+        empresa_id=str(usuario.empresa_id),
+        usuario_id=str(usuario.id),
+        accion=AuditAction.ALERT_UPDATED,
+        recurso_id=alerta_id,
+        metadata={"nuevo_estado": nuevo_estado},
+        ip=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+ 
     return {"ok": True, "id": alerta_id, "estado": nuevo_estado}
  
  
