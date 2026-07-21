@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.30.3 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.32.0 · **Última actualización:** 14/07/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -305,6 +305,45 @@ por completo. Ningún endpoint debe funcionar sin autenticación antes
 del lanzamiento público.
 ```
 Este TODO vive literalmente en el código (`services/identity_service.py`), y la condición de caducidad queda registrada aquí también: **6.2.8 no puede considerarse completo mientras `obtener_contexto_empresa()` siga existiendo en el proyecto.**
+
+---
+
+**Cierre (2026-07) — 6.2.8 completado:** `obtener_contexto_empresa()` y `ContextoEmpresa` fueron eliminados por completo de `services/identity_service.py`. Este ADR queda resuelto — la condición de caducidad ("6.2.8 no puede considerarse completo mientras `obtener_contexto_empresa()` siga existiendo en el proyecto") se cumplió.
+
+**Checklist de verificación acordado antes de aprobar el cierre** (a correr después de desplegar):
+1. Login, refresh de página (mantiene sesión), logout, y volver a entrar — todos correctos.
+2. Las 6 pantallas (Inicio, Analizar, Historial, Alertas, Perfil, Dashboard) cargan sin errores 401 inesperados estando autenticado.
+3. Sin sesión (probar en incógnito, o limpiando el storage del navegador): entrar directo a `/historial`, `/alertas`, `/perfil`, `/resultado` debe **redirigir a `/login`**, sin mostrar ningún dato ni error suelto — no solo que el backend rechace la petición, la pantalla debe reaccionar visiblemente.
+4. Auditoría de `DEFAULT_EMPRESA_ID`: buscarlo en todo el proyecto y confirmar que solo aparece en constantes, scripts o pruebas — nunca dentro de una dependencia de autenticación.
+
+**Aclaración importante, para no confundir dos cosas distintas:** este cierre **no elimina `DEFAULT_EMPRESA_ID` del proyecto** — sigue siendo el identificador real de la única empresa que existe hoy en `empresas`, y varias funciones lo siguen usando como valor por default en su firma. Lo que se elimina es la **puerta trasera**: la posibilidad de que una petición sin JWT válido reciba datos de todas formas. Son dos cosas distintas — "retirar el fallback de seguridad" no es lo mismo que "borrar la constante de la base de datos".
+
+**Reordenamiento de prioridades inmediatas después de 6.2.8 (decisión de César):** recuperación de contraseña antes que registro/invitaciones — si el único usuario real olvida su contraseña, no hay forma de recuperar acceso; ese riesgo se cierra primero. Registro público abierto sigue sin planearse (VerificaPago es B2B — la empresa crea la cuenta, luego invita a sus usuarios, no al revés).
+
+**Nota de posicionamiento (2026-07, no es una decisión técnica, es un cambio de lenguaje):** a partir de este punto, el proyecto deja de describirse como "la app" y pasa a describirse como "la plataforma VerificaPago" — con autenticación real, multiempresa, JWT, dashboard ejecutivo, motor documental y arquitectura modular, el proyecto cruzó el umbral de herramienta aislada a base sólida para construir funcionalidades empresariales de forma ordenada.
+
+---
+
+## 2026-07 — 🏛️ ADR: Access Control Layer — RBAC por permisos, `activity_logs` (no `audit_logs`)
+
+**Decisión 1 — permisos, no roles, en cada endpoint.** Cada endpoint declara qué **permiso** necesita (`Depends(require_permission(Permission.EXPORT))`), nunca una lista de roles aceptados directamente. La matriz completa vive en un solo lugar (`services/access_control_service.py`, `ROLE_PERMISSIONS`). Motivo: si un cliente pide "que mis Viewers también exporten", se cambia una línea en la matriz, no cada endpoint que mencione roles.
+
+**Matriz acordada:**
+
+| Rol | VIEW | OPERATE | EXPORT | USERS | CONFIG | API_KEYS |
+|---|---|---|---|---|---|---|
+| owner | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| admin | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| analyst | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| viewer | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+**`OPERATE` es deliberadamente amplio, no se llama "analizar":** agrupa cualquier acción operativa sobre datos existentes — analizar comprobantes, cambiar estado de una alerta, y lo que se sume después (reprocesar un análisis, liberar una operación). Evita inventar un permiso nuevo cada vez que aparece una acción parecida. `PATCH /alertas/{id}/estado` usa `OPERATE`, no un permiso aparte — es una acción operativa, no administrativa.
+
+**Decisión 2 — la tabla se llama `activity_logs`, no `audit_logs`.** "Auditoría" implica registrar todo, incluyendo autenticación (login, logout, recuperación de contraseña, MFA) — eso ya lo hace Supabase Auth por su cuenta, y registrarlo también en VerificaPago sería duplicar algo que no nos pertenece. Principio adoptado: **no auditar lo que no somos dueños.** Supabase es dueño de identidad/autenticación; VerificaPago es dueño de las decisiones y operaciones de negocio (análisis, exportaciones, cambios de estado, configuración). `activity_logs` registra solo lo segundo.
+
+**Decisión 3 — `accion` es un Enum (`AuditAction`), no un string libre; `recurso_id` siempre UUID.** Evita errores de escritura silenciosos (un typo en un string libre nunca da error, solo datos inconsistentes). `metadata_json` (JSONB) se agrega desde la primera versión, no después — permite guardar contexto específico de cada acción (ej. `{"tipo": "csv", "registros": 842}` en una exportación) sin tener que agregar columnas nuevas cada vez que aparece un caso nuevo.
+
+**Consecuencia:** `models/activity_log.py`, `services/access_control_service.py`, `services/activity_log_service.py` (los 3 nuevos). Migración de Alembic pendiente de aplicar. `LOGIN`/`LOGOUT` quedan fuera del alcance de `activity_logs` — si en algún momento se necesitan ver desde el propio dashboard de VerificaPago (no el de Supabase), se resuelve con un webhook de Supabase Auth hacia el backend, pieza aparte no comprometida ahora.
 
 ---
 

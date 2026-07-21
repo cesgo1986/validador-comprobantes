@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.31.2 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.32.0 · **Última actualización:** 14/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -388,14 +388,30 @@ Registro / Invitaciones      ← después, y solo por invitación (B2B), no regi
 
 **Motivo del reordenamiento:** con el fallback retirado, hoy existe un solo usuario real. Si ese usuario olvida su contraseña, no hay forma de recuperar acceso — ese riesgo debe cerrarse antes que cualquier otra prioridad, no después. Depende de 6.2.1 (Resend), que sigue pausado esperando el dominio — es la razón real por la que este paso, aunque sea prioritario, no se ha construido todavía. Registro público abierto sigue sin planearse — VerificaPago es B2B, el flujo esperado es que una empresa cree la cuenta y luego invite a sus usuarios, no al revés (ver `PRODUCT_VISION.md`).
 
-### 6.3 — Access Control Layer
+### 6.3 — Access Control Layer (en curso, 2026-07)
 
 Depende de 6.2 — una vez que sabemos quién eres, qué puedes hacer.
 
-- Roles y permisos, RBAC
-- **Rate limiting por cuenta** — distinto del rate limiting por IP de 6.1, este sí requiere saber a qué cuenta pertenece la petición
-- API Keys por empresa para integración B2B
-- **Auditoría de acciones real** ("qué usuario hizo qué, cuándo") — distinta del registro de eventos de seguridad de 6.1, esta sí requiere identidad
+**Diseño acordado (ver `DECISION_LOG.md` para el detalle completo):**
+
+- **RBAC ligero basado en permisos, no en roles hardcodeados.** Los 4 roles que ya existen en `models/usuario.py` (`owner`, `admin`, `analyst`, `viewer`) se mapean a una matriz única de permisos (`VIEW`, `OPERATE`, `EXPORT`, `USERS`, `CONFIG`, `API_KEYS`) — cada endpoint declara qué permiso necesita (`Depends(require_permission(Permission.EXPORT))`), nunca qué roles acepta directamente. Cambiar la matriz no requiere tocar endpoints.
+- **`OPERATE`** agrupa deliberadamente todas las acciones operativas (no solo "analizar") — analizar comprobantes, cambiar estado de alertas, y lo que se sume después (reprocesar, liberar operaciones). Crece sin tener que inventar un permiso nuevo por cada acción parecida.
+- **`activity_logs`** (no `audit_logs`) — nombre deliberado, ver `DECISION_LOG.md`: registra únicamente operaciones de negocio de las que VerificaPago es dueño (análisis, exportaciones, cambios de alerta). Login/logout/recuperación de contraseña **no se duplican aquí** — ya los registra Supabase Auth por su cuenta.
+- `accion` es un Enum de Python (`AuditAction`), no un string libre — evita errores de escritura. `metadata_json` (JSONB) permite guardar contexto específico de cada acción sin agregar columnas nuevas cada vez.
+
+**Secuencia:**
+
+| Paso | Qué | Estado |
+|---|---|---|
+| 6.3.1 | Matriz de permisos + `require_permission()` | ✅ Código listo — `services/access_control_service.py` (nuevo) |
+| 6.3.2 | Modelo `ActivityLog` + `AuditAction` (Enum) | ✅ Código listo — `models/activity_log.py` (nuevo) |
+| 6.3.3 | Servicio `registrar_actividad()` — degrada con gracia si falla, no rompe la operación principal | ✅ Código listo — `services/activity_log_service.py` (nuevo) |
+| 6.3.4 | Migración de Alembic para `activity_logs` | ⏳ pendiente de confirmar la migración más reciente antes de encadenarla |
+| 6.3.5 | Migrar endpoints reales a `require_permission(...)` + registrar actividad: `/analizar` (`OPERATE`), `/analisis/exportar` (`EXPORT`), `/alertas/{id}/estado` (`OPERATE`) | ⏳ |
+
+**Diferido a etapas posteriores (decisión explícita, no descuido):**
+- **Rate limiting por cuenta** — movido a 6.4/6.5. No aporta valor comercial hoy (sin API pública, sin integraciones, sin volumen de usuarios) — se retoma cuando exista alguna de esas condiciones.
+- `USERS`, `CONFIG`, `API_KEYS` (permisos) quedan definidos en la matriz pero sin ningún endpoint que los use todavía — se activan cuando existan esas funcionalidades.
 
 ### 6.4 — Data Protection
 

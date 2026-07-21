@@ -1,6 +1,6 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.31.2 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.32.0 · **Última actualización:** 14/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
 
@@ -25,6 +25,23 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ### Documentado
 - `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+---
+
+## [0.32.0] — 2026-07 — Etapa 6, 6.3.1-6.3.3: RBAC por permisos + activity_logs — código base listo
+
+### Agregado (código pendiente de aplicar y desplegar; falta la migración)
+- `services/access_control_service.py` (nuevo): `Permission` (Enum), `ROLE_PERMISSIONS` (matriz única), `require_permission(...)` — reemplazo directo de `Depends(obtener_usuario_actual)` que además verifica el permiso.
+- `models/activity_log.py` (nuevo): modelo `ActivityLog` + Enum `AuditAction`. Tabla `activity_logs`, no `audit_logs` — ver `DECISION_LOG.md`.
+- `services/activity_log_service.py` (nuevo): `registrar_actividad(...)`, degrada con gracia si falla (no rompe la operación principal).
+
+### Documentado
+- `DECISION_LOG.md`: ADR completo — matriz de permisos acordada, filosofía "no auditar lo que no somos dueños" (Supabase Auth es dueño de login/logout).
+- `ROADMAP.md`: 6.3 reescrita con la secuencia concreta (6.3.1-6.3.5). Rate limiting por cuenta diferido explícitamente a 6.4/6.5 — sin valor comercial hoy.
+
+### Pendiente (mismo ítem 6.3)
+- Migración de Alembic para `activity_logs` — falta confirmar la migración más reciente antes de encadenarla.
+- Migrar `/analizar`, `/analisis/exportar`, `/alertas/{id}/estado` a `require_permission(...)` + registrar actividad.
 
 ---
 
