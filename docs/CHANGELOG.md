@@ -1,6 +1,6 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.32.3 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.33.0 · **Última actualización:** 14/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
 
@@ -25,6 +25,23 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ### Documentado
 - `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+---
+
+## [0.33.0] — 2026-07 — Etapa 6, 6.4: validación de archivos y límites de longitud — código listo, pendiente de deploy
+
+### Confirmado (verificación, no código)
+- Encriptación en reposo ya resuelta por Supabase (AES-256 por defecto, sin poder desactivarse) — cierra ese punto de 6.4 sin construir nada.
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `main.py`: `TAMANO_MAXIMO_ARCHIVO_BYTES` (10 MB) y `detectar_tipo_real()` (nuevo) — valida el contenido real del archivo por magic bytes, no el header `Content-Type` que manda el navegador (falsificable). `/analizar` ahora rechaza archivos que excedan el tamaño o cuyo contenido no coincida con PDF/PNG/JPEG real, antes de cualquier otro procesamiento.
+- `main.py`: `banco_hint` y `clabe_hint` con `max_length` explícito (100 y 30 caracteres) — antes no tenían tope, se interpolan directo en el prompt de Claude.
+
+### Hallazgo real (no solo hardening genérico)
+- `media_type = file.content_type` confiaba ciegamente en un header que el cliente controla y puede falsificar — corregido para usar el tipo real verificado por contenido.
+
+### Documentado
+- `ROADMAP.md`: 6.4 actualizada con el estado real de cada ítem.
 
 ---
 
