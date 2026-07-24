@@ -1,6 +1,6 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.33.0 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.33.1 · **Última actualización:** 14/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
 
@@ -25,6 +25,16 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ### Documentado
 - `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+---
+
+## [0.33.1] — 2026-07 — ✅ 6.4 (Data Protection) completa
+
+### Desplegado y verificado en producción
+- Límite de tamaño, validación de tipo real de archivo, y límites de longitud en `banco_hint`/`clabe_hint` — confirmado funcionando con un análisis real. Un error de indentación (mismo tipo de bug que ya apareció antes en el proyecto) se encontró y corrigió durante la aplicación.
+
+### Cerrado
+- `ROADMAP.md`: 6.4 pasa a ✅ completa.
 
 ---
 

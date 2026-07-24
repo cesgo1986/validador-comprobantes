@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.33.0 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.33.1 · **Última actualización:** 14/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -415,14 +415,14 @@ Depende de 6.2 — una vez que sabemos quién eres, qué puedes hacer.
 - **Rate limiting por cuenta** — movido a 6.4/6.5. No aporta valor comercial hoy (sin API pública, sin integraciones, sin volumen de usuarios) — se retoma cuando exista alguna de esas condiciones.
 - `USERS`, `CONFIG`, `API_KEYS` (permisos) quedan definidos en la matriz pero sin ningún endpoint que los use todavía — se activan cuando existan esas funcionalidades.
 
-### 6.4 — Data Protection (en curso, 2026-07)
+### 6.4 — Data Protection ✅ (completa, 2026-07)
 
 Todo lo relacionado con proteger la información que entra al sistema. Independiente de 6.2/6.3, se puede hacer en paralelo.
 
 - ✅ **Encriptación en reposo — ya resuelto, confirmado (no solo asumido).** Supabase encripta todos los datos con AES-256 por defecto, sin configuración posible de desactivarlo (verificado en su documentación, 2026-07). No hay nada que construir aquí.
-- ✅ **Límite de tamaño de subida** (código listo, pendiente de aplicar y desplegar) — 10 MB en `/analizar`, antes de cualquier otro procesamiento. Antes no existía ningún tope.
-- ✅ **Validación de tipo de archivo real, no declarado** (código listo) — hallazgo real al revisar el código: `media_type = file.content_type` confiaba en el header `Content-Type` que manda el navegador, que **se puede falsificar sin esfuerzo**. Ahora se valida el contenido real del archivo por sus primeros bytes (magic bytes: `%PDF`, PNG, JPEG) antes de aceptar el archivo — `detectar_tipo_real()` en `main.py`.
-- ✅ **Límite de longitud en campos de texto libre** (código listo) — `banco_hint` (100 caracteres) y `clabe_hint` (30 caracteres), vía `Form(..., max_length=...)`. Antes no tenían tope; se interpolan directo en el prompt de Claude.
+- ✅ **Límite de tamaño de subida** (desplegado y verificado) — 10 MB en `/analizar`, antes de cualquier otro procesamiento.
+- ✅ **Validación de tipo de archivo real, no declarado** (desplegado y verificado) — `detectar_tipo_real()` en `main.py`, valida magic bytes en vez del header `Content-Type` falsificable.
+- ✅ **Límite de longitud en campos de texto libre** (desplegado y verificado) — `banco_hint` (100 caracteres) y `clabe_hint` (30 caracteres).
 - 🔵 Antivirus (sembrado, sin fecha) — no se construye ahora
 - Sanitización de inputs más allá de longitud (ej. caracteres de control) — evaluar si hace falta después de ver el comportamiento real con los límites de longitud ya puestos
 
