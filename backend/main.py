@@ -156,6 +156,37 @@ BANKS = {
     "728": "SPIN BY OXXO", "741": "KLAR", "748": "BINEO",
 }
 
+# Item 6.4 (Etapa 6, Data Protection): validación de archivos subidos.
+# ─────────────────────────────────────────────────────────────────────────────
+TAMANO_MAXIMO_ARCHIVO_BYTES = 10 * 1024 * 1024  # 10 MB -- generoso para un
+# comprobante bancario (normalmente unos cientos de KB), protege contra
+# archivos enormes que inflarían el costo de la llamada a Claude sin
+# ninguna necesidad real.
+ 
+# Firmas binarias (magic bytes) de los únicos 3 formatos que el sistema
+# procesa. NO se confía en el header Content-Type que manda el
+# navegador (file.content_type) -- ese header lo declara el cliente y
+# se puede falsificar sin ningún esfuerzo (renombrar un archivo,
+# interceptar la petición). Se valida el contenido real, no la
+# etiqueta.
+FIRMAS_ARCHIVO_VALIDAS = {
+    b"%PDF": "application/pdf",
+    b"\x89PNG\r\n\x1a\n": "image/png",
+    b"\xff\xd8\xff": "image/jpeg",
+}
+ 
+ 
+def detectar_tipo_real(contenido: bytes) -> str | None:
+    """
+    Devuelve el media_type real del archivo según sus primeros bytes,
+    o None si no coincide con ningún formato soportado. Nunca usar
+    file.content_type para esta decisión -- ver comentario arriba.
+    """
+    for firma, tipo in FIRMAS_ARCHIVO_VALIDAS.items():
+        if contenido.startswith(firma):
+            return tipo
+    return None
+ 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CLABE
@@ -618,16 +649,28 @@ async def verify_cep(clave_rastreo: str, referencia: str, fecha: str, monto: flo
 async def analizar(
     request: Request,
     file: UploadFile = File(...),
-    banco_hint: str = Form(""),
-    clabe_hint: str = Form(""),
+    banco_hint: str = Form("", max_length=100),
+    clabe_hint: str = Form("", max_length=30),
     fecha_pasada_confirmada: str = Form("false"),
     xml_cep: UploadFile | None = File(None),
     usuario: Usuario = Depends(require_permission(Permission.OPERATE)),
 ):
     contenido = await file.read()
+    if len(contenido) > TAMANO_MAXIMO_ARCHIVO_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"El archivo excede el tamaño máximo permitido ({TAMANO_MAXIMO_ARCHIVO_BYTES // (1024 * 1024)} MB).",
+        )
+ 
+    tipo_real = detectar_tipo_real(contenido)
+    if tipo_real is None:
+        raise HTTPException(
+            status_code=415,
+            detail="El archivo no parece ser una imagen (PNG/JPEG) ni un PDF válido.",
+        )
     t_inicio_analizar = time.time()
     b64 = base64.b64encode(contenido).decode()
-    media_type = file.content_type
+    media_type = tipo_real
     fecha_hoy = datetime.date.today().isoformat()
     fecha_legible = datetime.datetime.now().strftime("%A %d de %B de %Y")
     fecha_confirmada = fecha_pasada_confirmada.lower() == "true"
