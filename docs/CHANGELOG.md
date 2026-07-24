@@ -1,6 +1,6 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.32.2 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.32.3 · **Última actualización:** 14/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
 
@@ -25,6 +25,16 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ### Documentado
 - `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+---
+
+## [0.32.3] — 2026-07 — ✅ 6.3 (Access Control Layer) completa
+
+### Desplegado y verificado en producción
+- `/analizar`, `/analisis/exportar`, `/alertas/{id}/estado` funcionando con RBAC por permisos. Confirmadas filas reales en `activity_logs` con `metadata_json` correcto para las 3 acciones.
+
+### Cerrado
+- `ROADMAP.md`: 6.3.5 pasa a ✅ — **Etapa 6.3 completa.**
 
 ---
 
