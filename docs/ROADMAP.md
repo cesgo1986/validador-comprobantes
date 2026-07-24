@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.32.0 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.32.2 · **Última actualización:** 14/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -406,8 +406,8 @@ Depende de 6.2 — una vez que sabemos quién eres, qué puedes hacer.
 | 6.3.1 | Matriz de permisos + `require_permission()` | ✅ Código listo — `services/access_control_service.py` (nuevo) |
 | 6.3.2 | Modelo `ActivityLog` + `AuditAction` (Enum) | ✅ Código listo — `models/activity_log.py` (nuevo) |
 | 6.3.3 | Servicio `registrar_actividad()` — degrada con gracia si falla, no rompe la operación principal | ✅ Código listo — `services/activity_log_service.py` (nuevo) |
-| 6.3.4 | Migración de Alembic para `activity_logs` | ⏳ pendiente de confirmar la migración más reciente antes de encadenarla |
-| 6.3.5 | Migrar endpoints reales a `require_permission(...)` + registrar actividad: `/analizar` (`OPERATE`), `/analisis/exportar` (`EXPORT`), `/alertas/{id}/estado` (`OPERATE`) | ⏳ |
+| 6.3.4 | Migración de Alembic para `activity_logs` | ✅ Desplegado y verificado — tabla confirmada en Supabase Table Editor |
+| 6.3.5 | Migrar endpoints reales a `require_permission(...)` + registrar actividad: `/analizar` (`OPERATE`), `/analisis/exportar` (`EXPORT`), `/alertas/{id}/estado` (`OPERATE`) | ✅ Código listo, pendiente de aplicar y desplegar |
 
 **Diferido a etapas posteriores (decisión explícita, no descuido):**
 - **Rate limiting por cuenta** — movido a 6.4/6.5. No aporta valor comercial hoy (sin API pública, sin integraciones, sin volumen de usuarios) — se retoma cuando exista alguna de esas condiciones.

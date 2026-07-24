@@ -1,6 +1,6 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.32.0 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.32.2 · **Última actualización:** 14/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
 
@@ -25,6 +25,26 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ### Documentado
 - `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+---
+
+## [0.32.2] — 2026-07 — Etapa 6, 6.3.5: conectar /analizar, /analisis/exportar, /alertas/{id}/estado — código listo, pendiente de deploy
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `main.py`: los 3 endpoints migrados de `Depends(obtener_usuario_actual)` a `Depends(require_permission(...))` — `/analizar` (`OPERATE`), `/analisis/exportar` (`EXPORT`, agrega `request: Request` a la firma), `/alertas/{id}/estado` (`OPERATE`, agrega `request: Request`). Los 3 llaman `registrar_actividad(...)` después de completar su operación con éxito, nunca antes — `ANALYSIS_CREATED`, `REPORT_EXPORTED`, `ALERT_UPDATED` respectivamente, con `metadata_json` específico de cada caso e IP/user-agent capturados de la petición.
+
+### Documentado
+- `ROADMAP.md`: 6.3.5 código listo.
+
+---
+
+## [0.32.1] — 2026-07 — ✅ Migración de activity_logs desplegada y verificada
+
+### Desplegado y verificado en producción
+- Tabla `activity_logs` confirmada en Supabase Table Editor, con todas sus columnas (`empresa_id`, `usuario_id`, `accion`, `recurso_id`, `metadata_json`, `ip`, `user_agent`, `created_at`).
+
+### Cerrado
+- `ROADMAP.md`: 6.3.4 pasa a ✅.
 
 ---
 
