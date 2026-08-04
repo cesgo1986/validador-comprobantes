@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.33.1 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.34.0 · **Última actualización:** 23/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -435,13 +435,36 @@ Requiere decisiones de proveedor de infraestructura, mayor esfuerzo que las capa
 - Procesamiento asíncrono en general
 - **Cachear el juicio forense de Claude por hash exacto** (2026-07, sembrado desde `PRODUCT_VISION.md`) — `hash_service.py` ya detecta cuándo un archivo es exactamente el mismo (`documento_reutilizado`), pero hoy `/analizar` llama a Claude de nuevo de todas formas. Cachear solo campos extraídos + score de riesgo visual cuando el hash coincide — **nunca cachear el Estado SPEI**, siempre volver a consultar CEP/XML en Banxico sin importar si el archivo ya se vio, porque ese estado puede cambiar entre una subida y otra aunque el archivo sea idéntico. No requiere infraestructura nueva (Redis/cola), es un cambio de lógica dentro de `/analizar` — más simple que el resto de esta capa, construible antes
 
-### 6.6 — Business Readiness
+### 6.6 — Business Readiness (en curso, 2026-07)
 
 Sin código — es un ejercicio de producto/finanzas, independiente de todo lo anterior, puede correr en paralelo con cualquier capa.
 
-- **Modelo de costo unitario** — cada análisis cuesta una llamada a Claude Vision; modelar el costo antes de definir planes B2B por volumen
-- Margen, pricing
-- Consumo de Claude/Banxico, proyección financiera
+- **Modelo de costo unitario, Claude Sonnet 4.5** — estimado (no medido con precisión): ~$0.017–$0.022 USD por análisis (system prompt ~1,800 tokens + imagen ~1,000–1,500 tokens + respuesta JSON ~600–800 tokens, a $3/$15 por millón de tokens entrada/salida). Pendiente de reemplazar por el número real de Anthropic Console (Usage & Billing) contra los análisis reales ya procesados.
+- Margen, pricing — pendiente del número real de costo unitario
+
+**Presupuesto en dos escenarios, deliberadamente separados (2026-07):**
+
+| Concepto | Escenario A — operar el MVP hoy | Escenario B — salida comercial |
+|---|---|---|
+| Claude (variable, por análisis) | ✅ | ✅ |
+| Render | ✅ | ✅ |
+| Supabase | ✅ (Free → Pro al salir a público, ver `DECISION_LOG.md`) | ✅ |
+| Dominio | ⏳ (pausado, ver 6.2.1) | ✅ |
+| Resend | ⏳ (pausado, ver 6.2.1) | ✅ |
+| Redis / cola de trabajos | ❌ | ✅ (cuando exista volumen, ver 6.5) |
+| Pasarela de pago (Stripe/MercadoPago/OpenPay) | ❌ — no existe nada construido | ✅ |
+| Pentest profesional | ❌ | ✅ — recomendado antes de manejar dinero real de clientes |
+| Marketing (Google/LinkedIn/Meta Ads) | ❌ | ✅ |
+| Legal, contabilidad, facturación SAT | ❌ | ✅ |
+
+**Escenario A responde:** ¿cuánto cuesta mantener vivo el sistema hoy? **Escenario B responde:** ¿cuánto cuesta crecer? Son preguntas distintas — un inversionista pregunta por el B, la operación diaria de hoy solo necesita el A.
+
+**Aclaraciones de alcance (2026-07, en respuesta a preguntas directas de César sobre "estar listos para clientes reales"):**
+- El upgrade de Supabase a Pro no es una decisión nueva — es la ejecución del disparador ya acordado ("se paga al salir a público").
+- Registro/login: login ya funciona; registro público sigue sin construirse (pausado, 6.2.1/6.2.6) — para los primeros clientes reales, alta manual de empresa/usuario es suficiente, no bloquea nada.
+- **Método de pago: no existe absolutamente nada construido** — ni Stripe, ni MercadoPago, ni lógica de créditos/facturación. Es una pieza nueva completa, de Etapa 7 (Organización Empresarial), no de Etapa 6.
+- Sesión persistente entre reinicios del navegador: probablemente ya funciona por configuración por defecto de Supabase Auth (`persistSession`/`autoRefreshToken`) — pendiente de confirmar con una prueba real, no asumir.
+- Seguridad no es un estado binario — 6.1 a 6.4 completas, pero un pentest profesional externo (ver tabla de arriba, Escenario B) es lo recomendado antes de manejar dinero real de clientes, no algo que ya esté "terminado".
 
 **Diferido, sin fecha:** OAuth, observabilidad tipo SIEM, políticas de retención avanzada de logs — sin urgencia real hoy, sembrados desde la Architecture Readiness Review.
 

@@ -1,6 +1,6 @@
 # PRODUCT_VISION.md — Visión estratégica de VerificaPago
 
-**Versión del documento:** 0.28.7 · **Última actualización:** 07/07/2026
+**Versión del documento:** 0.34.0 · **Última actualización:** 23/07/2026
 
 *Documento de producto, no técnico. Define qué es VerificaPago, hacia dónde va y qué no será nunca.*
 
@@ -195,6 +195,17 @@ Empresas que necesitan integrar la verificación en sus propios sistemas. ERP, W
 3. Solo si la Fase 2 confirma que la coincidencia es suficientemente alta, cambiar el flujo de producción para que Claude intervenga solo cuando el OCR tenga baja confianza o el resto de los motores detecte inconsistencia.
 
 **Por qué no se construye ahora:** el problema que resuelve (costo a escala) todavía no ha ocurrido — el proyecto no tiene volumen de producción real que lo urja. Comprometer la Fase 3 sin los datos de la Fase 2 repetiría el mismo error que ya se evitó con la conciliación por token: diseñar antes de confirmar que el dato base (qué tan bien lee un OCR barato comprobantes de ~30 bancos mexicanos distintos) es confiable.
+
+**Umbrales de activación (2026-07), para que la decisión dependa de datos, no del entusiasmo del momento:**
+
+| Volumen mensual | Acción |
+|---|---|
+| < 10,000 análisis/mes | Claude Vision para todo — situación actual |
+| 10,000–50,000 | Iniciar Fase 1: prototipo de `OCRProvider` con un motor local |
+| 50,000–100,000 | Fase 2/3: pipeline híbrido en producción, si los datos de Fase 2 lo confirman |
+| > 100,000 | Claude solo para excepciones (baja confianza del OCR, inconsistencias) |
+
+El objetivo de este pipeline **no es eliminar Claude** — sigue siendo necesario para lo que un OCR no hace (detección de manipulación visual, razonamiento contextual, consistencia semántica). El objetivo es reducir las llamadas *innecesarias*, no todas.
 
 **Optimización relacionada, sí construible ahora, sin esperar a la capa OCR — ver `ROADMAP.md` próximo ítem de 6.1 o etapa aparte:** cachear el juicio forense de Claude (campos extraídos, score de riesgo visual) cuando el hash del archivo coincide exacto (`hash_service.py` ya detecta esto, hoy sin aprovecharse) — pero **siempre volver a consultar CEP/XML en Banxico** sin importar si el archivo ya se vio, porque el Estado SPEI puede cambiar entre una subida y otra aunque el archivo sea idéntico. Cachear la respuesta completa sin este matiz arriesgaría mostrar un estado desactualizado — justo lo opuesto a la propuesta de valor del producto.
 

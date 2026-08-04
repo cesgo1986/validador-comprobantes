@@ -1,6 +1,6 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.33.1 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.34.0 · **Última actualización:** 23/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
 
@@ -25,6 +25,15 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ### Documentado
 - `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+---
+
+## [0.34.0] — 2026-07 — Etapa 6.6: umbrales de activación del pipeline OCR, presupuesto en dos escenarios, aclaraciones de alcance pre-lanzamiento
+
+### Documentado (sin código)
+- `PRODUCT_VISION.md`: tabla de umbrales de volumen para activar el pipeline de OCR desacoplado (< 10,000/mes: Claude para todo; 10,000–50,000: prototipo; 50,000–100,000: híbrido; > 100,000: Claude solo para excepciones) — da concreción a la hipótesis ya sembrada sin comprometerla.
+- `ROADMAP.md`, 6.6: modelo de costo unitario estimado para Claude Sonnet 4.5 (~$0.017–$0.022 USD/análisis, pendiente de reemplazar por el número real de Anthropic Console). Presupuesto en dos escenarios separados (operar el MVP hoy vs. salida comercial) — un inversionista pregunta por el segundo, la operación diaria solo necesita el primero.
+- Aclaraciones de alcance en respuesta a preguntas directas sobre "estar listos para clientes reales": el upgrade de Supabase a Pro es la ejecución de un disparador ya acordado, no una decisión nueva; método de pago no tiene nada construido (es Etapa 7, no 6); sesión persistente probablemente ya funciona por defecto (pendiente de probar, no asumir); seguridad no es un estado binario, un pentest profesional es lo recomendado antes de manejar dinero real.
 
 ---
 
