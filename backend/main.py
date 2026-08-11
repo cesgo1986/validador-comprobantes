@@ -1287,19 +1287,6 @@ def dashboard_listar_analisis(
         estado_operacion=estado_operacion, hash_sha256=hash_sha256,
         banco=banco, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta, q=q,
     )
- 
- 
-@dashboard_router.get("/analisis/{analisis_id}")
-def dashboard_detalle_analisis(
-    analisis_id: str,
-    usuario: Usuario = Depends(obtener_usuario_actual),
-):
-    detalle = dashboard_service.obtener_analisis_detalle(analisis_id=analisis_id, empresa_id=str(usuario.empresa_id))
-    if detalle is None:
-        raise HTTPException(status_code=404, detail="Analisis no encontrado")
-    return detalle
- 
- 
 @dashboard_router.get("/analisis/exportar")
 def dashboard_exportar_analisis(
     request: Request,
@@ -1312,23 +1299,25 @@ def dashboard_exportar_analisis(
     fecha_hasta: str | None = Query(default=None),
     q: str | None = Query(default=None),
 ):
-    
     """
     Item 2.4 (ROADMAP.md, Etapa 2): exporta a CSV todos los análisis que
-    coinciden con los filtros activos. Item 6.2.8: NOTA CONOCIDA -- el
-    frontend llama a esta ruta con window.open(), que no puede llevar
-    el header Authorization -- ver ROADMAP.md, esto queda pendiente de
-    resolver aparte (fetch + blob, o un mecanismo de token distinto
-    para esta ruta específica). Hoy, con el fallback retirado, esta
-    llamada específica del frontend fallará con 401 hasta que se
-    resuelva -- documentado, no es un descuido.
+    coinciden con los filtros activos -- mismos parámetros que
+    /api/v1/dashboard/analisis, pero sin paginación (hasta el límite de
+    seguridad interno de exportar_analisis()). Devuelve exactamente lo
+    que el usuario ve filtrado en el Historial, no solo la página cargada.
+    Las etiquetas de estado_operacion se traducen a texto legible
+    (Liquidada, En proceso, etc.) usando SEMAFORO_SPEI -- mismo mapeo que
+    usa el resto del producto, para que el CSV hable el mismo idioma que
+    la app.
+    Item 6.4.5 (Etapa 6, orden de rutas): declarada ANTES de
+    /analisis/{analisis_id} a propósito -- rutas específicas siempre
+    antes que rutas genéricas con parámetro.
     """
     items = dashboard_service.exportar_analisis(
         empresa_id=str(usuario.empresa_id), riesgo=riesgo, estado_operacion=estado_operacion,
         hash_sha256=hash_sha256, banco=banco, fecha_desde=fecha_desde,
         fecha_hasta=fecha_hasta, q=q,
     )
- 
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow([
@@ -1342,7 +1331,6 @@ def dashboard_exportar_analisis(
         except ValueError:
             estado_enum = None
         etiqueta_estado = SEMAFORO_SPEI.get(estado_enum, {}).get("etiqueta", item["estado_operacion"] or "—") if estado_enum else "—"
- 
         writer.writerow([
             item["fecha"],
             item["banco_detectado"],
@@ -1354,7 +1342,7 @@ def dashboard_exportar_analisis(
             item["hash_sha256"],
             item["veces_visto"],
         ])
- 
+    buffer.seek(0)
     registrar_actividad(
         empresa_id=str(usuario.empresa_id),
         usuario_id=str(usuario.id),
@@ -1363,14 +1351,21 @@ def dashboard_exportar_analisis(
         ip=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )
-
-    buffer.seek(0)
     fecha_archivo = datetime.date.today().isoformat()
     return StreamingResponse(
         iter([buffer.getvalue()]),
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=historial_verificapago_{fecha_archivo}.csv"},
     )
+@dashboard_router.get("/analisis/{analisis_id}")
+def dashboard_detalle_analisis(
+    analisis_id: str,
+    usuario: Usuario = Depends(obtener_usuario_actual),
+):
+    detalle = dashboard_service.obtener_analisis_detalle(analisis_id=analisis_id, empresa_id=str(usuario.empresa_id))
+    if detalle is None:
+        raise HTTPException(status_code=404, detail="Analisis no encontrado")
+    return detalle
  
  
 @dashboard_router.get("/hashes")
