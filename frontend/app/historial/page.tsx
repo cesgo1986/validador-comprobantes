@@ -152,11 +152,28 @@ export default function Historial() {
     return params.toString();
   }, [busqueda, riesgo, fechaDesde, fechaHasta, hashBusqueda]);
 
-  const exportarCSV = () => {
-    // Nota (item 6.2.7b): window.open() no puede llevar un header
-    // Authorization -- ver comentario grande arriba del componente.
+ const exportarCSV = async () => {
+    // FIX (item 6.2.8, cierre de la nota pendiente): window.open() no
+    // podía llevar el header Authorization -- desde que 6.2.8 retiró
+    // el fallback de identidad, esta ruta requiere JWT obligatorio y
+    // window.open() dejó de funcionar (401). Se reemplaza por
+    // apiFetch() + descarga manual del blob.
     const url = `${API_URL}/api/v1/dashboard/analisis/exportar?${construirQueryExport()}`;
-    window.open(url, "_blank");
+    try {
+      const resp = await apiFetch(url);
+      if (!resp.ok) throw new Error();
+      const blob = await resp.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const enlace = document.createElement("a");
+      enlace.href = blobUrl;
+      enlace.download = `historial_verificapago_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(enlace);
+      enlace.click();
+      document.body.removeChild(enlace);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch {
+      setError("No se pudo exportar el CSV. Intenta de nuevo.");
+    }
   };
 
   const cargarStats = useCallback(async () => {
