@@ -1,6 +1,6 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.34.1 · **Última actualización:** 23/07/2026
+**Versión del documento:** 0.34.3 · **Última actualización:** 11/08/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
 
@@ -25,6 +25,29 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ### Documentado
 - `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+---
+
+## [0.34.3] — 2026-07 — 🔴 Segundo bug encontrado al probar el fix anterior: orden de rutas en /analisis
+
+### Encontrado al probar 0.34.2
+- Al aplicar el fix de `exportarCSV()`, apareció un error real del servidor que antes quedaba oculto por `window.open()` (que falla en silencio): `/analisis/exportar` coincidía con la ruta genérica `/analisis/{analisis_id}` en vez de con la específica, porque `{analisis_id}` estaba declarada **antes** en `main.py` — FastAPI evalúa rutas en el orden del archivo, y una ruta genérica con parámetro "captura" cualquier texto, incluida la palabra "exportar", si se declara antes que la ruta específica.
+- **Este bug es preexistente** — probablemente nunca funcionó la exportación, desde que se creó el endpoint, no es algo que rompimos con cambios recientes. Solo se hizo visible ahora porque `apiFetch()` sí expone errores del servidor, a diferencia de `window.open()`.
+
+### Corregido (código pendiente de aplicar y desplegar)
+- `main.py`: `dashboard_exportar_analisis` (`/analisis/exportar`) movido para declararse **antes** de `dashboard_detalle_analisis` (`/analisis/{analisis_id}`) — regla general: rutas específicas siempre antes que rutas genéricas con parámetro.
+
+---
+
+## [0.34.2] — 2026-07 — 🔴 Fix crítico: exportarCSV() rota en producción desde el cierre de 6.2.8
+
+### Corregido (código pendiente de aplicar y desplegar — bug activo en producción)
+- `app/historial/page.tsx`, `exportarCSV()`: usaba `window.open()`, que no puede llevar el header `Authorization`. Quedó anotado como pendiente al cerrar 6.2.7b, pero nunca se resolvió antes de que 6.2.8 retirara el fallback de identidad — desde entonces, el botón "Exportar a CSV" devuelve 401 para cualquiera que lo use. Corregido: se reemplaza por `apiFetch()` + descarga manual del blob (crea un enlace temporal con `download`, dispara el clic, lo revoca).
+
+### Documentado
+- `ROADMAP.md`: nota de la excepción pendiente retirada de 6.2.7b (ya resuelta aquí).
+
+Encontrado de forma proactiva mientras se esperaba la propagación de DNS para el dominio propio — no reportado por un usuario.
 
 ---
 
