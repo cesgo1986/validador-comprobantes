@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.34.0 · **Última actualización:** 23/07/2026
+**Versión del documento:** 0.34.1 · **Última actualización:** 23/07/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -352,7 +352,7 @@ Deliberadamente nombrada "Identity Layer" y no "login" — sirve a futuro para P
 
 | Paso | Qué | Estado |
 |---|---|---|
-| 6.2.1 | Configurar Resend como SMTP en Supabase | ⏸️ En pausa — César comprará dominio propio antes de retomarlo (necesario para 6.2.6, no bloquea el resto) |
+| 6.2.1 | Configurar Resend como SMTP en Supabase | 🟢 Desbloqueado (2026-07) — César ya compró el dominio y correo corporativo. Retomado |
 | 6.2.2 | Migración: agregar `supabase_auth_id` a `usuarios` (separado del `id` interno — nunca el identificador de un sistema externo como PK de negocio) | ✅ Desplegado y verificado — columna confirmada en Supabase Table Editor |
 | 6.2.3 | Definir constantes de `estado` válido para `Empresa`/`Usuario` — **las columnas `status` ya existen en ambos modelos**, no se crean de nuevo | ✅ Desplegado — `ESTADOS_USUARIO_VALIDOS` agregado a `models/usuario.py` (`active`, `invited`, `suspended`, `deleted`) |
 | 6.2.4a | Confirmado: llave activa de Supabase = ES256 (ECC P-256), ver `DECISION_LOG.md`. Instalar `PyJWT` + `cryptography` | ✅ Código listo, pendiente de aplicar y desplegar |
@@ -449,8 +449,8 @@ Sin código — es un ejercicio de producto/finanzas, independiente de todo lo a
 | Claude (variable, por análisis) | ✅ | ✅ |
 | Render | ✅ | ✅ |
 | Supabase | ✅ (Free → Pro al salir a público, ver `DECISION_LOG.md`) | ✅ |
-| Dominio | ⏳ (pausado, ver 6.2.1) | ✅ |
-| Resend | ⏳ (pausado, ver 6.2.1) | ✅ |
+| Dominio | ✅ comprado (2026-07) | ✅ |
+| Resend | 🟢 desbloqueado, pendiente de configurar (ver 6.2.1) | ✅ |
 | Redis / cola de trabajos | ❌ | ✅ (cuando exista volumen, ver 6.5) |
 | Pasarela de pago (Stripe/MercadoPago/OpenPay) | ❌ — no existe nada construido | ✅ |
 | Pentest profesional | ❌ | ✅ — recomendado antes de manejar dinero real de clientes |
@@ -462,6 +462,9 @@ Sin código — es un ejercicio de producto/finanzas, independiente de todo lo a
 **Aclaraciones de alcance (2026-07, en respuesta a preguntas directas de César sobre "estar listos para clientes reales"):**
 - El upgrade de Supabase a Pro no es una decisión nueva — es la ejecución del disparador ya acordado ("se paga al salir a público").
 - Registro/login: login ya funciona; registro público sigue sin construirse (pausado, 6.2.1/6.2.6) — para los primeros clientes reales, alta manual de empresa/usuario es suficiente, no bloquea nada.
+- **Sesión persistente entre reinicios del navegador: ✅ confirmado funcionando** (2026-07, probado por César cerrando el navegador completo) — no requería ningún cambio, la configuración por defecto de Supabase Auth ya lo resolvía.
+- **"Dar de alta como aplicación para uso profesional" aclarado: publicación en tiendas de aplicaciones (Apple/Google).** Sembrado como proyecto aparte, no una tarea menor — VerificaPago es una app web hoy; publicarla en tiendas normalmente requiere envolverla (Capacitor) o reescribirla (React Native), más el proceso de revisión de cada tienda (Apple puede tardar semanas). No comprometido a fecha.
+- **Dominio y correo corporativo: ✅ comprados (2026-07)** — desbloquea 6.2.1 (Resend SMTP) y, después, 6.2.6 (invitaciones reales).
 - **Método de pago: no existe absolutamente nada construido** — ni Stripe, ni MercadoPago, ni lógica de créditos/facturación. Es una pieza nueva completa, de Etapa 7 (Organización Empresarial), no de Etapa 6.
 - Sesión persistente entre reinicios del navegador: probablemente ya funciona por configuración por defecto de Supabase Auth (`persistSession`/`autoRefreshToken`) — pendiente de confirmar con una prueba real, no asumir.
 - Seguridad no es un estado binario — 6.1 a 6.4 completas, pero un pentest profesional externo (ver tabla de arriba, Escenario B) es lo recomendado antes de manejar dinero real de clientes, no algo que ya esté "terminado".

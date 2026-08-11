@@ -1,6 +1,6 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.34.0 · **Última actualización:** 23/07/2026
+**Versión del documento:** 0.34.1 · **Última actualización:** 23/07/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
 
@@ -25,6 +25,18 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ### Documentado
 - `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+---
+
+## [0.34.1] — 2026-07 — Sesión persistente confirmada, dominio comprado, 6.2.1 desbloqueado
+
+### Confirmado
+- Sesión persistente entre reinicios del navegador: funciona por defecto, sin cambios necesarios.
+- "Dar de alta como aplicación profesional" aclarado: publicación en tiendas de apps (Apple/Google) — sembrado como proyecto aparte, no tarea menor.
+- **Dominio y correo corporativo comprados por César** — desbloquea 6.2.1 (Resend SMTP) y, después, 6.2.6 (invitaciones reales).
+
+### Cerrado
+- `ROADMAP.md`: 6.2.1 pasa de pausado a desbloqueado, retomado.
 
 ---
 
