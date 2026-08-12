@@ -2,25 +2,12 @@
 services/identity_service.py — Identity Engine (item 6.2, Etapa 6).
 
 Ver DECISION_LOG.md, ADR "Supabase Auth como proveedor de identidad".
-Este archivo es la primera pieza real del Identity Engine sembrado
-junto a Motor SPEI, Motor Documental, Alert Engine y AggregationService
--- responsable de resolver "quién eres" a partir de un JWT, sin emitir
-ni firmar tokens propios en ningún caso.
-
-Flujo: JWT recibido -> se valida su firma contra la llave pública de
-Supabase (JWKS) -> se extrae `sub` (el ID de usuario de Supabase Auth)
--> se busca ese ID en la tabla `usuarios` (perfil de aplicación) ->
-se devuelve el registro con empresa_id/rol ya resueltos.
-
-Item 6.2.8 (Etapa 6, cierre): se retira por completo la dependencia
-transicional `obtener_contexto_empresa()` y la clase `ContextoEmpresa`
-que existían en este archivo -- ya no queda ni el código ni el
-fallback a DEFAULT_EMPRESA_ID. Esto NO significa que DEFAULT_EMPRESA_ID
-se elimine del proyecto (sigue siendo el identificador real de la
-única empresa que existe hoy en la tabla `empresas`) -- lo que
-desaparece es la posibilidad de que una petición SIN JWT sea aceptada
-igual. A partir de aquí, toda la aplicación funciona exclusivamente
-bajo autenticación real -- ver DECISION_LOG.md.
+Item 6.2.6: se extrae _validar_jwt() como función reutilizable -- la
+necesita también el flujo de aceptar invitación (services/invitacion_service.py),
+que valida un JWT real de Supabase pero NO puede usar
+obtener_usuario_actual() completo, porque esa persona todavía no tiene
+fila en `usuarios` en el momento exacto de aceptar su invitación (el
+vínculo se crea justo en ese paso).
 """
 import os
 import uuid
@@ -38,13 +25,12 @@ SUPABASE_ISSUER = f"{SUPABASE_URL}/auth/v1"
 _jwks_client = PyJWKClient(SUPABASE_JWKS_URL) if SUPABASE_URL else None
 
 
-def obtener_usuario_actual(authorization: str | None = Header(default=None)) -> Usuario:
+def _validar_jwt(authorization: str | None) -> dict:
     """
-    Dependencia DEFINITIVA y única a partir de 6.2.8 -- ver ROADMAP.md.
-    Sin fallback de ningún tipo: JWT válido -> usuario. Cualquier otro
-    caso (sin Authorization, token inválido, token expirado, usuario
-    sin perfil, usuario suspendido) -> 401 o 403, nunca una respuesta
-    con datos.
+    Valida la firma de un JWT de Supabase y devuelve su payload
+    decodificado. No consulta la tabla usuarios -- solo confirma que
+    el token es auténtico y no expiró. Usada por obtener_usuario_actual()
+    y por el flujo de aceptar invitación.
     """
     if _jwks_client is None:
         raise HTTPException(status_code=503, detail="Autenticación no configurada (falta SUPABASE_URL).")
@@ -65,6 +51,16 @@ def obtener_usuario_actual(authorization: str | None = Header(default=None)) -> 
         )
     except jwt.PyJWTError as e:
         raise HTTPException(status_code=401, detail=f"Token inválido o expirado: {e}")
+
+    return payload
+
+
+def obtener_usuario_actual(authorization: str | None = Header(default=None)) -> Usuario:
+    """
+    Dependencia DEFINITIVA -- ver ROADMAP.md item 6.2.4c. Sin fallback:
+    JWT válido -> usuario. Cualquier otro caso -> 401 o 403.
+    """
+    payload = _validar_jwt(authorization)
 
     sub = payload.get("sub")
     if not sub:

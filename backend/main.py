@@ -15,7 +15,7 @@ from models.activity_log import AuditAction
 from fastapi import Depends
 from services.identity_service import obtener_usuario_actual
 from models.usuario import Usuario
-from fastapi import FastAPI, UploadFile, File, Form, APIRouter, HTTPException, Query, Request
+from fastapi import FastAPI, UploadFile, File, Form, APIRouter, HTTPException, Query, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -29,7 +29,9 @@ from services import dashboard_service
 from services import metrics_service
 from services import alerta_service
 from alert_engine import engine as alert_engine
-from database import init_db, DEFAULT_EMPRESA_ID
+from sqlalchemy import select
+from database import init_db, DEFAULT_EMPRESA_ID, get_db_session
+from services.invitacion_service import crear_invitacion, vincular_invitacion
 from services.cep_xml_service import parsear_xml_cep, comparar_xml_contra_comprobante, construir_resultado_xml, XMLCepInvalido
 from services.cep_xml_auto_service import datos_suficientes_para_consulta, descargar_xml_cep_automatico
 from scoring_v3 import (
@@ -638,6 +640,18 @@ async def verify_cep(clave_rastreo: str, referencia: str, fecha: str, monto: flo
         metrics_service.registrar_error("cep", duracion_ms=(time.time() - t_inicio) * 1000)
         return {"found": False, "status": "ERROR", "confidence": 0,
                 "detalle": "Error al consultar CEP: " + str(e)}
+
+
+@app.post("/auth/aceptar-invitacion")
+def aceptar_invitacion(authorization: str | None = Header(default=None)):
+    """
+    Item 6.2.6: se llama justo después de que la persona invitada
+    define su contraseña por primera vez (frontend, /aceptar-invitacion).
+    No usa Depends(obtener_usuario_actual) a propósito -- esa persona
+    todavía no tiene fila en usuarios con su supabase_auth_id, que es
+    justo lo que este endpoint crea.
+    """
+    return vincular_invitacion(authorization)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1505,6 +1519,44 @@ def dashboard_resumen_ejecutivo(usuario: Usuario = Depends(obtener_usuario_actua
 @dashboard_router.get("/centro-operativo")
 def dashboard_centro_operativo(usuario: Usuario = Depends(obtener_usuario_actual)):
     return dashboard_service.obtener_centro_operativo(empresa_id=str(usuario.empresa_id))
+
+
+@dashboard_router.get("/usuarios")
+def dashboard_listar_usuarios(usuario: Usuario = Depends(require_permission(Permission.USERS))):
+    """
+    Item 6.2.6: lista los usuarios de la MISMA empresa que el que
+    hace la petición -- nunca de otra, sin importar lo que pida el
+    llamante (empresa_id sale de usuario.empresa_id, no de un
+    parámetro).
+    """
+    with get_db_session() as db:
+        filas = db.execute(
+            select(Usuario)
+            .where(Usuario.empresa_id == usuario.empresa_id, Usuario.deleted_at.is_(None))
+            .order_by(Usuario.created_at)
+        ).scalars().all()
+        return [
+            {"email": u.email, "nombre": u.nombre, "rol": u.rol, "status": u.status}
+            for u in filas
+        ]
+
+
+@dashboard_router.post("/usuarios/invitar")
+def dashboard_invitar_usuario(
+    email: str = Query(...),
+    rol: str = Query(...),
+    usuario: Usuario = Depends(require_permission(Permission.USERS)),
+):
+    """Item 6.2.6: crea la invitación y dispara el correo vía Supabase."""
+    resultado = crear_invitacion(empresa_id=str(usuario.empresa_id), email=email, rol=rol)
+    registrar_actividad(
+        empresa_id=str(usuario.empresa_id),
+        usuario_id=str(usuario.id),
+        accion=AuditAction.USER_INVITED,
+        metadata={"email_invitado": email, "rol": rol},
+    )
+    return resultado
+
 
 app.include_router(dashboard_router)
 
