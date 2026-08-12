@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.34.3 · **Última actualización:** 11/08/2026
+**Versión del documento:** 0.35.0 · **Última actualización:** 11/08/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -352,7 +352,7 @@ Deliberadamente nombrada "Identity Layer" y no "login" — sirve a futuro para P
 
 | Paso | Qué | Estado |
 |---|---|---|
-| 6.2.1 | Configurar Resend como SMTP en Supabase | 🟢 Desbloqueado (2026-07) — César ya compró el dominio y correo corporativo. Retomado |
+| 6.2.1 ✅ | Configurar Resend como SMTP en Supabase — **completo y verificado (2026-07)** con dominio propio (`verificapago.mx`, GoDaddy), subdominio dedicado `notificaciones.verificapago.mx` (separado del correo corporativo para no chocar registros DNS), remitente `app@notificaciones.verificapago.mx`. Prueba real: correo de recuperación de contraseña disparado desde Supabase, recibido correctamente |
 | 6.2.2 | Migración: agregar `supabase_auth_id` a `usuarios` (separado del `id` interno — nunca el identificador de un sistema externo como PK de negocio) | ✅ Desplegado y verificado — columna confirmada en Supabase Table Editor |
 | 6.2.3 | Definir constantes de `estado` válido para `Empresa`/`Usuario` — **las columnas `status` ya existen en ambos modelos**, no se crean de nuevo | ✅ Desplegado — `ESTADOS_USUARIO_VALIDOS` agregado a `models/usuario.py` (`active`, `invited`, `suspended`, `deleted`) |
 | 6.2.4a | Confirmado: llave activa de Supabase = ES256 (ECC P-256), ver `DECISION_LOG.md`. Instalar `PyJWT` + `cryptography` | ✅ Código listo, pendiente de aplicar y desplegar |
@@ -450,7 +450,7 @@ Sin código — es un ejercicio de producto/finanzas, independiente de todo lo a
 | Render | ✅ | ✅ |
 | Supabase | ✅ (Free → Pro al salir a público, ver `DECISION_LOG.md`) | ✅ |
 | Dominio | ✅ comprado (2026-07) | ✅ |
-| Resend | 🟢 desbloqueado, pendiente de configurar (ver 6.2.1) | ✅ |
+| Resend | ✅ configurado y verificado (2026-07) | ✅ |
 | Redis / cola de trabajos | ❌ | ✅ (cuando exista volumen, ver 6.5) |
 | Pasarela de pago (Stripe/MercadoPago/OpenPay) | ❌ — no existe nada construido | ✅ |
 | Pentest profesional | ❌ | ✅ — recomendado antes de manejar dinero real de clientes |

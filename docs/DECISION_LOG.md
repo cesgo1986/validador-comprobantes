@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.32.0 · **Última actualización:** 14/07/2026
+**Versión del documento:** 0.35.0 · **Última actualización:** 11/08/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -284,6 +284,23 @@ Nunca `Dashboard → SELECT ... → Base de datos` directo.
 **Corrección:** se agregó `color: "#1E293B"` explícito a cada campo afectado. Se revisó `alertas/page.tsx` y la pantalla de inicio (`app/page.tsx`) — ninguno de los dos tiene el mismo problema (Alertas no usa `<input>` de texto, solo botones con color propio ya definido; la pantalla de inicio ya tenía `color: "#fff"` explícito, intencional por su fondo oscuro).
 
 **Consecuencia:** vale la pena revisar cualquier `<input>` nuevo que se agregue al proyecto para confirmar que defina `color` explícito, no solo `background` — este bug puede repetirse si se sigue el mismo patrón sin pensarlo.
+
+---
+
+## 2026-07 — 🏛️ Configuración final de dominios: `app.verificapago.mx` (frontend), `notificaciones.verificapago.mx` (Resend)
+
+**Decisión:** con dominio propio (`verificapago.mx`, GoDaddy) y correo corporativo (GoDaddy Correo Profesional) ya comprados, se usan **2 subdominios separados**, dejando el dominio raíz libre para una futura página de presentación:
+
+- **`app.verificapago.mx`** → Vercel, apunta al frontend real (reemplaza gradualmente a `validador-comprobantes.vercel.app`, que se mantiene activo en paralelo hasta confirmar que todo funciona con el dominio nuevo).
+- **`notificaciones.verificapago.mx`** → Resend, dedicado exclusivamente al envío de correos automáticos de la app (confirmación, recuperación de contraseña, invitaciones). Remitente: `app@notificaciones.verificapago.mx`.
+
+**Por qué un subdominio separado para Resend, no el dominio raíz:** el dominio raíz (`verificapago.mx`) ya tiene registros MX/SPF del correo corporativo de GoDaddy — agregar los registros de Resend ahí encima habría arriesgado un conflicto (un dominio solo puede tener un registro SPF válido; dos rompen la entrega de ambos). Un subdominio dedicado aísla completamente los registros técnicos de Resend de los del correo corporativo, sin ningún riesgo de choque.
+
+**Incidente durante la configuración, ya resuelto:** el primer intento de agregar el subdominio en Resend tuvo un error de dedo (`notificaciones.verficapago.mx`, faltaba una "i") — el dominio nunca existió, por lo que la verificación DNS fallaba con "Domain not found" sin importar qué se agregara en GoDaddy. Se corrigió eliminando el dominio mal escrito y creando uno nuevo con el nombre correcto.
+
+**Verificado con una prueba real, no solo con la configuración:** correo de recuperación de contraseña disparado desde Supabase, recibido correctamente en la bandeja de `cesgo86@gmail.com`.
+
+**Pendiente, no bloqueante:** actualizar `ALLOWED_ORIGINS` en Render para incluir `app.verificapago.mx` (ya hecho, sin quitar el de Vercel todavía); retirar el dominio de Vercel de la lista y del propio proyecto solo cuando `app.verificapago.mx` lleve un tiempo funcionando sin problemas, no de inmediato.
 
 ---
 

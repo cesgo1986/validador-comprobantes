@@ -1,6 +1,6 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.34.3 · **Última actualización:** 11/08/2026
+**Versión del documento:** 0.35.0 · **Última actualización:** 11/08/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
 
@@ -25,6 +25,21 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ### Documentado
 - `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+---
+
+## [0.35.0] — 2026-07 — ✅ 6.2.1 completo: dominio propio, Resend configurado y verificado
+
+### Configurado y verificado en producción
+- Dominio `verificapago.mx` (GoDaddy) con 2 subdominios: `app.verificapago.mx` (Vercel, frontend) y `notificaciones.verificapago.mx` (Resend, correos automáticos). `ALLOWED_ORIGINS` actualizada en Render para incluir el dominio nuevo, sin quitar el de Vercel todavía.
+- SMTP de Supabase configurado con Resend (`smtp.resend.com:465`, remitente `app@notificaciones.verificapago.mx`). Prueba real: correo de recuperación de contraseña recibido correctamente.
+
+### Incidente durante la configuración, resuelto
+- Error de dedo en el nombre del subdominio de Resend (`verficapago` en vez de `verificapago`) causó una falla de verificación DNS completa — el dominio simplemente no existía. Corregido eliminando y recreando con el nombre correcto.
+
+### Documentado
+- `DECISION_LOG.md`: configuración final de dominios registrada, con la razón técnica de usar subdominios separados (evitar conflicto de registros SPF con el correo corporativo).
+- `ROADMAP.md`: 6.2.1 pasa a ✅ completo.
 
 ---
 
