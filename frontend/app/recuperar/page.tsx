@@ -55,7 +55,7 @@ export default function Recuperar() {
         ) : (
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>
-              Escribe tu correo y te mandamos un enlace para restablecer tu contraseña.
+              Escribe tu correo y te enviaremos un enlace para restablecer tu contraseña.
             </p>
             <div>
               <label style={{ fontSize: 12, color: "#64748B" }}>Correo</label>
