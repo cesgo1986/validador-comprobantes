@@ -1,6 +1,6 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.35.0 · **Última actualización:** 11/08/2026
+**Versión del documento:** 0.35.2 · **Última actualización:** 11/08/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
 
@@ -25,6 +25,32 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ### Documentado
 - `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+---
+
+## [0.35.2] — 2026-07 — ✅ Recuperación de contraseña completa, verificada de punta a punta
+
+### Desplegado y verificado en producción
+- Flujo completo confirmado: solicitud desde `/recuperar` → correo recibido (Resend) → nueva contraseña definida en `/restablecer` → acceso confirmado con la contraseña nueva.
+
+### Incidente durante el despliegue, resuelto
+- Las carpetas `app/recuperar/` y `app/restablecer/` quedaron creadas con el nombre del archivo compartido en vez del nombre real de la ruta (mismo patrón de error que ya había ocurrido con `login/`) — causaba 404. Corregido renombrando las carpetas.
+
+### Cerrado
+- `ROADMAP.md`: recuperación de contraseña pasa a ✅ completa.
+
+---
+
+## [0.35.1] — 2026-07 — Recuperación de contraseña — código listo, pendiente de deploy y de configurar Redirect URL en Supabase
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `app/recuperar/page.tsx` (nuevo): pide el correo, dispara `supabase.auth.resetPasswordForEmail(...)` con `redirectTo` hacia `/restablecer`.
+- `app/restablecer/page.tsx` (nuevo): pantalla a la que llega el usuario desde el enlace del correo — Supabase-js reconoce automáticamente el enlace de recuperación (`detectSessionInUrl`) y arma una sesión temporal; el formulario permite definir la contraseña nueva vía `supabase.auth.updateUser({ password })`.
+- `app/components/RequireAuth.tsx`: `/recuperar` y `/restablecer` agregadas a rutas públicas.
+- `app/login/page.tsx`: el mensaje "Recuperación de contraseña disponible próximamente" reemplazado por un enlace real a `/recuperar`.
+
+### Requiere antes de desplegar
+- En Supabase → Authentication → URL Configuration → **Redirect URLs**, agregar `https://app.verificapago.mx/restablecer` (y `http://localhost:3000/restablecer` si se prueba en local) — sin esto, Supabase rechaza la redirección y el enlace del correo no funciona aunque el código esté desplegado.
 
 ---
 
