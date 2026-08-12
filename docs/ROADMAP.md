@@ -1,6 +1,6 @@
 # ROADMAP.md — Plan de desarrollo de VerificaPago
 
-**Versión del documento:** 0.35.1 · **Última actualización:** 11/08/2026
+**Versión del documento:** 0.35.2 · **Última actualización:** 11/08/2026
 
 ## Estado actual (post Sprint 0)
 
@@ -388,7 +388,7 @@ Registro / Invitaciones      ← después, y solo por invitación (B2B), no regi
 
 **Motivo del reordenamiento:** con el fallback retirado, hoy existe un solo usuario real. Si ese usuario olvida su contraseña, no hay forma de recuperar acceso — ese riesgo debe cerrarse antes que cualquier otra prioridad, no después. Registro público abierto sigue sin planearse — VerificaPago es B2B, el flujo esperado es que una empresa cree la cuenta y luego invite a sus usuarios, no al revés (ver `PRODUCT_VISION.md`).
 
-**Recuperación de contraseña — código listo (2026-07), pendiente de aplicar y de configurar Redirect URL en Supabase:** `app/recuperar/page.tsx` (nuevo, pide el correo), `app/restablecer/page.tsx` (nuevo, donde llega el enlace del correo y se define la contraseña nueva), `RequireAuth.tsx` y `login/page.tsx` actualizados. Requiere agregar `https://app.verificapago.mx/restablecer` a Redirect URLs en Supabase antes de desplegar, o el enlace del correo no funcionará.
+**Recuperación de contraseña — ✅ completa y verificada de punta a punta (2026-07):** `app/recuperar/page.tsx`, `app/restablecer/page.tsx`, `RequireAuth.tsx` y `login/page.tsx` desplegados. Confirmado con una prueba real completa: solicitud → correo recibido → nueva contraseña definida → acceso confirmado con la contraseña nueva. Incidente durante el despliegue, resuelto: las carpetas `recuperar/` y `restablecer/` quedaron creadas con el nombre del archivo compartido (`recuperar_page.tsx`) en vez del nombre real de ruta — mismo patrón de error que ya había ocurrido con `login/` — corregido renombrando las carpetas.
 
 ### 6.3 — Access Control Layer (en curso, 2026-07)
 
