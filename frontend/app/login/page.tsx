@@ -55,9 +55,10 @@ export default function Login() {
           {cargando ? "Entrando..." : "Entrar"}
         </button>
 
-        <p style={{ fontSize: 11, color: "#94A3B8", textAlign: "center", margin: 0 }}>
-          Recuperación de contraseña disponible próximamente.
-        </p>
+        <button type="button" onClick={() => router.push("/recuperar")}
+          style={{ padding: 6, borderRadius: 8, background: "none", border: "none", color: "#64748B", fontSize: 12, textAlign: "center", cursor: "pointer" }}>
+          ¿Olvidaste tu contraseña?
+        </button>
       </form>
     </div>
   );
