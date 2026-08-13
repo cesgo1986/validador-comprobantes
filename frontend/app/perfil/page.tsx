@@ -91,6 +91,12 @@ export default function Perfil() {
                 Sesión iniciada
               </p>
               <button
+                onClick={() => router.push("/usuarios")}
+                style={{ padding: "10px 20px", borderRadius: 10, background: "#00BFA5", border: "none", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 8 }}
+              >
+                Gestionar usuarios
+              </button>
+              <button
                 onClick={async () => { await logout(); router.push("/login"); }}
                 style={{ padding: "10px 20px", borderRadius: 10, background: "#F1F5F9", border: "none", color: "#334155", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
               >
