@@ -1,6 +1,6 @@
 # CHANGELOG.md — Historial de versiones
 
-**Versión del documento:** 0.35.2 · **Última actualización:** 11/08/2026
+**Versión del documento:** 0.37.0 · **Última actualización:** 13/08/2026
 
 Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic Versioning: MAJOR.MINOR.PATCH.
 
@@ -25,6 +25,53 @@ Formato: `[versión] — fecha — descripción`. Las versiones siguen Semantic 
 
 ### Documentado
 - `ROADMAP.md`, `ARQUITECTURA.md`: actualizados.
+
+---
+
+## [0.37.0] — 2026-08 — ✅ 6.2.6 completo: invitaciones verificadas de punta a punta
+
+### Desplegado y verificado en producción
+- Flujo completo confirmado con una invitación real: `/usuarios` → correo recibido → `/aceptar-invitacion` → contraseña definida → cuenta activa.
+
+### Corregido (4 bugs reales encontrados durante la primera prueba)
+1. `SUPABASE_SECRET_KEY` necesitaba la `service_role` legacy (JWT), no la `sb_secret_` nueva — ese endpoint administrativo específico de Supabase exige un JWT real en `Authorization: Bearer`.
+2. `services/invitacion_service.py`: fila huérfana en `usuarios` cuando el envío del correo fallaba — corregido, se elimina la fila si el envío falla.
+3. "Site URL" de Supabase actualizado de `http://localhost:3000` (valor de ejemplo por defecto) a `https://app.verificapago.mx`.
+4. `https://app.verificapago.mx/aceptar-invitacion` agregada a "Redirect URLs" de Supabase — sin esto, el enlace real del correo apuntaba a `localhost`, no solo un problema de texto.
+
+### Cerrado
+- `ROADMAP.md`: 6.2.6 pasa a ✅ completo. **Con esto, Etapa 6.2 (Identity Layer) queda enteramente completa** — login, JWT obligatorio, recuperación de contraseña, e invitaciones, todo verificado en producción.
+
+---
+
+## [0.36.1] — 2026-07 — 6.2.6: frontend de invitaciones — código listo, pendiente de deploy
+
+### Desplegado y verificado (backend, confirmado por César)
+- Backend de invitaciones (0.36.0) desplegado en Render sin errores de arranque, con `SUPABASE_SECRET_KEY` y `FRONTEND_URL` configuradas.
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `app/usuarios/page.tsx` (nuevo): lista de usuarios de la empresa + formulario de invitar (correo + rol). Maneja el caso de rol sin permiso `USERS` mostrando un mensaje claro, no una lista vacía confusa. Estructura preparada para agregar después (cambiar rol, revocar acceso, reenviar invitación) sin refactor.
+- `app/aceptar-invitacion/page.tsx` (nuevo): donde llega la persona invitada desde el correo — mismo patrón que `/restablecer` para reconocer el enlace, con un paso extra al final: llama a `/auth/aceptar-invitacion` para vincular la cuenta real de Supabase con la fila `invited` que ya existía.
+- `app/components/RequireAuth.tsx`: `/aceptar-invitacion` agregada a rutas públicas (usa sesión temporal, igual que `/restablecer`). `/usuarios` deliberadamente NO se agrega — requiere sesión normal, el control de permiso `USERS` lo hace el backend.
+- `app/perfil/page.tsx`: enlace "Gestionar usuarios" agregado junto al botón de cerrar sesión.
+
+---
+
+## [0.36.0] — 2026-07 — Etapa 6.2.6: backend de invitaciones — código listo, pendiente de deploy y de frontend
+
+### Agregado (código pendiente de aplicar y desplegar)
+- `services/identity_service.py`: `_validar_jwt()` extraída como función reutilizable, separada de `obtener_usuario_actual()`.
+- `services/invitacion_service.py` (nuevo): `crear_invitacion()` (valida rol, valida que el correo no exista ya en cualquier empresa, crea la fila `invited`, llama a la API administrativa de Supabase), `vincular_invitacion()` (asigna `supabase_auth_id` y activa la cuenta cuando la persona invitada define su contraseña).
+- `main.py`: 3 endpoints nuevos — `GET /usuarios` (lista la empresa del llamante), `POST /usuarios/invitar` (ambos con permiso `USERS`), `POST /auth/aceptar-invitacion` (fuera de `dashboard_router`, validación propia sin `obtener_usuario_actual()`).
+
+### Requiere antes de desplegar
+- 2 variables de entorno nuevas en Render: `SUPABASE_SECRET_KEY` (Secret Key de Supabase — **nunca compartida en el chat**, se agrega directo en Render) y `FRONTEND_URL` (`https://app.verificapago.mx`, para el enlace de redirección del correo de invitación).
+
+### Documentado
+- `DECISION_LOG.md`: ADR completo — un usuario/una empresa, manejo estricto de la Secret Key, diseño del paso de vinculación separado.
+
+### Pendiente (mismo ítem 6.2.6)
+- Frontend: `/usuarios` (pantalla de lista + formulario de invitar) y `/aceptar-invitacion` (donde llega el enlace del correo, define contraseña, y dispara la vinculación) — siguiente paso, no en esta entrada.
 
 ---
 

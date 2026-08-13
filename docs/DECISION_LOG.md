@@ -1,6 +1,6 @@
 # DECISION_LOG.md — Registro de decisiones
 
-**Versión del documento:** 0.35.0 · **Última actualización:** 11/08/2026
+**Versión del documento:** 0.37.0 · **Última actualización:** 13/08/2026
 
 Registro de decisiones importantes tomadas durante el desarrollo de VerificaPago. No es un changelog de código — es el "por qué" detrás de las decisiones de arquitectura y producto. Cada entrada incluye la decisión, el motivo y las consecuencias para que puedan revisarse y cuestionarse en el futuro.
 
@@ -361,6 +361,29 @@ Este TODO vive literalmente en el código (`services/identity_service.py`), y la
 **Decisión 3 — `accion` es un Enum (`AuditAction`), no un string libre; `recurso_id` siempre UUID.** Evita errores de escritura silenciosos (un typo en un string libre nunca da error, solo datos inconsistentes). `metadata_json` (JSONB) se agrega desde la primera versión, no después — permite guardar contexto específico de cada acción (ej. `{"tipo": "csv", "registros": 842}` en una exportación) sin tener que agregar columnas nuevas cada vez que aparece un caso nuevo.
 
 **Consecuencia:** `models/activity_log.py`, `services/access_control_service.py`, `services/activity_log_service.py` (los 3 nuevos). Migración de Alembic pendiente de aplicar. `LOGIN`/`LOGOUT` quedan fuera del alcance de `activity_logs` — si en algún momento se necesitan ver desde el propio dashboard de VerificaPago (no el de Supabase), se resuelve con un webhook de Supabase Auth hacia el backend, pieza aparte no comprometida ahora.
+
+---
+
+## 2026-07 — 🏛️ ADR: Invitaciones de usuarios (6.2.6) — un usuario = una empresa, Secret Key nunca en el chat
+
+**Decisión 1 — un usuario, una sola empresa.** Un correo no puede pertenecer a más de una empresa en VerificaPago. Antes de crear cualquier invitación, se verifica que el correo no exista ya en `usuarios` (sin importar la empresa) — si existe, se rechaza con 409. Motivo: mucho más simple y seguro para esta etapa del producto; "un usuario en múltiples empresas" se reconsidera solo si aparece una necesidad real, no antes.
+
+**Decisión 2 — la Secret Key de Supabase (`sb_secret_...`) nunca se comparte en esta conversación, ni siquiera temporalmente.** Es el reemplazo del antiguo "service_role key" — bypasea RLS por completo y da acceso administrativo total sobre la autenticación. César la agrega directamente como variable de entorno en Render, sin pegarla en el chat, sin subirla a GitHub, sin que aparezca en ningún código fuente ni captura de pantalla. Es una regla más estricta que la ya aplicada a otras claves (Claude, Resend) — el nivel de daño posible si se filtra es mayor.
+
+**Decisión 3 — el vínculo `supabase_auth_id ↔ usuarios` se crea en un paso separado, no automáticamente.** Cuando se crea una invitación, la fila en `usuarios` nace con `status="invited"` y `supabase_auth_id=NULL` — todavía no existe ningún usuario real de Supabase Auth que vincular. Cuando la persona invitada define su contraseña por primera vez, un endpoint nuevo (`POST /auth/aceptar-invitacion`) hace la vinculación — busca la fila `invited` que coincide por correo, y ahí sí asigna el `supabase_auth_id` real y cambia el estado a `active`. Este endpoint **no puede usar `obtener_usuario_actual()`** (la dependencia normal), porque esa exige que ya exista una fila vinculada — es justo la condición que este paso resuelve. Se extrajo `_validar_jwt()` de `identity_service.py` como función reutilizable para este caso, separada de la lógica de "buscar en `usuarios`".
+
+**Flujo completo:** Frontend (owner/admin autenticado) → `POST /usuarios/invitar` → backend crea fila `invited` + llama a la API administrativa de Supabase (`/auth/v1/invite`, con la Secret Key) → Supabase manda el correo (vía Resend, ya configurado) → persona invitada abre el enlace, llega a `/aceptar-invitacion` → define contraseña → frontend llama a `POST /auth/aceptar-invitacion` → backend vincula `supabase_auth_id` y activa la cuenta.
+
+**Consecuencia:** `services/invitacion_service.py` (nuevo), `services/identity_service.py` refactorizado (`_validar_jwt()` extraída), 3 endpoints nuevos en `main.py`. Frontend: `app/usuarios/page.tsx`, `app/aceptar-invitacion/page.tsx`. **Verificado con una invitación real de punta a punta (2026-08):** invitación enviada → correo recibido → contraseña definida → cuenta vinculada y activa en `/usuarios`.
+
+**4 bugs reales encontrados y corregidos durante la primera prueba real — vale la pena que queden registrados, porque cada uno tenía una causa distinta y no obvia:**
+
+1. **La `sb_secret_...` (formato nuevo) no sirve para `/auth/v1/invite`.** Confirmado en la documentación oficial de Supabase: las llaves nuevas no son JWT, y ese endpoint administrativo específico exige un JWT real en `Authorization: Bearer`. Corregido usando la `service_role` legacy (pestaña "Legacy anon, service_role API keys" en el panel de Supabase) como valor de `SUPABASE_SECRET_KEY`, no la Secret Key nueva.
+2. **Fila huérfana en `usuarios` cuando el envío del correo fallaba.** El código original creaba la fila `invited` *antes* de intentar el envío — si el envío fallaba, la fila quedaba guardada de todas formas, bloqueando cualquier reintento con ese correo (el sistema lo veía como "ya registrado"). Corregido: si el envío falla, la fila recién creada se elimina antes de propagar el error.
+3. **"Site URL" de Supabase seguía en `http://localhost:3000`** (el valor de ejemplo por defecto desde que se crea cualquier proyecto) — afectaba el texto de la plantilla del correo. Corregido a `https://app.verificapago.mx`.
+4. **`https://app.verificapago.mx/aceptar-invitacion` nunca se había agregado a "Redirect URLs"** en Supabase — sin eso, Supabase ignora silenciosamente el `redirect_to` que mandamos en cada invitación y usa el "Site URL" por defecto, produciendo un enlace real que apuntaba a `localhost` (no solo un problema visual, el enlace de verdad no funcionaba fuera de la máquina de César). Corregido agregando la URL a la lista.
+
+Efecto colateral del bug 1: el primer intento fallido sí alcanzó a crear el usuario en **Supabase Auth** (no solo en nuestra tabla `usuarios`) antes de fallar — al reintentar, Supabase rechazó la invitación repetida con `email_exists`. Hubo que borrar también ese usuario desde Supabase → Authentication → Users, no solo la fila de nuestra base de datos.
 
 ---
 
